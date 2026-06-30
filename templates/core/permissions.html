@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app">
+    <aside class="tickets-sidebar">
+        <div>
+            <div class="system-mark">TI</div>
+            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+            <p class="sidebar-copy">Administracao inicial de acessos para a operacao do portal de chamados.</p>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
+            <a href="{% url 'permissions' %}" class="menu-link active">Permissoes</a>
+            <a href="#" class="menu-link disabled-link">Chamados do Usuario</a>
+            <a href="#" class="menu-link disabled-link">Relatorios</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user-card">
+                <span class="sidebar-user-label">Administrador logado</span>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <span>{{ request.user.username }}</span>
+            </div>
+            <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
+        </div>
+    </aside>
+
+    <section class="tickets-main">
+        <header class="tickets-topbar">
+            <div>
+                <span class="topbar-kicker">Administracao</span>
+                <h2 class="topbar-title">Permissoes iniciais do sistema</h2>
+                <p class="topbar-subtitle">
+                    Gerencie quem faz parte do grupo <strong>Atendente TI</strong>.
+                    TODO: evoluir para uma politica mais completa de perfis e permissoes quando o dominio do sistema estiver consolidado.
+                </p>
+            </div>
+        </header>
+
+        <section class="permissions-panel">
+            <div class="permissions-table-wrapper">
+                <table class="permissions-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Nome</th>
+                            <th>E-mail</th>
+                            <th>Atendente TI</th>
+                            <th>Administrador</th>
+                            <th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr>
+                                <td>
+                                    <div class="permissions-user">
+                                        <span class="permissions-avatar">{{ user.username|slice:":2"|upper }}</span>
+                                        <span class="permissions-username">{{ user.username }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ user.name }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.is_attendant %}
+                                        <span class="status-badge status-badge-success">Ativo</span>
+                                    {% else %}
+                                        <span class="status-badge status-badge-muted">Nao</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_admin %}
+                                        <span class="status-badge status-badge-admin">Administrador</span>
+                                    {% else %}
+                                        <span class="status-badge status-badge-muted">Nao</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{% url 'toggle_attendant_permission' user.id %}">
+                                        {% csrf_token %}
+                                        {% if user.is_attendant %}
+                                            <button type="submit" class="btn permission-action-btn permission-action-btn-remove">
+                                                Remover Atendente TI
+                                            </button>
+                                        {% else %}
+                                            <button type="submit" class="btn permission-action-btn permission-action-btn-add">
+                                                Tornar Atendente TI
+                                            </button>
+                                        {% endif %}
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="permissions-empty">
+                                    Nenhum usuario autenticado foi encontrado.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="permissions-note">
+                <span class="status-badge status-badge-admin">Regra fixa</span>
+                <p class="mb-0">
+                    O usuario <strong>fabiano.polone</strong> permanece como Administrador do sistema e nao deve perder esse perfil.
+                </p>
+            </div>
+        </section>
+    </section>
+</main>
+{% endblock %}

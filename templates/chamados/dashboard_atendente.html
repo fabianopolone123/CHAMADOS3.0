@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app"
+    data-start-attendance-url="{% url 'start_attendance' %}"
+    data-finish-attendance-url="{% url 'finish_attendance' %}"
+>
+    <aside class="tickets-sidebar">
+        <div>
+            <div class="system-mark">TI</div>
+            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+            <p class="sidebar-copy">Painel inicial de atendimento para triagem, movimentacao e controle do tempo dedicado em cada chamado.</p>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link active">Quadro de Atendimento</a>
+            {% if is_admin %}
+                <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
+            {% endif %}
+            <a href="#" class="menu-link disabled-link">Chamados do Usuario</a>
+            <a href="#" class="menu-link disabled-link">Relatorios</a>
+            <a href="#" class="menu-link disabled-link">Configuracoes</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user-card">
+                <span class="sidebar-user-label">Usuario logado</span>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <span>{{ request.user.username }}</span>
+            </div>
+            <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
+        </div>
+    </aside>
+
+    <section class="tickets-main">
+        <section class="kanban-wrapper">
+            <div class="kanban-columns">
+                <article class="kanban-column">
+                    <div class="column-header">
+                        <div>
+                            <span class="column-kicker">Fila inicial</span>
+                            <h3 class="column-title">Nao atribuidos</h3>
+                        </div>
+                        <span class="column-count">{{ unassigned_tickets|length }}</span>
+                    </div>
+                    <div class="ticket-list js-ticket-list" data-column="unassigned">
+                        {% for ticket in unassigned_tickets %}
+                            <article
+                                class="ticket-card ticket-card--clickable{% if ticket.attendance.is_active %} ticket-card--active{% endif %}"
+                                tabindex="0"
+                                data-ticket-number="{{ ticket.number }}"
+                                data-ticket-title="{{ ticket.title }}"
+                                data-ticket-active="{{ ticket.attendance.is_active|yesno:'true,false' }}"
+                                data-ticket-started-at="{{ ticket.attendance.started_at_iso }}"
+                                aria-label="Abrir detalhes do chamado {{ ticket.number }}"
+                            >
+                                <div class="ticket-card-top">
+                                    <span class="ticket-number">{{ ticket.number }}</span>
+                                    <span class="priority-badge {{ ticket.priority_class }}">{{ ticket.priority }}</span>
+                                </div>
+                                <h4 class="ticket-title">{{ ticket.title }}</h4>
+                                <dl class="ticket-meta">
+                                    <div>
+                                        <dt>Solicitante</dt>
+                                        <dd>{{ ticket.requester }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Categoria</dt>
+                                        <dd>{{ ticket.category }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Tempo aberto</dt>
+                                        <dd>{{ ticket.opened_time }}</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="ticket-attendance-panel">
+                                    <div class="ticket-attendance-state">
+                                        <span class="ticket-attendance-indicator{% if ticket.attendance.is_active %} ticket-attendance-indicator--active{% endif %}" data-ticket-state>
+                                            {% if ticket.attendance.is_active %}Em atendimento{% else %}Pronto para iniciar{% endif %}
+                                        </span>
+                                        <span class="ticket-attendance-timer{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-timer>
+                                            {{ ticket.attendance.elapsed_display|default:"0m" }}
+                                        </span>
+                                    </div>
+
+                                    <div class="ticket-action-buttons">
+                                        <button type="button" class="ticket-action-btn ticket-action-btn--play{% if ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="play" aria-label="Iniciar atendimento">
+                                            <span>Play</span>
+                                        </button>
+                                        <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
+                                            <span>Pause</span>
+                                        </button>
+                                        <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
+                                            <span>Stop</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                {% for attendant in attendants %}
+                    <article class="kanban-column">
+                        <div class="column-header">
+                            <div class="column-owner">
+                                <span class="owner-avatar">{{ attendant.avatar }}</span>
+                                <div>
+                                    <span class="column-kicker">{{ attendant.role }}</span>
+                                    <h3 class="column-title">{{ attendant.name }}</h3>
+                                </div>
+                            </div>
+                            <span class="column-count">{{ attendant.tickets|length }}</span>
+                        </div>
+                        <div class="ticket-list js-ticket-list" data-column="{{ attendant.id }}">
+                            {% for ticket in attendant.tickets %}
+                                <article
+                                    class="ticket-card ticket-card--clickable{% if ticket.attendance.is_active %} ticket-card--active{% endif %}"
+                                    tabindex="0"
+                                    data-ticket-number="{{ ticket.number }}"
+                                    data-ticket-title="{{ ticket.title }}"
+                                    data-ticket-active="{{ ticket.attendance.is_active|yesno:'true,false' }}"
+                                    data-ticket-started-at="{{ ticket.attendance.started_at_iso }}"
+                                    aria-label="Abrir detalhes do chamado {{ ticket.number }}"
+                                >
+                                    <div class="ticket-card-top">
+                                        <span class="ticket-number">{{ ticket.number }}</span>
+                                        <span class="priority-badge {{ ticket.priority_class }}">{{ ticket.priority }}</span>
+                                    </div>
+                                    <h4 class="ticket-title">{{ ticket.title }}</h4>
+                                    <dl class="ticket-meta">
+                                        <div>
+                                            <dt>Solicitante</dt>
+                                            <dd>{{ ticket.requester }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Categoria</dt>
+                                            <dd>{{ ticket.category }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt>Tempo aberto</dt>
+                                            <dd>{{ ticket.opened_time }}</dd>
+                                        </div>
+                                    </dl>
+
+                                    <div class="ticket-attendance-panel">
+                                        <div class="ticket-attendance-state">
+                                            <span class="ticket-attendance-indicator{% if ticket.attendance.is_active %} ticket-attendance-indicator--active{% endif %}" data-ticket-state>
+                                                {% if ticket.attendance.is_active %}Em atendimento{% else %}Pronto para iniciar{% endif %}
+                                            </span>
+                                            <span class="ticket-attendance-timer{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-timer>
+                                                {{ ticket.attendance.elapsed_display|default:"0m" }}
+                                            </span>
+                                        </div>
+
+                                        <div class="ticket-action-buttons">
+                                            <button type="button" class="ticket-action-btn ticket-action-btn--play{% if ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="play" aria-label="Iniciar atendimento">
+                                                <span>Play</span>
+                                            </button>
+                                            <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
+                                                <span>Pause</span>
+                                            </button>
+                                            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
+                                                <span>Stop</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+    </section>
+</main>
+
+{% include "partials/chamado_modal.html" %}
+{% include "partials/atendimento_modal.html" %}
+
+{{ ticket_details_map|json_script:"ticket-details-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="{% static 'js/chamados.js' %}"></script>
+{% endblock %}

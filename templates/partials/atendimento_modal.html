@@ -1,0 +1,39 @@
+<div class="modal fade attendance-modal" id="attendanceActionModal" tabindex="-1" aria-labelledby="attendanceActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered attendance-modal__dialog">
+        <div class="modal-content attendance-modal__content">
+            <div class="modal-header attendance-modal__header">
+                <div>
+                    <span class="attendance-modal__eyebrow">Registro de atendimento</span>
+                    <h2 class="attendance-modal__title" id="attendanceActionModalLabel">Registrar atendimento</h2>
+                    <p class="attendance-modal__subtitle mb-0" id="attendanceModalTicketLabel">Chamado</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form class="attendance-modal__form" id="attendanceActionForm">
+                <div class="modal-body attendance-modal__body">
+                    <input type="hidden" id="attendanceModalTicketNumber" name="ticket_number">
+                    <input type="hidden" id="attendanceModalAction" name="action">
+
+                    <div class="attendance-modal__action-pill" id="attendanceModalActionLabel">Pause</div>
+
+                    <label class="attendance-modal__field">
+                        <span>O que foi feito neste atendimento?</span>
+                        <textarea
+                            id="attendanceModalDescription"
+                            name="description"
+                            rows="5"
+                            required
+                            placeholder="Descreva objetivamente o que foi analisado, ajustado ou encaminhado neste periodo de atendimento."
+                        ></textarea>
+                    </label>
+                </div>
+
+                <div class="modal-footer attendance-modal__footer">
+                    <button type="button" class="btn btn-light attendance-modal__secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn attendance-modal__primary" id="attendanceModalSubmit">Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

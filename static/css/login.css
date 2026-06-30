@@ -1,0 +1,309 @@
+:root {
+    --login-bg: #07111f;
+    --login-bg-soft: #0f1c33;
+    --login-accent: #4f8cff;
+    --login-accent-dark: #3168e8;
+    --login-text: #0f172a;
+    --dashboard-panel: rgba(9, 22, 39, 0.76);
+    --dashboard-border: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    font-family: "Manrope", sans-serif;
+    background:
+        radial-gradient(circle at top left, rgba(79, 140, 255, 0.24), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(32, 201, 151, 0.16), transparent 24%),
+        linear-gradient(135deg, #eef4ff 0%, #f7fafc 45%, #edf2f7 100%);
+    color: var(--login-text);
+}
+
+.login-page {
+    position: relative;
+    overflow: hidden;
+}
+
+.login-grid-pattern {
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.38) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.38) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.9), transparent 82%);
+    pointer-events: none;
+}
+
+.login-bg-shape {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(8px);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.login-bg-shape--one {
+    width: 260px;
+    height: 260px;
+    top: -80px;
+    right: -90px;
+    background: rgba(79, 140, 255, 0.28);
+}
+
+.login-bg-shape--two {
+    width: 180px;
+    height: 180px;
+    bottom: -50px;
+    left: -40px;
+    background: rgba(32, 201, 151, 0.18);
+}
+
+.login-card {
+    position: relative;
+    z-index: 1;
+    max-width: 980px;
+    width: 100%;
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+}
+
+.login-panel {
+    background: linear-gradient(160deg, var(--login-bg) 0%, var(--login-bg-soft) 100%);
+}
+
+.brand-badge {
+    width: 3rem;
+    height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.12);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.login-eyebrow,
+.login-form-kicker {
+    display: inline-block;
+    margin-bottom: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.login-eyebrow {
+    color: rgba(191, 219, 254, 0.92);
+}
+
+.login-form-kicker {
+    color: #4f46e5;
+}
+
+.login-panel-copy {
+    max-width: 30ch;
+    line-height: 1.7;
+}
+
+.login-feature-list {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 2rem;
+}
+
+.login-feature-item {
+    display: grid;
+    gap: 0.2rem;
+    padding: 1rem 1.05rem;
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.login-feature-item strong {
+    font-size: 0.98rem;
+}
+
+.login-feature-item span {
+    color: rgba(226, 232, 240, 0.78);
+    line-height: 1.55;
+}
+
+.login-form-panel {
+    position: relative;
+}
+
+.login-alert {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.login-form .form-control {
+    border-radius: 0.95rem;
+    border-color: #d8e1ef;
+    padding: 0.9rem 1rem;
+}
+
+.login-form .form-control:focus {
+    border-color: rgba(79, 140, 255, 0.7);
+    box-shadow: 0 0 0 0.25rem rgba(79, 140, 255, 0.14);
+}
+
+.invalid-feedback {
+    font-size: 0.92rem;
+}
+
+.login-button {
+    border-radius: 0.95rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--login-accent) 0%, var(--login-accent-dark) 100%);
+    border: 0;
+    box-shadow: 0 12px 30px rgba(49, 104, 232, 0.28);
+}
+
+.login-button:hover,
+.login-button:focus {
+    background: linear-gradient(135deg, #5b95ff 0%, #245be1 100%);
+}
+
+.login-footer-note {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5edf8;
+    color: #64748b;
+    font-size: 0.92rem;
+}
+
+.dashboard-page {
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top, rgba(58, 107, 255, 0.24), transparent 26%),
+        linear-gradient(135deg, #06101d 0%, #0b1f35 42%, #102947 100%);
+    color: #f8fafc;
+}
+
+.dashboard-bg-shape {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(18px);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.dashboard-bg-shape--one {
+    width: 280px;
+    height: 280px;
+    top: -80px;
+    right: -60px;
+    background: rgba(79, 140, 255, 0.3);
+}
+
+.dashboard-bg-shape--two {
+    width: 220px;
+    height: 220px;
+    bottom: -90px;
+    left: -70px;
+    background: rgba(18, 208, 170, 0.2);
+}
+
+.dashboard-shell {
+    position: relative;
+    z-index: 1;
+}
+
+.dashboard-kicker,
+.panel-label {
+    display: inline-block;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: rgba(191, 219, 254, 0.9);
+}
+
+.dashboard-title {
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.dashboard-subtitle,
+.panel-text {
+    max-width: 62ch;
+    color: rgba(226, 232, 240, 0.82);
+}
+
+.dashboard-logout {
+    border-radius: 999px;
+    padding-inline: 1.25rem;
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #f8fafc;
+}
+
+.dashboard-logout:hover,
+.dashboard-logout:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+
+.dashboard-panel {
+    height: 100%;
+    padding: 1.75rem;
+    border-radius: 1.5rem;
+    background: var(--dashboard-panel);
+    border: 1px solid var(--dashboard-border);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+.panel-title {
+    margin-top: 0.75rem;
+    margin-bottom: 0.9rem;
+    font-size: 1.65rem;
+    font-weight: 700;
+}
+
+.dashboard-meta dt {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(148, 163, 184, 0.95);
+    margin-bottom: 0.4rem;
+}
+
+.dashboard-meta dd {
+    margin-bottom: 1.15rem;
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+@media (max-width: 991.98px) {
+    .login-panel {
+        min-height: 220px;
+    }
+
+    .login-feature-list {
+        margin-top: 1.5rem;
+    }
+
+    .login-footer-note {
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .dashboard-panel {
+        padding: 1.4rem;
+    }
+}

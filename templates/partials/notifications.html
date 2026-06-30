@@ -1,0 +1,44 @@
+{% if messages %}
+    <div class="toast-stack" aria-live="polite" aria-atomic="true">
+        {% for message in messages %}
+            <div
+                class="app-toast app-toast--{{ message.tags|default:'info' }}"
+                data-toast
+                data-timeout="2800"
+                role="status"
+            >
+                <div class="app-toast__icon" aria-hidden="true">
+                    {% if "success" in message.tags %}
+                        <span>OK</span>
+                    {% elif "error" in message.tags %}
+                        <span>!</span>
+                    {% elif "warning" in message.tags %}
+                        <span>!</span>
+                    {% else %}
+                        <span>i</span>
+                    {% endif %}
+                </div>
+
+                <div class="app-toast__body">
+                    <div class="app-toast__title">
+                        {% if "success" in message.tags %}
+                            Sucesso
+                        {% elif "error" in message.tags %}
+                            Erro
+                        {% elif "warning" in message.tags %}
+                            Aviso
+                        {% else %}
+                            Informacao
+                        {% endif %}
+                    </div>
+                    <div class="app-toast__message">{{ message }}</div>
+                    <div class="app-toast__progress" aria-hidden="true"></div>
+                </div>
+
+                <button type="button" class="app-toast__close" data-toast-close aria-label="Fechar notificacao">
+                    x
+                </button>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}

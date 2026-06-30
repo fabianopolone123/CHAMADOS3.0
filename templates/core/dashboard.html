@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<main class="dashboard-page">
+    <div class="dashboard-bg-shape dashboard-bg-shape--one"></div>
+    <div class="dashboard-bg-shape dashboard-bg-shape--two"></div>
+
+    <div class="container py-5">
+        <div class="dashboard-shell">
+            <div class="dashboard-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+                <div>
+                    <span class="dashboard-kicker">Sistema de Chamados TI</span>
+                    <h1 class="dashboard-title mb-2">Bem-vindo, {{ request.user.get_full_name|default:request.user.username }}</h1>
+                    <p class="dashboard-subtitle mb-0">
+                        Sua autenticacao no Active Directory foi concluida com sucesso.
+                    </p>
+                </div>
+                <a href="{% url 'logout' %}" class="btn btn-outline-light dashboard-logout">Sair</a>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} border-0 rounded-4 mb-4" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <section class="dashboard-panel h-100">
+                        <span class="panel-label">Status do projeto</span>
+                        <h2 class="panel-title">Autenticacao LDAP integrada</h2>
+                        <p class="panel-text">
+                            A base do login corporativo esta pronta e o proximo passo natural e conectar as funcionalidades
+                            internas do portal de chamados a este fluxo autenticado.
+                        </p>
+                    </section>
+                </div>
+                <div class="col-lg-4">
+                    <section class="dashboard-panel h-100">
+                        <span class="panel-label">Sessao atual</span>
+                        <dl class="dashboard-meta mb-0">
+                            <div>
+                                <dt>Usuario</dt>
+                                <dd>{{ request.user.username }}</dd>
+                            </div>
+                            <div>
+                                <dt>E-mail</dt>
+                                <dd>{{ request.user.email|default:"Nao informado" }}</dd>
+                            </div>
+                            <div>
+                                <dt>Nome</dt>
+                                <dd>{{ request.user.get_full_name|default:"Nao informado" }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}
