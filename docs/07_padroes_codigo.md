@@ -42,3 +42,8 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 
 - Qualquer funcionalidade nova exige atualizacao da documentacao.
 - Mudancas de comportamento devem ser refletidas no `AGENTS.md` e nos documentos do `docs/` afetados.
+
+## Versionamento
+
+- Toda alteracao concluida deve gerar commit com mensagem descritiva.
+- Apos cada commit, o projeto deve ser enviado com push para o repositorio remoto.

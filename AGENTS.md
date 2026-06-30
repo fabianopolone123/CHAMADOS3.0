@@ -29,6 +29,7 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 7. Ao registrar mudancas relevantes, atualizar `docs/06_changelog.md`.
 8. Ao alterar convencoes, padroes ou organizacao do codigo, atualizar `docs/07_padroes_codigo.md`.
 9. Nunca expor credenciais, senhas, chaves ou conteudo do `.env` em codigo versionado ou documentacao.
+10. Toda alteracao concluida no projeto deve ser subida para o Git com commit descritivo e push para o repositorio remoto.
 
 ## Diretrizes de implementacao
 

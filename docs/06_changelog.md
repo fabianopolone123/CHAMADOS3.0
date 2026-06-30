@@ -21,6 +21,7 @@
 - Criados os modelos `Chamado` e `AtendimentoHistorico` para iniciar a persistencia do tempo de atendimento.
 - Implementados os endpoints JSON para iniciar, pausar e finalizar periodos de atendimento.
 - Adicionados Play, Pause, Stop e contador visual de atendimento nos cards do Kanban.
+- Definida regra de processo para sempre registrar alteracoes com commit descritivo e push ao remoto.
 
 ## Convencao de registro
 
