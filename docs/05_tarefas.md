@@ -24,6 +24,7 @@
 - Atualizada a documentacao apos a interface inicial de chamados
 - Criado modal global de detalhes do chamado no Kanban com dados mockados
 - Criado o backend inicial de controle de tempo por atendimento
+- Criada a tela inicial de Historico de Atendimentos com busca dinamica
 
 ## Proximas tarefas sugeridas
 

@@ -31,6 +31,8 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 4. Pausar ou finalizar atendimento exige descricao obrigatoria do que foi feito.
 5. Cada registro deve guardar inicio, fim, duracao, tipo de encerramento e descricao.
 6. O backend deve validar as regras criticas mesmo que o frontend tambem faca bloqueios visuais.
+7. Administrador pode consultar todos os historicos de atendimento.
+8. Atendente TI pode consultar apenas o proprio historico na tela dedicada.
 
 ## Regras atuais de permissao
 

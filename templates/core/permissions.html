@@ -18,6 +18,9 @@
 
         <nav class="sidebar-menu">
             <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
+            {% if can_view_history %}
+                <a href="{% url 'history' %}" class="menu-link">Historico</a>
+            {% endif %}
             <a href="{% url 'permissions' %}" class="menu-link active">Permissoes</a>
             <a href="#" class="menu-link disabled-link">Chamados do Usuario</a>
             <a href="#" class="menu-link disabled-link">Relatorios</a>

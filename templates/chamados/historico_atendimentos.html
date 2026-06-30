@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/historico.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app history-app" data-history-search-url="{% url 'history_search' %}">
+    <aside class="tickets-sidebar">
+        <div>
+            <div class="system-mark">TI</div>
+            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+            <p class="sidebar-copy">Consulta dos registros de atendimento realizados, com busca rapida e foco na rastreabilidade do trabalho executado.</p>
+        </div>
+
+        <nav class="sidebar-menu">
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
+            <a href="{% url 'history' %}" class="menu-link active">Historico</a>
+            {% if is_admin %}
+                <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
+            {% endif %}
+            <a href="#" class="menu-link disabled-link">Chamados do Usuario</a>
+            <a href="#" class="menu-link disabled-link">Relatorios</a>
+            <a href="#" class="menu-link disabled-link">Configuracoes</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user-card">
+                <span class="sidebar-user-label">Usuario logado</span>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <span>{{ request.user.username }}</span>
+            </div>
+            <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
+        </div>
+    </aside>
+
+    <section class="tickets-main">
+        <header class="tickets-topbar history-topbar">
+            <div>
+                <span class="topbar-kicker">Historico</span>
+                <h2 class="topbar-title">Historico de Atendimentos</h2>
+                <p class="topbar-subtitle">
+                    {% if is_admin %}
+                        Visualize todos os atendimentos registrados no sistema e pesquise por atendente, chamado, data ou descricao.
+                    {% else %}
+                        Visualize apenas os seus registros de atendimento e acompanhe o que ja foi executado em cada chamado.
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="history-summary">
+                <span class="history-summary__label">Registros carregados</span>
+                <strong id="historyCount">{{ history_total }}</strong>
+            </div>
+        </header>
+
+        <section class="history-panel">
+            <div class="history-searchbar">
+                <div class="history-searchbar__field">
+                    <input
+                        type="search"
+                        id="historySearchInput"
+                        class="form-control history-searchbar__input"
+                        placeholder="Pesquisar por atendente, chamado, data, descricao..."
+                        autocomplete="off"
+                    >
+                    <span class="history-searchbar__loading is-hidden" id="historySearchLoading">Buscando...</span>
+                </div>
+            </div>
+
+            <div class="history-table-wrapper">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Chamado</th>
+                            <th>Titulo</th>
+                            <th>Atendente</th>
+                            <th>Inicio</th>
+                            <th>Fim</th>
+                            <th>Duracao</th>
+                            <th>Tipo</th>
+                            <th>Descricao</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyResultsBody">
+                        {% for row in history_rows %}
+                            <tr>
+                                <td>
+                                    <span class="history-ticket">{{ row.ticket_number }}</span>
+                                </td>
+                                <td>{{ row.ticket_title }}</td>
+                                <td>
+                                    <div class="history-attendant">
+                                        <strong>{{ row.attendant_name }}</strong>
+                                        <span>{{ row.attendant_username }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ row.started_at }}</td>
+                                <td>{{ row.finished_at }}</td>
+                                <td>
+                                    <span class="history-badge history-badge--duration">{{ row.duration }}</span>
+                                </td>
+                                <td>
+                                    <span class="history-badge {% if row.type == 'pause' %}history-badge--pause{% elif row.type == 'stop' %}history-badge--stop{% else %}history-badge--active{% endif %}">
+                                        {{ row.type }}
+                                    </span>
+                                </td>
+                                <td class="history-description">{{ row.description }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8">
+                                    <div class="history-empty history-empty--inline">
+                                        Nenhum historico de atendimento foi encontrado ate o momento.
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="history-empty is-hidden" id="historyEmptyState">
+                <div class="history-empty__card">
+                    <strong>Nenhum resultado encontrado</strong>
+                    <p class="mb-0">Ajuste os termos pesquisados para localizar atendimentos por chamado, atendente, data ou descricao.</p>
+                </div>
+            </div>
+        </section>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/historico.js' %}"></script>
+{% endblock %}

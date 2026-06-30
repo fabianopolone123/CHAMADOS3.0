@@ -15,6 +15,7 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 - O sistema possui grupos iniciais `Administrador` e `Atendente TI`.
 - O usuario `fabiano.polone` deve permanecer como administrador principal.
 - O projeto ja possui os modelos `Chamado` e `AtendimentoHistorico` para sustentar o controle inicial de tempo por atendimento.
+- O projeto possui tela de Historico de Atendimentos em `/historico/` com busca dinamica por registros.
 - O arquivo `.env` na raiz concentra as configuracoes sensiveis de ambiente.
 - A base de documentacao do projeto fica em `docs/`.
 
@@ -46,6 +47,7 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 - O modal de detalhes deve continuar em formato temporario/mockateado ate a camada de persistencia e API estarem prontas.
 - O controle de tempo deve manter a regra de um unico atendimento ativo por atendente, validada no backend.
 - Encerramentos de atendimento por `pause` ou `stop` devem exigir descricao obrigatoria antes de salvar.
+- A tela de Historico deve respeitar o recorte de permissao: administrador ve tudo e atendente ve apenas os proprios registros.
 
 ## Convencoes gerais
 

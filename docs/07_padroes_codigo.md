@@ -37,6 +37,7 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 - Quando houver dados mockados para modais ou cards, preferir `json_script` ou outro carregamento seguro no template.
 - Acoes interativas do Kanban devem usar `fetch` com `JsonResponse`, CSRF e validacao espelhada no backend.
 - Regras criticas, como impedir mais de um atendimento ativo por atendente, devem ser garantidas no backend e apenas refletidas no frontend.
+- Buscas dinamicas devem usar debounce no frontend e manter o recorte de permissao no backend antes de retornar JSON.
 
 ## Documentacao
 

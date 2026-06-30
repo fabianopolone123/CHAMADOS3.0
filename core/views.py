@@ -9,8 +9,10 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -38,6 +40,18 @@ def admin_required(view_func):
     return _wrapped_view
 
 
+def history_access_required(view_func):
+    @login_required
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+            messages.error(request, "Voce nao possui permissao para acessar o historico de atendimentos.")
+            return redirect("tickets_dashboard")
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
 def _format_duration(duration: timedelta | None) -> str:
     if not duration:
         return "0m"
@@ -51,6 +65,53 @@ def _format_duration(duration: timedelta | None) -> str:
     if minutes:
         return f"{minutes}m {seconds:02d}s"
     return f"{seconds}s"
+
+
+def _parse_history_query_date(raw_value: str):
+    normalized = (raw_value or "").strip()
+    if not normalized:
+        return None
+
+    parsed = parse_date(normalized)
+    if parsed:
+        return parsed
+
+    if "/" in normalized:
+        parts = normalized.split("/")
+        if len(parts) == 3:
+            day, month, year = parts
+            parsed = parse_date(f"{year}-{month.zfill(2)}-{day.zfill(2)}")
+            if parsed:
+                return parsed
+
+    return None
+
+
+def _get_history_queryset_for_user(user):
+    queryset = AtendimentoHistorico.objects.select_related("chamado", "atendente").order_by("-iniciado_em")
+    if is_admin_user(user):
+        return queryset
+    return queryset.filter(atendente=user)
+
+
+def _serialize_history_item(item: AtendimentoHistorico):
+    started_at = timezone.localtime(item.iniciado_em)
+    finished_at = timezone.localtime(item.finalizado_em) if item.finalizado_em else None
+    duration = item.duracao if item.duracao is not None else (timezone.now() - item.iniciado_em if item.iniciado_em else None)
+    attendant_name = item.atendente.get_full_name() or item.atendente.username
+
+    return {
+        "id": item.id,
+        "ticket_number": item.chamado.numero,
+        "ticket_title": item.chamado.titulo,
+        "attendant_name": attendant_name,
+        "attendant_username": item.atendente.username,
+        "started_at": started_at.strftime("%d/%m/%Y %H:%M"),
+        "finished_at": finished_at.strftime("%d/%m/%Y %H:%M") if finished_at else "Em andamento",
+        "duration": _format_duration(duration),
+        "type": item.tipo_encerramento or "em andamento",
+        "description": item.descricao_atividade or "-",
+    }
 
 
 def _build_mock_ticket(
@@ -561,6 +622,7 @@ def tickets_dashboard_view(request):
         "active_attendance": active_attendance,
         "stats": stats,
         "is_admin": is_admin_user(request.user),
+        "can_view_history": is_admin_user(request.user) or is_attendant_user(request.user),
     }
     return render(request, "chamados/dashboard_atendente.html", context)
 
@@ -684,6 +746,54 @@ def finish_attendance_view(request):
     )
 
 
+@history_access_required
+def history_view(request):
+    history_items = list(_get_history_queryset_for_user(request.user)[:80])
+    rows = [_serialize_history_item(item) for item in history_items]
+
+    context = {
+        "page_title": "Historico de Atendimentos",
+        "history_rows": rows,
+        "history_total": len(rows),
+        "history_limit": 200,
+        "is_admin": is_admin_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/historico_atendimentos.html", context)
+
+
+@history_access_required
+def history_search_view(request):
+    query = (request.GET.get("q") or "").strip()
+    queryset = _get_history_queryset_for_user(request.user)
+
+    if query:
+        filters = (
+            Q(chamado__numero__icontains=query)
+            | Q(chamado__titulo__icontains=query)
+            | Q(atendente__username__icontains=query)
+            | Q(atendente__first_name__icontains=query)
+            | Q(atendente__last_name__icontains=query)
+            | Q(descricao_atividade__icontains=query)
+            | Q(tipo_encerramento__icontains=query)
+        )
+
+        query_date = _parse_history_query_date(query)
+        if query_date:
+            filters |= Q(iniciado_em__date=query_date) | Q(finalizado_em__date=query_date)
+
+        queryset = queryset.filter(filters)
+
+    items = list(queryset[:200])
+    return JsonResponse(
+        {
+            "ok": True,
+            "count": len(items),
+            "results": [_serialize_history_item(item) for item in items],
+        }
+    )
+
+
 @admin_required
 def permissions_view(request):
     ensure_permission_groups()
@@ -708,6 +818,7 @@ def permissions_view(request):
         "page_title": "Permissoes do Sistema",
         "users": rows,
         "is_admin": True,
+        "can_view_history": True,
     }
     return render(request, "core/permissions.html", context)
 
