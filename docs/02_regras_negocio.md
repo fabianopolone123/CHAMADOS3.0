@@ -21,8 +21,14 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 5. Cada card exibe numero, titulo, solicitante, data de abertura e status atual.
 6. Os cards sao arrastaveis entre as colunas e a movimentacao salva o novo status no banco.
 7. A alteracao de status usa endpoint `POST` protegido por login e permissao de TI, com CSRF; usuario comum nao altera status.
-8. Clicar em um card abre a tela de detalhe do chamado.
-9. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
+8. Ao mover um chamado, o usuario que moveu e registrado como `atendente_atual`; isso NAO o torna dono do chamado (o dono e sempre o solicitante).
+9. Ao encerrar (`resolvido`/`fechado`), o ultimo atendente que agiu e mantido.
+10. Toda acao relevante gera um registro em `ChamadoEvento` (criacao, mudanca de status e troca de atendente).
+11. Ao arrastar, o badge de status do card atualiza texto e cor imediatamente, sem refresh.
+12. Clicar em um card abre a tela de detalhe do chamado.
+13. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
+14. O detalhe do chamado exibe os anexos (nome, link de download, data e usuario que enviou) e o historico de eventos.
+15. Anexos so podem ser baixados pelo dono do chamado ou por TI/admin.
 
 ## Regras atuais de controle de tempo
 

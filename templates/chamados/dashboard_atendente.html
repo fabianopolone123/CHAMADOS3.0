@@ -93,7 +93,11 @@
                                         </div>
                                         <div>
                                             <dt>Status</dt>
-                                            <dd><span class="status-badge {{ ticket.status_class }}">{{ ticket.status_label }}</span></dd>
+                                            <dd><span class="status-badge {{ ticket.status_class }}" data-status-badge>{{ ticket.status_label }}</span></dd>
+                                        </div>
+                                        <div class="ticket-attendant-row{% if not ticket.current_attendant %} is-hidden{% endif %}" data-attendant-row>
+                                            <dt>Atendente</dt>
+                                            <dd data-current-attendant>{{ ticket.current_attendant }}</dd>
                                         </div>
                                     </dl>
 

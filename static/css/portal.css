@@ -231,6 +231,12 @@
     gap: 0.5rem;
 }
 
+.portal-attachment {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .portal-attachment a {
     display: inline-flex;
     align-items: center;
@@ -241,10 +247,17 @@
     color: #1d4ed8;
     font-weight: 600;
     text-decoration: none;
+    align-self: flex-start;
 }
 
 .portal-attachment a:hover {
     background: #f1f5f9;
+}
+
+.portal-attachment__meta {
+    font-size: 0.78rem;
+    color: #64748b;
+    padding-left: 0.15rem;
 }
 
 .portal-form__errors {

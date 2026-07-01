@@ -272,14 +272,46 @@
         }
     }
 
+    const STATUS_BADGE_CLASSES = [
+        "status-info",
+        "status-warning",
+        "status-muted",
+        "status-success",
+        "status-neutral",
+        "status-danger",
+    ];
+
+    function applyBadgeState(card, statusLabel, statusClass) {
+        const badge = card.querySelector("[data-status-badge]");
+        if (!badge) {
+            return;
+        }
+        if (statusLabel) {
+            badge.textContent = statusLabel;
+        }
+        if (statusClass) {
+            badge.classList.remove(...STATUS_BADGE_CLASSES);
+            badge.classList.add(statusClass);
+        }
+    }
+
+    function applyAttendantState(card, attendantName) {
+        const row = card.querySelector("[data-attendant-row]");
+        const value = card.querySelector("[data-current-attendant]");
+        if (value && attendantName) {
+            value.textContent = attendantName;
+        }
+        if (row && attendantName) {
+            row.classList.remove("is-hidden");
+        }
+    }
+
     async function persistStatusChange(ticketNumber, newStatus, event) {
         const card = event.item;
         try {
             const result = await sendJson(updateStatusUrl, { ticket_number: ticketNumber, status: newStatus });
-            const badge = card.querySelector(".status-badge");
-            if (badge && result.status_label) {
-                badge.textContent = result.status_label;
-            }
+            applyBadgeState(card, result.status_label, result.status_class);
+            applyAttendantState(card, result.atendente_atual);
             updateColumnCounts();
             showToast(result.message || "Status atualizado.", "success");
         } catch (error) {

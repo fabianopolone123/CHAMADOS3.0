@@ -38,10 +38,31 @@
                     <ul class="portal-attachments">
                         {% for anexo in anexos %}
                             <li class="portal-attachment">
-                                <a href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener">{{ anexo.nome_original|default:anexo.arquivo.name }}</a>
+                                <a href="{% url 'download_anexo' numero=chamado.numero anexo_id=anexo.id %}">{{ anexo.nome_original|default:anexo.arquivo.name }}</a>
+                                <span class="portal-attachment__meta">
+                                    Enviado em {{ anexo.enviado_em|date:"d/m/Y H:i" }}{% if anexo.enviado_por %} por {{ anexo.enviado_por.get_full_name|default:anexo.enviado_por.username }}{% endif %}
+                                </span>
                             </li>
                         {% endfor %}
                     </ul>
+                {% endif %}
+
+                <h3 class="portal-detail__section-title">Historico do chamado</h3>
+                {% if eventos %}
+                    <ul class="portal-timeline">
+                        {% for evento in eventos %}
+                            <li class="portal-timeline__item">
+                                <div class="portal-timeline__head">
+                                    <strong>{{ evento.author }}</strong>
+                                    <span>{{ evento.tipo_label }}</span>
+                                    <time>{{ evento.timestamp }}</time>
+                                </div>
+                                <p class="portal-timeline__message">{{ evento.descricao }}</p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="portal-detail__empty">Nenhum evento registrado para este chamado ainda.</p>
                 {% endif %}
 
                 <h3 class="portal-detail__section-title">Andamento do atendimento</h3>
@@ -59,7 +80,7 @@
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="portal-detail__empty">Este chamado ainda nao teve atendimento iniciado. Voce sera notificado quando a equipe de TI comecar a trabalhar nele.</p>
+                    <p class="portal-detail__empty">Este chamado ainda nao teve atendimento iniciado.</p>
                 {% endif %}
             </article>
 
@@ -85,6 +106,10 @@
                     <div>
                         <dt>Solicitante</dt>
                         <dd>{{ chamado.solicitante_nome|default:"-" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Atendente atual</dt>
+                        <dd>{{ current_attendant|default:"-" }}</dd>
                     </div>
                     <div>
                         <dt>Origem</dt>

@@ -10,14 +10,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import AberturaChamadoForm, LoginForm
-from .models import AtendimentoHistorico, Chamado, ChamadoAnexo
+from .models import AtendimentoHistorico, Chamado, ChamadoAnexo, ChamadoEvento
 from .permissions import (
     ATTENDANT_GROUP_NAME,
     PRIMARY_ADMIN_USERNAME,
@@ -221,12 +221,19 @@ def _requester_display(chamado: Chamado) -> str:
     return "-"
 
 
+def _attendant_display(user):
+    if not user:
+        return ""
+    return user.get_full_name() or user.username
+
+
 def _serialize_kanban_card(chamado: Chamado, active_state):
     is_active = bool(active_state and active_state["ticket_number"] == chamado.numero)
     return {
         "number": chamado.numero,
         "title": chamado.titulo,
         "requester": _requester_display(chamado),
+        "current_attendant": _attendant_display(chamado.atendente_atual),
         "opened_at": timezone.localtime(chamado.criado_em).strftime("%d/%m/%Y %H:%M"),
         "status": chamado.status,
         "status_label": chamado.status_label,
@@ -251,7 +258,7 @@ def tickets_dashboard_view(request):
     active_state = _serialize_attendance_state(active_attendance)
 
     grouped = {key: [] for key, _ in KANBAN_COLUMNS}
-    chamados = Chamado.objects.select_related("solicitante").order_by("-criado_em")
+    chamados = Chamado.objects.select_related("solicitante", "atendente_atual").order_by("-criado_em")
     for chamado in chamados:
         grouped[_canonical_status(chamado.status)].append(_serialize_kanban_card(chamado, active_state))
 
@@ -300,13 +307,20 @@ def update_ticket_status_view(request):
     if new_status not in {key for key, _ in Chamado.STATUS_CHOICES}:
         return _json_error("Status invalido.")
 
-    chamado = Chamado.objects.filter(numero=ticket_number).first()
+    chamado = Chamado.objects.select_related("atendente_atual").filter(numero=ticket_number).first()
     if not chamado:
         return _json_error("Chamado nao encontrado.", status=404)
 
+    autor = request.user.get_full_name() or request.user.username
     previous_status = chamado.status
+    previous_status_label = chamado.status_label
+    previous_attendant_id = chamado.atendente_atual_id
+    status_changed = previous_status != new_status
+    attendant_changed = previous_attendant_id != request.user.id
+
     chamado.status = new_status
-    update_fields = ["status", "atualizado_em"]
+    chamado.atendente_atual = request.user
+    update_fields = ["status", "atendente_atual", "atualizado_em"]
 
     if new_status in Chamado.STATUS_ENCERRADOS and not chamado.fechado_em:
         chamado.fechado_em = timezone.now()
@@ -315,7 +329,23 @@ def update_ticket_status_view(request):
         chamado.fechado_em = None
         update_fields.append("fechado_em")
 
-    chamado.save(update_fields=update_fields)
+    with transaction.atomic():
+        chamado.save(update_fields=update_fields)
+
+        if status_changed:
+            ChamadoEvento.registrar(
+                chamado=chamado,
+                usuario=request.user,
+                tipo=ChamadoEvento.TIPO_STATUS,
+                descricao=f"Status alterado de {previous_status_label} para {chamado.status_label} por {autor}.",
+            )
+        if attendant_changed:
+            ChamadoEvento.registrar(
+                chamado=chamado,
+                usuario=request.user,
+                tipo=ChamadoEvento.TIPO_ATENDENTE,
+                descricao=f"Chamado assumido por {autor}.",
+            )
 
     return JsonResponse(
         {
@@ -324,7 +354,9 @@ def update_ticket_status_view(request):
             "ticket_number": ticket_number,
             "status": new_status,
             "status_label": chamado.status_label,
+            "status_class": _STATUS_BADGE_CLASS.get(new_status, "status-muted"),
             "previous_status": previous_status,
+            "atendente_atual": autor,
         }
     )
 
@@ -553,6 +585,13 @@ def open_ticket_view(request):
                             nome_original=arquivo.name,
                             enviado_por=request.user,
                         )
+                    autor = request.user.get_full_name() or request.user.username
+                    ChamadoEvento.registrar(
+                        chamado=chamado,
+                        usuario=request.user,
+                        tipo=ChamadoEvento.TIPO_CRIACAO,
+                        descricao=f"Chamado aberto por {autor}.",
+                    )
                 break
             except IntegrityError:
                 continue
@@ -574,15 +613,38 @@ def open_ticket_view(request):
     return render(request, "chamados/abrir_chamado.html", context)
 
 
+def _serialize_ticket_events(chamado: Chamado):
+    tipo_labels = dict(ChamadoEvento.TIPO_CHOICES)
+    eventos = []
+    for evento in chamado.eventos.select_related("usuario").all():
+        eventos.append(
+            {
+                "author": _attendant_display(evento.usuario) or "Sistema",
+                "tipo_label": tipo_labels.get(evento.tipo, evento.tipo),
+                "descricao": evento.descricao,
+                "timestamp": timezone.localtime(evento.criado_em).strftime("%d/%m/%Y %H:%M"),
+            }
+        )
+    return eventos
+
+
+def _user_can_access_ticket(user, chamado) -> bool:
+    if is_admin_user(user) or is_attendant_user(user):
+        return True
+    return chamado.solicitante_id == user.id
+
+
 @login_required
 def ticket_detail_view(request, numero: str):
-    chamado = get_object_or_404(Chamado, numero=numero)
+    chamado = get_object_or_404(
+        Chamado.objects.select_related("solicitante", "atendente_atual"), numero=numero
+    )
 
-    pode_ver_todos = is_admin_user(request.user) or is_attendant_user(request.user)
-    if not pode_ver_todos and chamado.solicitante_id != request.user.id:
+    if not _user_can_access_ticket(request.user, chamado):
         messages.error(request, "Voce nao tem acesso a este chamado.")
         return redirect("my_tickets")
 
+    pode_ver_todos = is_admin_user(request.user) or is_attendant_user(request.user)
     context = {
         "page_title": f"Chamado {chamado.numero}",
         "chamado": chamado,
@@ -590,14 +652,30 @@ def ticket_detail_view(request, numero: str):
         "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
         "priority_label": chamado.prioridade_label,
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
+        "current_attendant": _attendant_display(chamado.atendente_atual),
         "timeline": _serialize_ticket_timeline(chamado),
-        "anexos": list(chamado.anexos.all()),
+        "eventos": _serialize_ticket_events(chamado),
+        "anexos": list(chamado.anexos.select_related("enviado_por").all()),
         "is_owner": chamado.solicitante_id == request.user.id,
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
         "can_view_history": pode_ver_todos,
     }
     return render(request, "chamados/detalhe_chamado.html", context)
+
+
+@login_required
+def download_anexo_view(request, numero: str, anexo_id: int):
+    chamado = get_object_or_404(Chamado, numero=numero)
+
+    if not _user_can_access_ticket(request.user, chamado):
+        raise Http404("Anexo nao encontrado.")
+
+    anexo = get_object_or_404(ChamadoAnexo, pk=anexo_id, chamado=chamado)
+    try:
+        return FileResponse(anexo.arquivo.open("rb"), as_attachment=True, filename=anexo.nome_original or anexo.arquivo.name)
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
 
 
 @history_access_required

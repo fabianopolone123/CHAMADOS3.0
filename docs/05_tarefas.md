@@ -2,12 +2,15 @@
 
 ## Em andamento
 
-- Atribuir chamados a um atendente responsavel de forma persistida
-- Exibir os anexos do chamado tambem na visao de detalhe da TI
-- Refletir no card a cor do badge de status apos o drag sem exigir refresh
+- Permitir que a TI registre comentarios/acoes manuais no historico do chamado
+- Evoluir a atribuicao para um fluxo formal de responsavel, se necessario
 
 ## Concluidas
 
+- Registrado o atendente atual (quem movimenta o chamado) sem trata-lo como dono do chamado
+- Criado o model ChamadoEvento e o log de eventos (criacao, mudanca de status, troca de atendente)
+- Exibidos anexos (com data e usuario) e historico do chamado no detalhe, com download protegido de anexos
+- Corrigido o badge do Kanban para atualizar texto e cor no drag sem refresh
 - Migrado o Kanban da TI para chamados reais do banco, com colunas por status e persistencia da movimentacao
 - Removidos os dados mockados/fixos do Kanban e os chamados-fixture do banco
 - Criado o endpoint protegido de atualizacao de status com CSRF e permissao de TI

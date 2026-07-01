@@ -12,7 +12,8 @@
 | `/chamados/status/atualizar/` | POST | Altera o status de um chamado (drag-and-drop do Kanban); apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
-| `/meus-chamados/<numero>/` | GET | Detalhe read-only do chamado com timeline de atendimentos | Implementada |
+| `/meus-chamados/<numero>/` | GET | Detalhe do chamado com anexos, historico de eventos e timeline de atendimentos | Implementada |
+| `/meus-chamados/<numero>/anexo/<anexo_id>/` | GET | Download protegido de anexo (dono do chamado ou TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -36,7 +37,15 @@
 - `/chamados/status/atualizar/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403` em JSON).
 - A rota aceita apenas `POST`, recebe `ticket_number` e `status` em JSON, valida o status contra os choices do model e usa CSRF via header `X-CSRFToken`.
 - Ao mover um chamado para `resolvido` ou `fechado`, o campo `fechado_em` e preenchido; ao reabrir, e limpo.
-- Cada card exibe numero, titulo, solicitante, data de abertura e status atual; clicar no card abre o detalhe do chamado.
+- Ao mover um chamado, o `atendente_atual` passa a ser o usuario que moveu (nao e dono do chamado) e a acao e registrada em `ChamadoEvento`.
+- A resposta JSON retorna `status_label` e `status_class` para o Kanban atualizar o texto e a cor do badge sem recarregar a pagina.
+- Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir); clicar no card abre o detalhe do chamado.
+
+## Regras de acesso a anexos
+
+- O download de anexos exige `login_required` e usa uma rota dedicada (nao expoe a URL direta de `MEDIA`).
+- Usuario comum so acessa anexos dos chamados que ele mesmo abriu; administrador e Atendente TI acessam anexos de qualquer chamado.
+- Acesso nao autorizado retorna `404`.
 
 ## Regras das rotas de historico
 

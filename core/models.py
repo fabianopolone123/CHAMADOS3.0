@@ -54,6 +54,14 @@ class Chamado(models.Model):
     subcategoria = models.CharField(max_length=120, blank=True)
     prioridade = models.CharField(max_length=30, blank=True)
     status = models.CharField(max_length=60, blank=True, default=STATUS_ABERTO)
+    atendente_atual = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chamados_em_atendimento",
+        help_text="Atendente que realizou a ultima acao no chamado. Nao representa dono do chamado.",
+    )
     origem = models.CharField(max_length=120, blank=True)
     aberto_em_referencia = models.CharField(max_length=60, blank=True)
     ultima_atualizacao_referencia = models.CharField(max_length=60, blank=True)
@@ -117,6 +125,43 @@ class ChamadoAnexo(models.Model):
 
     def __str__(self) -> str:
         return f"{self.chamado.numero} - {self.nome_original or self.arquivo.name}"
+
+
+class ChamadoEvento(models.Model):
+    """Log de eventos/acoes de um chamado ao longo da sua vida."""
+
+    TIPO_CRIACAO = "criacao"
+    TIPO_STATUS = "mudanca_status"
+    TIPO_ATENDENTE = "atendente_alterado"
+    TIPO_COMENTARIO = "comentario"
+    TIPO_CHOICES = [
+        (TIPO_CRIACAO, "Criacao"),
+        (TIPO_STATUS, "Mudanca de status"),
+        (TIPO_ATENDENTE, "Atendente alterado"),
+        (TIPO_COMENTARIO, "Comentario"),
+    ]
+
+    chamado = models.ForeignKey(Chamado, on_delete=models.CASCADE, related_name="eventos")
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="eventos_chamado",
+    )
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES)
+    descricao = models.TextField()
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.chamado.numero} - {self.tipo}"
+
+    @classmethod
+    def registrar(cls, *, chamado, usuario, tipo, descricao):
+        return cls.objects.create(chamado=chamado, usuario=usuario, tipo=tipo, descricao=descricao)
 
 
 class AtendimentoHistorico(models.Model):

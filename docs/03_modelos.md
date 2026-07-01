@@ -26,6 +26,7 @@ Campos atuais:
 - `subcategoria`
 - `prioridade` (choices: `baixa`, `media`, `alta`, `critica`)
 - `status` (choices: `aberto`, `em_atendimento`, `aguardando_usuario`, `resolvido`, `fechado`; default `aberto`)
+- `atendente_atual` (FK opcional para o usuario que realizou a ultima acao; **nao representa dono do chamado**)
 - `origem`
 - `aberto_em_referencia`
 - `ultima_atualizacao_referencia`
@@ -39,13 +40,35 @@ Metodos e propriedades:
 - `status_label` e `prioridade_label` retornam o rotulo legivel do valor armazenado.
 - `STATUS_ENCERRADOS` agrupa os status `resolvido` e `fechado`.
 
+Metodos e propriedades (continuacao):
+
+- `atendente_atual` e distinto de `solicitante`: o solicitante e o dono/criador do chamado; o `atendente_atual` e apenas quem realizou a ultima acao de atendimento.
+
 Observacoes:
 
 - Chamados abertos pelo portal do solicitante nascem com `solicitante`, `numero` gerado, `status = aberto` e `origem = "Portal do solicitante"`.
 - O Kanban da TI usa exclusivamente chamados reais do banco, agrupados pelo campo `status` (sem dados mockados).
-- A alteracao de status pelo Kanban grava diretamente no campo `status`; ao encerrar (`resolvido`/`fechado`) o campo `fechado_em` e preenchido.
+- A alteracao de status pelo Kanban grava `status` e `atendente_atual` (usuario que moveu); ao encerrar (`resolvido`/`fechado`) o campo `fechado_em` e preenchido e o ultimo atendente e mantido.
 - O campo `numero` e unico e serve como chave de referencia entre o Kanban, o portal e o backend.
-- `solicitante` usa `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
+- `solicitante` e `atendente_atual` usam `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
+
+### ChamadoEvento
+
+Log de eventos/acoes de um chamado ao longo da sua vida (historico do chamado, separado do controle de tempo).
+
+Campos atuais:
+
+- `chamado` (FK para `Chamado`, `on_delete=CASCADE`, related_name `eventos`)
+- `usuario` (FK opcional para quem realizou a acao, `on_delete=SET_NULL`)
+- `tipo` (choices: `criacao`, `mudanca_status`, `atendente_alterado`, `comentario`)
+- `descricao` (texto claro da acao)
+- `criado_em`
+
+Eventos registrados atualmente:
+
+- Criacao do chamado (`criacao`): "Chamado aberto por X."
+- Mudanca de status (`mudanca_status`): "Status alterado de A para B por X."
+- Atendente que assumiu/movimentou (`atendente_alterado`): "Chamado assumido por X." (registrado apenas quando o `atendente_atual` muda, evitando duplicidade)
 
 ### ChamadoAnexo
 

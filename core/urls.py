@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     dashboard_redirect_view,
+    download_anexo_view,
     finish_attendance_view,
     history_search_view,
     history_view,
@@ -26,6 +27,7 @@ urlpatterns = [
     path("meus-chamados/", my_tickets_view, name="my_tickets"),
     path("meus-chamados/novo/", open_ticket_view, name="open_ticket"),
     path("meus-chamados/<str:numero>/", ticket_detail_view, name="ticket_detail"),
+    path("meus-chamados/<str:numero>/anexo/<int:anexo_id>/", download_anexo_view, name="download_anexo"),
     path("historico/", history_view, name="history"),
     path("historico/buscar/", history_search_view, name="history_search"),
     path("login/", login_view, name="login"),

@@ -2,6 +2,13 @@
 
 ## 2026-07-01
 
+- Adicionado o campo `atendente_atual` ao `Chamado` (usuario que realizou a ultima acao; nao e dono do chamado).
+- Criado o model `ChamadoEvento` como log de eventos do chamado (criacao, mudanca de status, troca de atendente).
+- Ao mover um card no Kanban, o sistema salva status e atendente atual e registra os eventos correspondentes, sem duplicar registros.
+- Encerramentos (`resolvido`/`fechado`) preenchem `fechado_em` e mantem o ultimo atendente que agiu.
+- Corrigido o badge de status do Kanban para atualizar texto e cor imediatamente no drag (sem refresh).
+- Exibidos no detalhe do chamado o atendente atual, o historico de eventos e os anexos (nome, download, data e usuario).
+- Criada a rota protegida de download de anexo (dono do chamado ou TI/admin), sem expor a URL direta de MEDIA.
 - Migrado o Kanban da TI para usar chamados reais do banco, agrupados por status, removendo todo o dado mockado/fixo.
 - Removidos os 9 chamados-fixture do banco (e os registros de atendimento vinculados) apos backup.
 - Definidas as colunas do Kanban pelos status do model: Aberto, Em atendimento, Aguardando, Resolvido e Fechado.
