@@ -17,7 +17,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import AberturaChamadoForm, LoginForm
-from .models import AtendimentoHistorico, Chamado
+from .models import AtendimentoHistorico, Chamado, ChamadoAnexo
 from .permissions import (
     ATTENDANT_GROUP_NAME,
     PRIMARY_ADMIN_USERNAME,
@@ -835,7 +835,7 @@ def my_tickets_view(request):
 
 @login_required
 def open_ticket_view(request):
-    form = AberturaChamadoForm(request.POST or None)
+    form = AberturaChamadoForm(request.POST or None, request.FILES or None)
 
     if request.method == "POST" and form.is_valid():
         chamado = form.save(commit=False)
@@ -844,12 +844,20 @@ def open_ticket_view(request):
         chamado.solicitante_email = request.user.email or ""
         chamado.status = Chamado.STATUS_ABERTO
         chamado.origem = "Portal do solicitante"
+        anexos = form.cleaned_data.get("anexos") or []
 
         for _attempt in range(3):
             chamado.numero = Chamado.gerar_numero()
             try:
                 with transaction.atomic():
                     chamado.save()
+                    for arquivo in anexos:
+                        ChamadoAnexo.objects.create(
+                            chamado=chamado,
+                            arquivo=arquivo,
+                            nome_original=arquivo.name,
+                            enviado_por=request.user,
+                        )
                 break
             except IntegrityError:
                 continue
@@ -888,6 +896,7 @@ def ticket_detail_view(request, numero: str):
         "priority_label": chamado.prioridade_label,
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "timeline": _serialize_ticket_timeline(chamado),
+        "anexos": list(chamado.anexos.all()),
         "is_owner": chamado.solicitante_id == request.user.id,
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),

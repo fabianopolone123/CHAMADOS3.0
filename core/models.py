@@ -93,6 +93,32 @@ class Chamado(models.Model):
         return dict(self.PRIORIDADE_CHOICES).get(self.prioridade, self.prioridade or "-")
 
 
+def anexo_upload_path(instance, filename):
+    """Organiza os anexos por chamado dentro de MEDIA_ROOT."""
+    numero = instance.chamado.numero or "sem-numero"
+    return f"chamados/{numero}/{filename}"
+
+
+class ChamadoAnexo(models.Model):
+    chamado = models.ForeignKey(Chamado, on_delete=models.CASCADE, related_name="anexos")
+    arquivo = models.FileField(upload_to=anexo_upload_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="anexos_enviados",
+    )
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.chamado.numero} - {self.nome_original or self.arquivo.name}"
+
+
 class AtendimentoHistorico(models.Model):
     TIPO_ENCERRAMENTO_PAUSE = "pause"
     TIPO_ENCERRAMENTO_STOP = "stop"

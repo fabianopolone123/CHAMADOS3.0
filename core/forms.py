@@ -28,10 +28,36 @@ class LoginForm(forms.Form):
     )
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """Campo de arquivo que aceita multiplos anexos, sem limite de tamanho ou extensao."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultipleFileInput(attrs={"class": "form-control", "multiple": True}))
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            return [single_clean(item, initial) for item in data]
+        if data in self.empty_values:
+            return []
+        return [single_clean(data, initial)]
+
+
 class AberturaChamadoForm(forms.ModelForm):
+    anexos = MultipleFileField(
+        label="Anexos",
+        required=False,
+        help_text="Voce pode anexar um ou mais arquivos (opcional).",
+    )
+
     class Meta:
         model = Chamado
-        fields = ["titulo", "categoria", "prioridade", "descricao"]
+        fields = ["titulo", "descricao"]
         widgets = {
             "titulo": forms.TextInput(
                 attrs={
@@ -40,13 +66,6 @@ class AberturaChamadoForm(forms.ModelForm):
                     "maxlength": 255,
                 }
             ),
-            "categoria": forms.TextInput(
-                attrs={
-                    "class": "form-control",
-                    "placeholder": "Ex.: Acesso, E-mail, Impressao",
-                }
-            ),
-            "prioridade": forms.Select(attrs={"class": "form-select"}),
             "descricao": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -57,18 +76,11 @@ class AberturaChamadoForm(forms.ModelForm):
         }
         labels = {
             "titulo": "Titulo",
-            "categoria": "Categoria",
-            "prioridade": "Prioridade",
             "descricao": "Descricao",
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["prioridade"].choices = [
-            ("", "Selecione a prioridade"),
-            *Chamado.PRIORIDADE_CHOICES,
-        ]
-        self.fields["prioridade"].initial = Chamado.PRIORIDADE_MEDIA
         self.fields["descricao"].required = True
 
     def clean_titulo(self):

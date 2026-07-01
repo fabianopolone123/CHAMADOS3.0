@@ -46,12 +46,14 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 
 1. O usuario comum e todo usuario autenticado que nao pertence aos grupos `Administrador` nem `Atendente TI`.
 2. Apos o login, o usuario comum e direcionado para `/meus-chamados/` e a equipe de TI para o Kanban.
-3. O usuario comum pode abrir chamados informando titulo, categoria, prioridade e descricao.
-4. Cada chamado aberto pelo portal recebe numero unico gerado no formato `CH-000123`.
-5. O chamado aberto nasce com status `aberto` e registra o usuario logado como solicitante.
-6. O usuario comum visualiza e acessa apenas os chamados que ele mesmo abriu.
-7. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
-8. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
+3. O usuario comum abre chamados informando apenas titulo, descricao e anexos (opcionais).
+4. O usuario comum nao escolhe status, prioridade, atendente nem solicitante; esses campos sao definidos pelo sistema ou pela equipe de TI.
+5. Cada chamado aberto pelo portal recebe numero unico gerado no formato `CH-000123`.
+6. O chamado aberto nasce com status `aberto` e registra o usuario logado como solicitante automaticamente.
+7. Os anexos enviados na abertura ficam vinculados ao chamado, sem restricao de tamanho ou extensao neste momento.
+8. O usuario comum visualiza e acessa apenas os chamados que ele mesmo abriu.
+9. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
+10. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
 
 ## Regras previstas para o sistema de chamados
 

@@ -33,6 +33,17 @@
                 <h3 class="portal-detail__section-title">Descricao</h3>
                 <p class="portal-detail__description">{{ chamado.descricao|linebreaksbr|default:"Sem descricao informada." }}</p>
 
+                {% if anexos %}
+                    <h3 class="portal-detail__section-title">Anexos</h3>
+                    <ul class="portal-attachments">
+                        {% for anexo in anexos %}
+                            <li class="portal-attachment">
+                                <a href="{{ anexo.arquivo.url }}" target="_blank" rel="noopener">{{ anexo.nome_original|default:anexo.arquivo.name }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
                 <h3 class="portal-detail__section-title">Andamento do atendimento</h3>
                 {% if timeline %}
                     <ul class="portal-timeline">

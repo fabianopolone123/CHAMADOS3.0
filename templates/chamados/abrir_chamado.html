@@ -23,7 +23,7 @@
         </header>
 
         <section class="portal-panel">
-            <form method="post" action="{% url 'open_ticket' %}" class="portal-form" novalidate>
+            <form method="post" action="{% url 'open_ticket' %}" class="portal-form" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
 
                 {% if form.non_field_errors %}
@@ -36,23 +36,17 @@
                     {% if form.titulo.errors %}<span class="portal-field__error">{{ form.titulo.errors.0 }}</span>{% endif %}
                 </div>
 
-                <div class="portal-field-row">
-                    <div class="portal-field">
-                        <label for="{{ form.categoria.id_for_label }}">{{ form.categoria.label }}</label>
-                        {{ form.categoria }}
-                        {% if form.categoria.errors %}<span class="portal-field__error">{{ form.categoria.errors.0 }}</span>{% endif %}
-                    </div>
-                    <div class="portal-field">
-                        <label for="{{ form.prioridade.id_for_label }}">{{ form.prioridade.label }}</label>
-                        {{ form.prioridade }}
-                        {% if form.prioridade.errors %}<span class="portal-field__error">{{ form.prioridade.errors.0 }}</span>{% endif %}
-                    </div>
-                </div>
-
                 <div class="portal-field">
                     <label for="{{ form.descricao.id_for_label }}">{{ form.descricao.label }}</label>
                     {{ form.descricao }}
                     {% if form.descricao.errors %}<span class="portal-field__error">{{ form.descricao.errors.0 }}</span>{% endif %}
+                </div>
+
+                <div class="portal-field">
+                    <label for="{{ form.anexos.id_for_label }}">{{ form.anexos.label }}</label>
+                    {{ form.anexos }}
+                    <span class="portal-field__hint">{{ form.anexos.help_text }}</span>
+                    {% if form.anexos.errors %}<span class="portal-field__error">{{ form.anexos.errors.0 }}</span>{% endif %}
                 </div>
 
                 <div class="portal-form__actions">

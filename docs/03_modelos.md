@@ -46,6 +46,24 @@ Observacoes:
 - O campo `numero` e unico e serve como chave de referencia entre o Kanban, o portal e o backend.
 - `solicitante` usa `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
 
+### ChamadoAnexo
+
+Armazena os arquivos anexados a um chamado no momento da abertura pelo portal do solicitante.
+
+Campos atuais:
+
+- `chamado` (FK para `Chamado`, `on_delete=CASCADE`, related_name `anexos`)
+- `arquivo` (`FileField`, salvo em `MEDIA_ROOT/chamados/<numero>/<arquivo>`)
+- `nome_original`
+- `enviado_por` (FK opcional para o usuario, `on_delete=SET_NULL`)
+- `enviado_em`
+
+Regras atuais:
+
+- Um chamado pode ter varios anexos.
+- Nao ha restricao de tamanho nem de extensao de arquivo neste momento.
+- Os arquivos ficam sob `MEDIA_ROOT` e sao servidos por `MEDIA_URL` (em desenvolvimento, servidos pelo proprio Django com `DEBUG=True`).
+
 ### AtendimentoHistorico
 
 Registra cada periodo individual de trabalho de um atendente em um chamado.

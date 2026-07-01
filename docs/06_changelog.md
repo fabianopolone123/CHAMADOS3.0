@@ -2,6 +2,10 @@
 
 ## 2026-07-01
 
+- Simplificada a abertura de chamado pelo usuario comum para apenas titulo, descricao e anexos.
+- Criado o modelo `ChamadoAnexo` para vincular arquivos ao chamado, sem restricao de tamanho ou extensao.
+- Adicionado suporte a upload de multiplos arquivos com `multipart/form-data`.
+- Configurados `MEDIA_URL` e `MEDIA_ROOT` e o servico de media em desenvolvimento.
 - Criado o portal do solicitante (visao do usuario comum) com as telas de abertura, listagem e detalhe de chamados.
 - Adicionado o vinculo `solicitante` no modelo `Chamado` para associar o chamado ao usuario que o abriu.
 - Definidos choices de `status` e `prioridade` no `Chamado`, com status default `aberto` e campo `fechado_em`.
