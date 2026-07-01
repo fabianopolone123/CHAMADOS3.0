@@ -15,27 +15,7 @@
     data-finish-attendance-url="{% url 'finish_attendance' %}"
     data-move-ticket-url="{% url 'move_ticket' %}"
 >
-    <aside class="tickets-sidebar">
-        <div>
-            <div class="system-mark">TI</div>
-            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
-            <p class="sidebar-copy">Fila de atendimento por atendente. Arraste um chamado para a coluna de um atendente para coloca-lo em atendimento.</p>
-        </div>
-
-        <nav class="sidebar-menu">
-            <a href="{% url 'tickets_dashboard' %}" class="menu-link active">Chamados</a>
-            <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
-        </nav>
-
-        <div class="sidebar-footer">
-            <div class="sidebar-user-card">
-                <span class="sidebar-user-label">Usuario logado</span>
-                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                <span>{{ request.user.username }}</span>
-            </div>
-            <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
-        </div>
-    </aside>
+    {% include "partials/ti_sidebar.html" with active="chamados" %}
 
     <section class="tickets-main">
         <header class="tickets-topbar">

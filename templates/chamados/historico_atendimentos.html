@@ -10,33 +10,7 @@
 
 {% block content %}
 <main class="tickets-app history-app" data-history-search-url="{% url 'history_search' %}">
-    <aside class="tickets-sidebar">
-        <div>
-            <div class="system-mark">TI</div>
-            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
-            <p class="sidebar-copy">Consulta dos registros de atendimento realizados, com busca rapida e foco na rastreabilidade do trabalho executado.</p>
-        </div>
-
-        <nav class="sidebar-menu">
-            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
-            <a href="{% url 'history' %}" class="menu-link active">Historico</a>
-            {% if is_admin %}
-                <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
-            {% endif %}
-            <a href="{% url 'my_tickets' %}" class="menu-link">Chamados do Usuario</a>
-            <a href="#" class="menu-link disabled-link">Relatorios</a>
-            <a href="#" class="menu-link disabled-link">Configuracoes</a>
-        </nav>
-
-        <div class="sidebar-footer">
-            <div class="sidebar-user-card">
-                <span class="sidebar-user-label">Usuario logado</span>
-                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                <span>{{ request.user.username }}</span>
-            </div>
-            <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
-        </div>
-    </aside>
+    {% include "partials/ti_sidebar.html" %}
 
     <section class="tickets-main">
         <header class="tickets-topbar history-topbar">

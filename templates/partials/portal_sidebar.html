@@ -14,8 +14,7 @@ Valores de active: "meus", "novo".
         <a href="{% url 'my_tickets' %}" class="menu-link{% if active == 'meus' %} active{% endif %}">Meus Chamados</a>
         <a href="{% url 'open_ticket' %}" class="menu-link{% if active == 'novo' %} active{% endif %}">Abrir Chamado</a>
         {% if is_admin or is_attendant %}
-            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
-            <a href="{% url 'history' %}" class="menu-link">Historico</a>
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Chamados</a>
         {% endif %}
         {% if is_admin %}
             <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>

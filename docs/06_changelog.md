@@ -2,6 +2,9 @@
 
 ## 2026-07-01
 
+- Padronizado o menu lateral da area de TI em um unico include reutilizavel (`partials/ti_sidebar.html`), eliminando a inconsistencia entre as telas de Kanban, Permissoes e Historico.
+- Menu da area de TI passa a exibir apenas "Chamados" (Kanban) e "Permissoes"; removidos os itens antigos "Quadro de Atendimento", "Historico", "Chamados do Usuario" e "Relatorios".
+- Padronizado o nome do botao principal para "Chamados" (apontando para o Kanban) em todas as telas.
 - Reorganizado o Kanban para funcionar por fila e por atendente: coluna fixa "Chamados abertos", colunas dinamicas por Atendente TI e coluna fixa "Chamados fechados".
 - Substituido o endpoint de status por `POST /chamados/mover/`, que recebe a coluna de destino (aberto/atendente/fechado) e valida o atendente de destino.
 - Movimentacao entre colunas atualiza status e `atendente_atual`, registra o historico (puxar, transferir, fechar, devolver) e responde com dados para o badge atualizar sem refresh.

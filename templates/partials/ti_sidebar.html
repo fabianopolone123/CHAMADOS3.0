@@ -1,0 +1,27 @@
+{% comment %}
+Menu lateral padrao da area de TI (Atendente TI / Admin).
+Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
+Valores de active: "chamados", "permissoes".
+Mantido intencionalmente enxuto: apenas Chamados e Permissoes.
+{% endcomment %}
+<aside class="tickets-sidebar">
+    <div>
+        <div class="system-mark">TI</div>
+        <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+        <p class="sidebar-copy">Area de atendimento da equipe de TI para triagem, movimentacao e acompanhamento dos chamados.</p>
+    </div>
+
+    <nav class="sidebar-menu">
+        <a href="{% url 'tickets_dashboard' %}" class="menu-link{% if active == 'chamados' %} active{% endif %}">Chamados</a>
+        <a href="{% url 'permissions' %}" class="menu-link{% if active == 'permissoes' %} active{% endif %}">Permissoes</a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-user-card">
+            <span class="sidebar-user-label">Usuario logado</span>
+            <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+            <span>{{ request.user.username }}</span>
+        </div>
+        <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
+    </div>
+</aside>
