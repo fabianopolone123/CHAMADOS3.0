@@ -6,9 +6,10 @@
 |---|---|---|---|
 | `/` | GET | Redireciona para login ou landing conforme a sessao e o perfil | Implementada |
 | `/login/` | GET, POST | Tela de login com autenticacao AD/LDAP; roteia por perfil apos autenticar | Implementada |
-| `/chamados/` | GET | Painel inicial Kanban para Atendente TI | Implementada |
+| `/chamados/` | GET | Quadro Kanban com chamados reais agrupados por status (apenas TI/admin) | Implementada |
 | `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza o atendimento ativo com descricao obrigatoria | Implementada |
+| `/chamados/status/atualizar/` | POST | Altera o status de um chamado (drag-and-drop do Kanban); apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe read-only do chamado com timeline de atendimentos | Implementada |
@@ -26,6 +27,16 @@
 - O backend valida que o usuario nao pode iniciar dois atendimentos ativos ao mesmo tempo.
 - O backend valida que `pause` e `stop` exigem descricao obrigatoria.
 - As respostas dessas rotas sao em `JsonResponse` para consumo do JavaScript do Kanban.
+
+## Regras do Kanban e da atualizacao de status
+
+- `/chamados/` usa o decorator `ti_required`: administrador e Atendente TI acessam; usuario comum e redirecionado para `/meus-chamados/`.
+- O Kanban lista chamados reais do banco (model `Chamado`), sem dados mockados, agrupados por status.
+- As colunas representam os status: Aberto, Em atendimento, Aguardando, Resolvido, Fechado.
+- `/chamados/status/atualizar/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403` em JSON).
+- A rota aceita apenas `POST`, recebe `ticket_number` e `status` em JSON, valida o status contra os choices do model e usa CSRF via header `X-CSRFToken`.
+- Ao mover um chamado para `resolvido` ou `fechado`, o campo `fechado_em` e preenchido; ao reabrir, e limpo.
+- Cada card exibe numero, titulo, solicitante, data de abertura e status atual; clicar no card abre o detalhe do chamado.
 
 ## Regras das rotas de historico
 

@@ -59,6 +59,20 @@ def history_access_required(view_func):
     return _wrapped_view
 
 
+def ti_required(view_func):
+    """Restringe o acesso a administradores e atendentes de TI; usuario comum e redirecionado."""
+
+    @login_required
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+            messages.error(request, "Apenas a equipe de TI pode acessar o quadro de atendimento.")
+            return redirect("my_tickets")
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
 def _format_duration(duration: timedelta | None) -> str:
     if not duration:
         return "0m"
@@ -121,409 +135,6 @@ def _serialize_history_item(item: AtendimentoHistorico):
     }
 
 
-def _build_mock_ticket(
-    *,
-    number,
-    title,
-    description,
-    requester,
-    requester_email,
-    department,
-    category,
-    subcategory,
-    priority,
-    priority_class,
-    status,
-    status_class,
-    responsible_attendant,
-    opened_at,
-    opened_time,
-    last_update,
-    source,
-    attachments,
-    history,
-):
-    return {
-        "number": number,
-        "title": title,
-        "description": description,
-        "requester": requester,
-        "requester_email": requester_email,
-        "department": department,
-        "category": category,
-        "subcategory": subcategory,
-        "priority": priority,
-        "priority_class": priority_class,
-        "status": status,
-        "status_class": status_class,
-        "responsible_attendant": responsible_attendant,
-        "opened_at": opened_at,
-        "opened_time": opened_time,
-        "last_update": last_update,
-        "source": source,
-        "attachments": attachments,
-        "history": history,
-    }
-
-
-def _build_attachment(name, size, file_type):
-    return {
-        "name": name,
-        "size": size,
-        "file_type": file_type,
-    }
-
-
-def _build_history_entry(author, timestamp, message, kind="comment"):
-    return {
-        "author": author,
-        "timestamp": timestamp,
-        "message": message,
-        "kind": kind,
-    }
-
-
-def _build_timeline_excerpt(ticket_number):
-    return [
-        _build_history_entry(
-            "Sistema",
-            "Hoje, 08:12",
-            f"Chamado {ticket_number} criado e direcionado para triagem inicial.",
-            kind="created",
-        ),
-        _build_history_entry(
-            "Roberta Lima",
-            "Hoje, 08:45",
-            "Solicitante confirmou os detalhes adicionais do problema.",
-        ),
-        _build_history_entry(
-            "Atendente TI",
-            "Hoje, 09:03",
-            "Aguardando verificacao do ambiente e resposta do usuario.",
-        ),
-    ]
-
-
-def _default_ticket_payload(
-    *,
-    number,
-    title,
-    requester,
-    requester_email,
-    department,
-    category,
-    subcategory,
-    priority,
-    priority_class,
-    status,
-    status_class,
-    responsible_attendant,
-    opened_at,
-    opened_time,
-    last_update,
-    source,
-    description_suffix,
-):
-    return _build_mock_ticket(
-        number=number,
-        title=title,
-        description=(
-            f"{title}. {description_suffix} "
-            "Esta descricao e um mock temporario para a interface de detalhes do chamado."
-        ),
-        requester=requester,
-        requester_email=requester_email,
-        department=department,
-        category=category,
-        subcategory=subcategory,
-        priority=priority,
-        priority_class=priority_class,
-        status=status,
-        status_class=status_class,
-        responsible_attendant=responsible_attendant,
-        opened_at=opened_at,
-        opened_time=opened_time,
-        last_update=last_update,
-        source=source,
-        attachments=[
-            _build_attachment("print-erro-vpn.png", "248 KB", "Imagem"),
-            _build_attachment("log-acesso.txt", "14 KB", "Texto"),
-        ],
-        history=_build_timeline_excerpt(number),
-    )
-
-
-def _build_default_attendant_tickets(user, position):
-    display_name = user.get_full_name() or user.username.replace(".", " ").title()
-    slug = user.username.lower()
-    primary_ticket_number = f"INC-10{50 + position}"
-    secondary_ticket_number = f"REQ-20{80 + position}"
-
-    return [
-        _default_ticket_payload(
-            number=primary_ticket_number,
-            title=f"Analise de acesso para {display_name}",
-            requester="Equipe Corporativa",
-            requester_email="suporte@empresa.local",
-            department="Tecnologia da Informacao",
-            category="Acesso",
-            subcategory="VPN",
-            priority="Alta",
-            priority_class="priority-high",
-            status="Em atendimento",
-            status_class="status-warning",
-            responsible_attendant=display_name,
-            opened_at="30/06/2026 08:20",
-            opened_time="1h 42m",
-            last_update="30/06/2026 09:18",
-            source="Portal de chamados",
-            description_suffix=f"Fila atribuida automaticamente ao atendente {display_name}.",
-        ),
-        _default_ticket_payload(
-            number=secondary_ticket_number,
-            title=f"Solicitacao pendente para {display_name}",
-            requester="Central de Operacoes",
-            requester_email="operacoes@empresa.local",
-            department="Operacoes",
-            category="Cadastro",
-            subcategory="Novo usuario",
-            priority="Media",
-            priority_class="priority-medium",
-            status="Aguardando usuario",
-            status_class="status-info",
-            responsible_attendant=display_name,
-            opened_at="30/06/2026 07:55",
-            opened_time="2h 07m",
-            last_update="30/06/2026 09:05",
-            source="E-mail",
-            description_suffix=f"Mock temporario associado ao usuario {slug}.",
-        ),
-    ]
-
-
-def _build_attendant_columns():
-    User = get_user_model()
-    attendant_users = list(
-        User.objects.filter(groups__name=ATTENDANT_GROUP_NAME).order_by("first_name", "username").distinct()
-    )
-
-    columns = []
-    for position, user in enumerate(attendant_users, start=1):
-        display_name = user.get_full_name() or user.username
-        initials = "".join(part[0] for part in display_name.split()[:2]).upper() or user.username[:2].upper()
-        ticket_list = _build_default_attendant_tickets(user, position)
-        columns.append(
-            {
-                "id": f"attendant-{user.username}",
-                "username": user.username,
-                "name": display_name,
-                "role": "Atendente TI",
-                "avatar": initials[:2],
-                "tickets": ticket_list,
-            }
-        )
-
-    if columns:
-        return columns
-
-    return [
-        {
-            "id": "atendente-alex",
-            "username": "alex.silva",
-            "name": "Alex Silva",
-            "role": "Infraestrutura",
-            "avatar": "AS",
-            "tickets": [
-                _default_ticket_payload(
-                    number="INC-1048",
-                    title="Notebook sem acesso a VPN",
-                    requester="Mariana Costa",
-                    requester_email="mariana.costa@empresa.local",
-                    department="Comercial",
-                    category="Acesso remoto",
-                    subcategory="VPN corporativa",
-                    priority="Alta",
-                    priority_class="priority-high",
-                    status="Em atendimento",
-                    status_class="status-warning",
-                    responsible_attendant="Alex Silva",
-                    opened_at="30/06/2026 07:40",
-                    opened_time="1h 42m",
-                    last_update="30/06/2026 08:58",
-                    source="Portal de chamados",
-                    description_suffix="O notebook apresenta falha de autenticacao ao conectar na VPN corporativa.",
-                ),
-                _default_ticket_payload(
-                    number="INC-1039",
-                    title="Erro no cliente de e-mail do financeiro",
-                    requester="Carlos Mota",
-                    requester_email="carlos.mota@empresa.local",
-                    department="Financeiro",
-                    category="E-mail",
-                    subcategory="Cliente Outlook",
-                    priority="Media",
-                    priority_class="priority-medium",
-                    status="Em atendimento",
-                    status_class="status-warning",
-                    responsible_attendant="Alex Silva",
-                    opened_at="30/06/2026 06:58",
-                    opened_time="3h 15m",
-                    last_update="30/06/2026 08:50",
-                    source="Telefone",
-                    description_suffix="O cliente de e-mail abre, mas nao sincroniza a caixa de entrada.",
-                ),
-            ],
-        },
-        {
-            "id": "atendente-bianca",
-            "username": "bianca.torres",
-            "name": "Bianca Torres",
-            "role": "Suporte N1",
-            "avatar": "BT",
-            "tickets": [
-                _default_ticket_payload(
-                    number="REQ-2081",
-                    title="Criacao de usuario para novo colaborador",
-                    requester="RH Corporativo",
-                    requester_email="rh@empresa.local",
-                    department="Recursos Humanos",
-                    category="Cadastro",
-                    subcategory="Usuario novo",
-                    priority="Baixa",
-                    priority_class="priority-low",
-                    status="Pendente de aprovacao",
-                    status_class="status-info",
-                    responsible_attendant="Bianca Torres",
-                    opened_at="30/06/2026 04:58",
-                    opened_time="5h 08m",
-                    last_update="30/06/2026 08:32",
-                    source="E-mail",
-                    description_suffix="Solicitacao para preparar o acesso do novo colaborador da area de RH.",
-                )
-            ],
-        },
-        {
-            "id": "atendente-diego",
-            "username": "diego.rocha",
-            "name": "Diego Rocha",
-            "role": "Redes e Servidores",
-            "avatar": "DR",
-            "tickets": [
-                _default_ticket_payload(
-                    number="INC-1054",
-                    title="Oscilacao de internet na filial",
-                    requester="Unidade Campinas",
-                    requester_email="campinas@empresa.local",
-                    department="Operacoes",
-                    category="Rede",
-                    subcategory="Link principal",
-                    priority="Critica",
-                    priority_class="priority-critical",
-                    status="Critico",
-                    status_class="status-danger",
-                    responsible_attendant="Diego Rocha",
-                    opened_at="30/06/2026 09:08",
-                    opened_time="27m",
-                    last_update="30/06/2026 09:26",
-                    source="Monitoramento",
-                    description_suffix="Oscilacao recorrente no link principal da unidade, exigindo verificacao de redes.",
-                )
-            ],
-        },
-    ]
-
-
-def _build_unassigned_tickets():
-    return [
-        _default_ticket_payload(
-            number="INC-1058",
-            title="Impressora do faturamento nao responde",
-            requester="Patricia Gomes",
-            requester_email="patricia.gomes@empresa.local",
-            department="Financeiro",
-            category="Impressao",
-            subcategory="Driver da impressora",
-            priority="Media",
-            priority_class="priority-medium",
-            status="Nao atribuido",
-            status_class="status-muted",
-            responsible_attendant=None,
-            opened_at="30/06/2026 09:34",
-            opened_time="18m",
-            last_update="30/06/2026 09:41",
-            source="Portal de chamados",
-            description_suffix="A impressora do setor nao conclui a fila de impressao do fechamento.",
-        ),
-        _default_ticket_payload(
-            number="INC-1056",
-            title="Senha expirada no ERP",
-            requester="Joao Pedro",
-            requester_email="joao.pedro@empresa.local",
-            department="Comercial",
-            category="Acesso",
-            subcategory="ERP",
-            priority="Alta",
-            priority_class="priority-high",
-            status="Nao atribuido",
-            status_class="status-muted",
-            responsible_attendant=None,
-            opened_at="30/06/2026 08:58",
-            opened_time="52m",
-            last_update="30/06/2026 09:22",
-            source="Telefone",
-            description_suffix="O usuario nao consegue redefinir a senha pelo fluxo de autoatendimento.",
-        ),
-        _default_ticket_payload(
-            number="REQ-2084",
-            title="Instalacao do pacote Adobe",
-            requester="Time de Marketing",
-            requester_email="marketing@empresa.local",
-            department="Marketing",
-            category="Software",
-            subcategory="Licenca Adobe",
-            priority="Baixa",
-            priority_class="priority-low",
-            status="Nao atribuido",
-            status_class="status-muted",
-            responsible_attendant=None,
-            opened_at="30/06/2026 07:46",
-            opened_time="2h 05m",
-            last_update="30/06/2026 09:14",
-            source="E-mail",
-            description_suffix="Solicitacao de instalacao para criacao de materiais da campanha atual.",
-        ),
-    ]
-
-
-def _collect_ticket_details(attendants, unassigned_tickets):
-    ticket_details_map = {ticket["number"]: ticket for ticket in unassigned_tickets}
-    for attendant in attendants:
-        for ticket in attendant["tickets"]:
-            ticket_details_map[ticket["number"]] = ticket
-    return ticket_details_map
-
-
-def _sync_mock_tickets(ticket_details_map):
-    for payload in ticket_details_map.values():
-        Chamado.objects.update_or_create(
-            numero=payload["number"],
-            defaults={
-                "titulo": payload["title"],
-                "descricao": payload["description"],
-                "solicitante_nome": payload["requester"],
-                "solicitante_email": payload["requester_email"],
-                "departamento": payload["department"],
-                "categoria": payload["category"],
-                "subcategoria": payload["subcategory"] or "",
-                "prioridade": payload["priority"],
-                "status": payload["status"],
-                "origem": payload["source"],
-                "aberto_em_referencia": payload["opened_at"],
-                "ultima_atualizacao_referencia": payload["last_update"],
-            },
-        )
-
-
 def _serialize_attendance_state(attendance: AtendimentoHistorico | None):
     if not attendance:
         return None
@@ -536,41 +147,6 @@ def _serialize_attendance_state(attendance: AtendimentoHistorico | None):
         "started_at_display": timezone.localtime(attendance.iniciado_em).strftime("%d/%m/%Y %H:%M"),
         "elapsed_display": _format_duration(elapsed),
     }
-
-
-def _append_attendance_state(ticket, active_state):
-    is_active = bool(active_state and active_state["ticket_number"] == ticket["number"])
-    ticket["attendance"] = {
-        "is_active": is_active,
-        "started_at_iso": active_state["started_at_iso"] if is_active else "",
-        "started_at_display": active_state["started_at_display"] if is_active else "",
-        "elapsed_display": active_state["elapsed_display"] if is_active else "",
-    }
-    return ticket
-
-
-def _prepare_dashboard_payload_for_user(user):
-    attendants = _build_attendant_columns()
-    unassigned_tickets = _build_unassigned_tickets()
-    ticket_details_map = _collect_ticket_details(attendants, unassigned_tickets)
-    _sync_mock_tickets(ticket_details_map)
-
-    active_attendance = (
-        AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=user, finalizado_em__isnull=True)
-        .first()
-    )
-    active_state = _serialize_attendance_state(active_attendance)
-
-    for ticket in unassigned_tickets:
-        _append_attendance_state(ticket, active_state)
-    for attendant in attendants:
-        for ticket in attendant["tickets"]:
-            _append_attendance_state(ticket, active_state)
-    for ticket in ticket_details_map.values():
-        _append_attendance_state(ticket, active_state)
-
-    return attendants, unassigned_tickets, ticket_details_map, active_state
 
 
 def _json_error(message, status=400, **extra):
@@ -611,27 +187,146 @@ def login_view(request):
     return render(request, "core/login.html", context)
 
 
-@login_required
+KANBAN_COLUMNS = [
+    (Chamado.STATUS_ABERTO, "Aberto"),
+    (Chamado.STATUS_EM_ATENDIMENTO, "Em atendimento"),
+    (Chamado.STATUS_AGUARDANDO_USUARIO, "Aguardando"),
+    (Chamado.STATUS_RESOLVIDO, "Resolvido"),
+    (Chamado.STATUS_FECHADO, "Fechado"),
+]
+
+_STATUS_ALIASES = {
+    "": Chamado.STATUS_ABERTO,
+    "nao_atribuido": Chamado.STATUS_ABERTO,
+    "aguardando": Chamado.STATUS_AGUARDANDO_USUARIO,
+    "concluido": Chamado.STATUS_RESOLVIDO,
+    "cancelado": Chamado.STATUS_FECHADO,
+}
+
+
+def _canonical_status(raw: str) -> str:
+    """Resolve o status para uma das chaves canonicas das colunas do Kanban."""
+    value = (raw or "").strip().lower().replace(" ", "_")
+    valid = {key for key, _ in Chamado.STATUS_CHOICES}
+    if value in valid:
+        return value
+    return _STATUS_ALIASES.get(value, Chamado.STATUS_ABERTO)
+
+
+def _requester_display(chamado: Chamado) -> str:
+    if chamado.solicitante_nome:
+        return chamado.solicitante_nome
+    if chamado.solicitante:
+        return chamado.solicitante.get_full_name() or chamado.solicitante.username
+    return "-"
+
+
+def _serialize_kanban_card(chamado: Chamado, active_state):
+    is_active = bool(active_state and active_state["ticket_number"] == chamado.numero)
+    return {
+        "number": chamado.numero,
+        "title": chamado.titulo,
+        "requester": _requester_display(chamado),
+        "opened_at": timezone.localtime(chamado.criado_em).strftime("%d/%m/%Y %H:%M"),
+        "status": chamado.status,
+        "status_label": chamado.status_label,
+        "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+        "priority_label": chamado.prioridade_label,
+        "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
+        "attendance": {
+            "is_active": is_active,
+            "started_at_iso": active_state["started_at_iso"] if is_active else "",
+            "elapsed_display": active_state["elapsed_display"] if is_active else "",
+        },
+    }
+
+
+@ti_required
 def tickets_dashboard_view(request):
-    attendants, unassigned_tickets, ticket_details_map, active_attendance = _prepare_dashboard_payload_for_user(request.user)
+    active_attendance = (
+        AtendimentoHistorico.objects.select_related("chamado")
+        .filter(atendente=request.user, finalizado_em__isnull=True)
+        .first()
+    )
+    active_state = _serialize_attendance_state(active_attendance)
+
+    grouped = {key: [] for key, _ in KANBAN_COLUMNS}
+    chamados = Chamado.objects.select_related("solicitante").order_by("-criado_em")
+    for chamado in chamados:
+        grouped[_canonical_status(chamado.status)].append(_serialize_kanban_card(chamado, active_state))
+
+    columns = [
+        {"key": key, "label": label, "tickets": grouped[key], "count": len(grouped[key])}
+        for key, label in KANBAN_COLUMNS
+    ]
+    total = sum(col["count"] for col in columns)
 
     stats = {
-        "total_open": sum(len(attendant["tickets"]) for attendant in attendants) + len(unassigned_tickets),
-        "unassigned": len(unassigned_tickets),
-        "attendants": len(attendants),
+        "total": total,
+        "em_aberto": sum(
+            col["count"] for col in columns if col["key"] not in Chamado.STATUS_ENCERRADOS
+        ),
+        "encerrados": sum(
+            col["count"] for col in columns if col["key"] in Chamado.STATUS_ENCERRADOS
+        ),
     }
 
     context = {
         "page_title": "Painel de Chamados TI",
-        "attendants": attendants,
-        "unassigned_tickets": unassigned_tickets,
-        "ticket_details_map": ticket_details_map,
-        "active_attendance": active_attendance,
+        "columns": columns,
         "stats": stats,
         "is_admin": is_admin_user(request.user),
-        "can_view_history": is_admin_user(request.user) or is_attendant_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
     }
     return render(request, "chamados/dashboard_atendente.html", context)
+
+
+@login_required
+@require_POST
+def update_ticket_status_view(request):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para alterar o status de chamados.", status=403)
+
+    payload = _load_request_payload(request)
+    if payload is None:
+        return _json_error("Nao foi possivel ler os dados enviados.")
+
+    ticket_number = (payload.get("ticket_number") or "").strip()
+    new_status = (payload.get("status") or "").strip()
+
+    if not ticket_number:
+        return _json_error("Informe o chamado a atualizar.")
+    if new_status not in {key for key, _ in Chamado.STATUS_CHOICES}:
+        return _json_error("Status invalido.")
+
+    chamado = Chamado.objects.filter(numero=ticket_number).first()
+    if not chamado:
+        return _json_error("Chamado nao encontrado.", status=404)
+
+    previous_status = chamado.status
+    chamado.status = new_status
+    update_fields = ["status", "atualizado_em"]
+
+    if new_status in Chamado.STATUS_ENCERRADOS and not chamado.fechado_em:
+        chamado.fechado_em = timezone.now()
+        update_fields.append("fechado_em")
+    elif new_status not in Chamado.STATUS_ENCERRADOS and chamado.fechado_em:
+        chamado.fechado_em = None
+        update_fields.append("fechado_em")
+
+    chamado.save(update_fields=update_fields)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Chamado {ticket_number} movido para {chamado.status_label}.",
+            "ticket_number": ticket_number,
+            "status": new_status,
+            "status_label": chamado.status_label,
+            "previous_status": previous_status,
+        }
+    )
 
 
 @login_required

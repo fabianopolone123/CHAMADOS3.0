@@ -2,14 +2,15 @@
 
 ## Em andamento
 
-- Estruturar as primeiras funcionalidades autenticadas do portal
-- Definir os modelos e fluxos de abertura de chamados
-- Planejar a persistencia real do quadro Kanban
-- Evoluir o modal de detalhes do chamado para consumir API real quando existir backend persistido
-- Construir a tela futura de consulta do historico de atendimento por chamado e por atendente
+- Atribuir chamados a um atendente responsavel de forma persistida
+- Exibir os anexos do chamado tambem na visao de detalhe da TI
+- Refletir no card a cor do badge de status apos o drag sem exigir refresh
 
 ## Concluidas
 
+- Migrado o Kanban da TI para chamados reais do banco, com colunas por status e persistencia da movimentacao
+- Removidos os dados mockados/fixos do Kanban e os chamados-fixture do banco
+- Criado o endpoint protegido de atualizacao de status com CSRF e permissao de TI
 - Criado o portal do solicitante (visao do usuario comum) com abertura, listagem e detalhe de chamados
 - Adicionado roteamento pos-login por perfil (TI para o Kanban, usuario comum para o portal)
 - Vinculado o chamado ao usuario solicitante e adicionados choices de status e prioridade

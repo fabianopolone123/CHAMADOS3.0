@@ -14,6 +14,7 @@ from .views import (
     ticket_detail_view,
     tickets_dashboard_view,
     toggle_attendant_permission_view,
+    update_ticket_status_view,
 )
 
 urlpatterns = [
@@ -21,6 +22,7 @@ urlpatterns = [
     path("chamados/", tickets_dashboard_view, name="tickets_dashboard"),
     path("chamados/atendimento/iniciar/", start_attendance_view, name="start_attendance"),
     path("chamados/atendimento/encerrar/", finish_attendance_view, name="finish_attendance"),
+    path("chamados/status/atualizar/", update_ticket_status_view, name="update_ticket_status"),
     path("meus-chamados/", my_tickets_view, name="my_tickets"),
     path("meus-chamados/novo/", open_ticket_view, name="open_ticket"),
     path("meus-chamados/<str:numero>/", ticket_detail_view, name="ticket_detail"),

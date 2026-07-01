@@ -12,16 +12,17 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 4. Em caso de erro, o sistema deve exibir mensagem amigavel sem expor detalhes internos do AD.
 5. O logout deve encerrar a sessao e retornar o usuario para a tela de login.
 
-## Regras atuais do painel de atendimento
+## Regras atuais do painel de atendimento (Kanban)
 
-1. A interface inicial apos login deve abrir em `/chamados/`.
-2. A visao inicial atual e exclusiva para Atendente TI.
-3. O quadro deve possuir uma coluna fixa de chamados nao atribuidos.
-4. O quadro deve possuir uma coluna para cada atendente de TI exibido.
-5. Os cards devem ser arrastaveis entre as colunas.
-6. A movimentacao atual e apenas visual e ainda nao deve salvar no banco.
-7. O sistema deve deixar claro no codigo que a persistencia ficara para uma etapa futura.
-8. Cada card deve permitir iniciar, pausar e finalizar um periodo de atendimento.
+1. O Kanban e acessivel apenas para administrador e Atendente TI; o usuario comum e redirecionado para o portal.
+2. O quadro lista os chamados reais do banco (model `Chamado`), sem dados mockados.
+3. As colunas representam os status do chamado: Aberto, Em atendimento, Aguardando, Resolvido e Fechado.
+4. Cada chamado aparece na coluna correspondente ao status salvo no banco.
+5. Cada card exibe numero, titulo, solicitante, data de abertura e status atual.
+6. Os cards sao arrastaveis entre as colunas e a movimentacao salva o novo status no banco.
+7. A alteracao de status usa endpoint `POST` protegido por login e permissao de TI, com CSRF; usuario comum nao altera status.
+8. Clicar em um card abre a tela de detalhe do chamado.
+9. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
 
 ## Regras atuais de controle de tempo
 

@@ -42,7 +42,8 @@ Metodos e propriedades:
 Observacoes:
 
 - Chamados abertos pelo portal do solicitante nascem com `solicitante`, `numero` gerado, `status = aberto` e `origem = "Portal do solicitante"`.
-- Os chamados do Kanban ainda nascem de dados mockados sincronizados com o banco via `update_or_create` ao abrir a dashboard.
+- O Kanban da TI usa exclusivamente chamados reais do banco, agrupados pelo campo `status` (sem dados mockados).
+- A alteracao de status pelo Kanban grava diretamente no campo `status`; ao encerrar (`resolvido`/`fechado`) o campo `fechado_em` e preenchido.
 - O campo `numero` e unico e serve como chave de referencia entre o Kanban, o portal e o backend.
 - `solicitante` usa `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
 

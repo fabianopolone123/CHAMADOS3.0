@@ -2,6 +2,12 @@
 
 ## 2026-07-01
 
+- Migrado o Kanban da TI para usar chamados reais do banco, agrupados por status, removendo todo o dado mockado/fixo.
+- Removidos os 9 chamados-fixture do banco (e os registros de atendimento vinculados) apos backup.
+- Definidas as colunas do Kanban pelos status do model: Aberto, Em atendimento, Aguardando, Resolvido e Fechado.
+- Criado o endpoint `POST /chamados/status/atualizar/` para alterar o status via drag-and-drop, com login, permissao de TI e CSRF.
+- Restringido o acesso ao Kanban a administrador e Atendente TI; usuario comum e redirecionado ao portal.
+- Cards do Kanban agora exibem numero, titulo, solicitante, data de abertura e status; clique abre o detalhe.
 - Simplificada a abertura de chamado pelo usuario comum para apenas titulo, descricao e anexos.
 - Criado o modelo `ChamadoAnexo` para vincular arquivos ao chamado, sem restricao de tamanho ou extensao.
 - Adicionado suporte a upload de multiplos arquivos com `multipart/form-data`.
