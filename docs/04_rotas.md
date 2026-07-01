@@ -6,10 +6,10 @@
 |---|---|---|---|
 | `/` | GET | Redireciona para login ou landing conforme a sessao e o perfil | Implementada |
 | `/login/` | GET, POST | Tela de login com autenticacao AD/LDAP; roteia por perfil apos autenticar | Implementada |
-| `/chamados/` | GET | Quadro Kanban com chamados reais agrupados por status (apenas TI/admin) | Implementada |
+| `/chamados/` | GET | Kanban por atendente: coluna de abertos, colunas por Atendente TI e coluna de fechados (apenas TI/admin) | Implementada |
 | `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza o atendimento ativo com descricao obrigatoria | Implementada |
-| `/chamados/status/atualizar/` | POST | Altera o status de um chamado (drag-and-drop do Kanban); apenas TI/admin | Implementada |
+| `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe do chamado com anexos, historico de eventos e timeline de atendimentos | Implementada |
@@ -29,17 +29,19 @@
 - O backend valida que `pause` e `stop` exigem descricao obrigatoria.
 - As respostas dessas rotas sao em `JsonResponse` para consumo do JavaScript do Kanban.
 
-## Regras do Kanban e da atualizacao de status
+## Regras do Kanban e da movimentacao de chamados
 
 - `/chamados/` usa o decorator `ti_required`: administrador e Atendente TI acessam; usuario comum e redirecionado para `/meus-chamados/`.
-- O Kanban lista chamados reais do banco (model `Chamado`), sem dados mockados, agrupados por status.
-- As colunas representam os status: Aberto, Em atendimento, Aguardando, Resolvido, Fechado.
-- `/chamados/status/atualizar/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403` em JSON).
-- A rota aceita apenas `POST`, recebe `ticket_number` e `status` em JSON, valida o status contra os choices do model e usa CSRF via header `X-CSRFToken`.
-- Ao mover um chamado para `resolvido` ou `fechado`, o campo `fechado_em` e preenchido; ao reabrir, e limpo.
-- Ao mover um chamado, o `atendente_atual` passa a ser o usuario que moveu (nao e dono do chamado) e a acao e registrada em `ChamadoEvento`.
-- A resposta JSON retorna `status_label` e `status_class` para o Kanban atualizar o texto e a cor do badge sem recarregar a pagina.
-- Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir); clicar no card abre o detalhe do chamado.
+- O Kanban lista chamados reais do banco (model `Chamado`), sem dados mockados.
+- Colunas: "Chamados abertos" (fixa) + uma coluna por usuario do grupo `Atendente TI` + "Chamados fechados" (fixa).
+- `/chamados/mover/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403` em JSON) e aceita apenas `POST` (GET retorna `405`).
+- Recebe em JSON: `ticket_number`, `target` (`aberto`, `atendente` ou `fechado`) e, quando `target=atendente`, `attendant_id`.
+- Valida que o `attendant_id` pertence ao grupo `Atendente TI` (caso contrario retorna `400`).
+- `target=atendente`: define `atendente_atual` e status "Em atendimento". `target=aberto`: status "Aberto" e limpa `atendente_atual`. `target=fechado`: status "Fechado", preenche `fechado_em` e registra quem fechou.
+- O `atendente_atual` e apenas o atendente que agiu por ultimo; nao e dono do chamado.
+- Toda movimentacao registra eventos em `ChamadoEvento` (mudanca de status e/ou troca de atendente).
+- A resposta JSON retorna `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban atualizar texto e cor do badge e o atendente do card sem recarregar a pagina.
+- Usa CSRF via header `X-CSRFToken`.
 
 ## Regras de acesso a anexos
 

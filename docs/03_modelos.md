@@ -48,7 +48,8 @@ Observacoes:
 
 - Chamados abertos pelo portal do solicitante nascem com `solicitante`, `numero` gerado, `status = aberto` e `origem = "Portal do solicitante"`.
 - O Kanban da TI usa exclusivamente chamados reais do banco, agrupados pelo campo `status` (sem dados mockados).
-- A alteracao de status pelo Kanban grava `status` e `atendente_atual` (usuario que moveu); ao encerrar (`resolvido`/`fechado`) o campo `fechado_em` e preenchido e o ultimo atendente e mantido.
+- O Kanban e organizado por fila: coluna fixa de abertos, colunas dinamicas por usuario do grupo `Atendente TI` e coluna fixa de fechados.
+- A movimentacao pelo Kanban grava `status` e `atendente_atual` conforme a coluna de destino; ao fechar, `fechado_em` e preenchido e o atendente que fechou e registrado; ao voltar para abertos, o `atendente_atual` e limpo.
 - O campo `numero` e unico e serve como chave de referencia entre o Kanban, o portal e o backend.
 - `solicitante` e `atendente_atual` usam `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
 

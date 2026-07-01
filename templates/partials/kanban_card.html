@@ -1,0 +1,57 @@
+<article
+    class="ticket-card ticket-card--clickable{% if ticket.attendance.is_active %} ticket-card--active{% endif %}"
+    tabindex="0"
+    data-ticket-number="{{ ticket.number }}"
+    data-ticket-title="{{ ticket.title }}"
+    data-detail-url="{% url 'ticket_detail' numero=ticket.number %}"
+    data-ticket-active="{{ ticket.attendance.is_active|yesno:'true,false' }}"
+    data-ticket-started-at="{{ ticket.attendance.started_at_iso }}"
+    aria-label="Abrir detalhes do chamado {{ ticket.number }}"
+>
+    <div class="ticket-card-top">
+        <span class="ticket-number">{{ ticket.number }}</span>
+        <span class="priority-badge {{ ticket.priority_class }}">{{ ticket.priority_label }}</span>
+    </div>
+    <h4 class="ticket-title">{{ ticket.title }}</h4>
+    <dl class="ticket-meta">
+        <div>
+            <dt>Solicitante</dt>
+            <dd>{{ ticket.requester }}</dd>
+        </div>
+        <div>
+            <dt>Aberto em</dt>
+            <dd>{{ ticket.opened_at }}</dd>
+        </div>
+        <div>
+            <dt>Status</dt>
+            <dd><span class="status-badge {{ ticket.status_class }}" data-status-badge>{{ ticket.status_label }}</span></dd>
+        </div>
+        <div class="ticket-attendant-row{% if not ticket.current_attendant %} is-hidden{% endif %}" data-attendant-row>
+            <dt>Atendente</dt>
+            <dd data-current-attendant>{{ ticket.current_attendant }}</dd>
+        </div>
+    </dl>
+
+    <div class="ticket-attendance-panel">
+        <div class="ticket-attendance-state">
+            <span class="ticket-attendance-indicator{% if ticket.attendance.is_active %} ticket-attendance-indicator--active{% endif %}" data-ticket-state>
+                {% if ticket.attendance.is_active %}Em atendimento{% else %}Pronto para iniciar{% endif %}
+            </span>
+            <span class="ticket-attendance-timer{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-timer>
+                {{ ticket.attendance.elapsed_display|default:"0m" }}
+            </span>
+        </div>
+
+        <div class="ticket-action-buttons">
+            <button type="button" class="ticket-action-btn ticket-action-btn--play{% if ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="play" aria-label="Iniciar atendimento">
+                <span>Play</span>
+            </button>
+            <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
+                <span>Pause</span>
+            </button>
+            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
+                <span>Stop</span>
+            </button>
+        </div>
+    </div>
+</article>

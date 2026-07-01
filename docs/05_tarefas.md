@@ -7,6 +7,9 @@
 
 ## Concluidas
 
+- Reorganizado o Kanban por fila: coluna de abertos, colunas por Atendente TI e coluna de fechados
+- Simplificado o menu do Atendente TI para apenas Chamados e Permissoes
+- Criado o endpoint de movimentacao por coluna de destino (aberto/atendente/fechado) com validacao do atendente
 - Registrado o atendente atual (quem movimenta o chamado) sem trata-lo como dono do chamado
 - Criado o model ChamadoEvento e o log de eventos (criacao, mudanca de status, troca de atendente)
 - Exibidos anexos (com data e usuario) e historico do chamado no detalhe, com download protegido de anexos

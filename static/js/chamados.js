@@ -15,7 +15,7 @@
 
     const startAttendanceUrl = appElement.dataset.startAttendanceUrl;
     const finishAttendanceUrl = appElement.dataset.finishAttendanceUrl;
-    const updateStatusUrl = appElement.dataset.updateStatusUrl;
+    const moveTicketUrl = appElement.dataset.moveTicketUrl;
 
     let dragInProgress = false;
     let activeTicketNumber = null;
@@ -298,29 +298,29 @@
     function applyAttendantState(card, attendantName) {
         const row = card.querySelector("[data-attendant-row]");
         const value = card.querySelector("[data-current-attendant]");
-        if (value && attendantName) {
-            value.textContent = attendantName;
+        if (value) {
+            value.textContent = attendantName || "";
         }
-        if (row && attendantName) {
-            row.classList.remove("is-hidden");
+        if (row) {
+            row.classList.toggle("is-hidden", !attendantName);
         }
     }
 
-    async function persistStatusChange(ticketNumber, newStatus, event) {
+    async function persistMove(payload, event) {
         const card = event.item;
         try {
-            const result = await sendJson(updateStatusUrl, { ticket_number: ticketNumber, status: newStatus });
+            const result = await sendJson(moveTicketUrl, payload);
             applyBadgeState(card, result.status_label, result.status_class);
             applyAttendantState(card, result.atendente_atual);
             updateColumnCounts();
-            showToast(result.message || "Status atualizado.", "success");
+            showToast(result.message || "Chamado movido.", "success");
         } catch (error) {
             // reverte a movimentacao visual em caso de falha
             const origin = event.from;
             const reference = origin.children[event.oldIndex] || null;
             origin.insertBefore(card, reference);
             updateColumnCounts();
-            showToast(error.message || "Nao foi possivel atualizar o status.", "error");
+            showToast(error.message || "Nao foi possivel movimentar o chamado.", "error");
         }
     }
 
@@ -346,15 +346,30 @@
                         dragInProgress = false;
                     }, 0);
 
-                    const fromStatus = event.from.dataset.status;
-                    const toStatus = event.to.dataset.status;
                     const ticketNumber = event.item.dataset.ticketNumber;
+                    const target = event.to.dataset.columnType;
+                    const attendantId = event.to.dataset.attendantId;
+                    const fromAttendantId = event.from.dataset.attendantId;
 
-                    if (!ticketNumber || !toStatus || fromStatus === toStatus) {
+                    if (!ticketNumber || !target) {
                         return;
                     }
 
-                    persistStatusChange(ticketNumber, toStatus, event);
+                    // sem mudanca real de coluna
+                    if (event.from === event.to) {
+                        return;
+                    }
+                    // mesma coluna de atendente (por seguranca)
+                    if (target === "atendente" && attendantId === fromAttendantId) {
+                        return;
+                    }
+
+                    const payload = { ticket_number: ticketNumber, target: target };
+                    if (target === "atendente") {
+                        payload.attendant_id = attendantId;
+                    }
+
+                    persistMove(payload, event);
                 },
             });
         });

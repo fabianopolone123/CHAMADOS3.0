@@ -12,23 +12,28 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 4. Em caso de erro, o sistema deve exibir mensagem amigavel sem expor detalhes internos do AD.
 5. O logout deve encerrar a sessao e retornar o usuario para a tela de login.
 
-## Regras atuais do painel de atendimento (Kanban)
+## Regras atuais do painel de atendimento (Kanban por atendente)
 
 1. O Kanban e acessivel apenas para administrador e Atendente TI; o usuario comum e redirecionado para o portal.
-2. O quadro lista os chamados reais do banco (model `Chamado`), sem dados mockados.
-3. As colunas representam os status do chamado: Aberto, Em atendimento, Aguardando, Resolvido e Fechado.
-4. Cada chamado aparece na coluna correspondente ao status salvo no banco.
-5. Cada card exibe numero, titulo, solicitante, data de abertura e status atual.
-6. Os cards sao arrastaveis entre as colunas e a movimentacao salva o novo status no banco.
-7. A alteracao de status usa endpoint `POST` protegido por login e permissao de TI, com CSRF; usuario comum nao altera status.
-8. Ao mover um chamado, o usuario que moveu e registrado como `atendente_atual`; isso NAO o torna dono do chamado (o dono e sempre o solicitante).
-9. Ao encerrar (`resolvido`/`fechado`), o ultimo atendente que agiu e mantido.
-10. Toda acao relevante gera um registro em `ChamadoEvento` (criacao, mudanca de status e troca de atendente).
-11. Ao arrastar, o badge de status do card atualiza texto e cor imediatamente, sem refresh.
-12. Clicar em um card abre a tela de detalhe do chamado.
-13. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
-14. O detalhe do chamado exibe os anexos (nome, link de download, data e usuario que enviou) e o historico de eventos.
-15. Anexos so podem ser baixados pelo dono do chamado ou por TI/admin.
+2. O menu do Atendente TI mostra apenas "Chamados" (o Kanban) e "Permissoes".
+3. O quadro lista os chamados reais do banco (model `Chamado`), sem dados mockados.
+4. A primeira coluna e fixa: "Chamados abertos" (chamados nao encerrados e sem atendente atual).
+5. As colunas do meio sao dinamicas: uma para cada usuario do grupo `Atendente TI`, exibindo os chamados nao encerrados cujo `atendente_atual` e aquele usuario.
+6. A ultima coluna e fixa: "Chamados fechados" (status `resolvido` ou `fechado`).
+7. Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir).
+8. Arrastar para a coluna de um atendente define o `atendente_atual` como aquele usuario e o status como "Em atendimento".
+9. Arrastar entre atendentes atualiza o `atendente_atual`.
+10. Arrastar para "Chamados fechados" marca o status como "Fechado", registra quem fechou e preenche `fechado_em`.
+11. Arrastar para "Chamados abertos" volta o status para "Aberto" e limpa o `atendente_atual`.
+12. O `atendente_atual` NAO torna o usuario dono do chamado; o dono e sempre o solicitante que abriu.
+13. Toda movimentacao e salva no banco e gera registro em `ChamadoEvento`.
+14. A movimentacao usa endpoint `POST` protegido por login e permissao de TI, com CSRF; usuario comum nao movimenta chamados.
+15. O atendente de destino e validado no backend: precisa pertencer ao grupo `Atendente TI`.
+16. Ao arrastar, o badge de status do card atualiza texto e cor imediatamente, sem refresh.
+17. Clicar em um card abre a tela de detalhe do chamado.
+18. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
+19. O detalhe do chamado exibe os anexos (nome, link de download, data e usuario que enviou) e o historico de eventos.
+20. Anexos so podem ser baixados pelo dono do chamado ou por TI/admin.
 
 ## Regras atuais de controle de tempo
 

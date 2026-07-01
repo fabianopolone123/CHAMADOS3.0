@@ -2,6 +2,10 @@
 
 ## 2026-07-01
 
+- Reorganizado o Kanban para funcionar por fila e por atendente: coluna fixa "Chamados abertos", colunas dinamicas por Atendente TI e coluna fixa "Chamados fechados".
+- Substituido o endpoint de status por `POST /chamados/mover/`, que recebe a coluna de destino (aberto/atendente/fechado) e valida o atendente de destino.
+- Movimentacao entre colunas atualiza status e `atendente_atual`, registra o historico (puxar, transferir, fechar, devolver) e responde com dados para o badge atualizar sem refresh.
+- Simplificado o menu do perfil Atendente TI para apenas "Chamados" e "Permissoes".
 - Adicionado o campo `atendente_atual` ao `Chamado` (usuario que realizou a ultima acao; nao e dono do chamado).
 - Criado o model `ChamadoEvento` como log de eventos do chamado (criacao, mudanca de status, troca de atendente).
 - Ao mover um card no Kanban, o sistema salva status e atendente atual e registra os eventos correspondentes, sem duplicar registros.

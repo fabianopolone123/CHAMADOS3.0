@@ -187,30 +187,14 @@ def login_view(request):
     return render(request, "core/login.html", context)
 
 
-KANBAN_COLUMNS = [
-    (Chamado.STATUS_ABERTO, "Aberto"),
-    (Chamado.STATUS_EM_ATENDIMENTO, "Em atendimento"),
-    (Chamado.STATUS_AGUARDANDO_USUARIO, "Aguardando"),
-    (Chamado.STATUS_RESOLVIDO, "Resolvido"),
-    (Chamado.STATUS_FECHADO, "Fechado"),
-]
-
-_STATUS_ALIASES = {
-    "": Chamado.STATUS_ABERTO,
-    "nao_atribuido": Chamado.STATUS_ABERTO,
-    "aguardando": Chamado.STATUS_AGUARDANDO_USUARIO,
-    "concluido": Chamado.STATUS_RESOLVIDO,
-    "cancelado": Chamado.STATUS_FECHADO,
-}
-
-
-def _canonical_status(raw: str) -> str:
-    """Resolve o status para uma das chaves canonicas das colunas do Kanban."""
-    value = (raw or "").strip().lower().replace(" ", "_")
-    valid = {key for key, _ in Chamado.STATUS_CHOICES}
-    if value in valid:
-        return value
-    return _STATUS_ALIASES.get(value, Chamado.STATUS_ABERTO)
+def _attendant_users():
+    """Usuarios do grupo Atendente TI, na ordem de exibicao das colunas."""
+    User = get_user_model()
+    return list(
+        User.objects.filter(groups__name=ATTENDANT_GROUP_NAME)
+        .order_by("first_name", "username")
+        .distinct()
+    )
 
 
 def _requester_display(chamado: Chamado) -> str:
@@ -257,31 +241,38 @@ def tickets_dashboard_view(request):
     )
     active_state = _serialize_attendance_state(active_attendance)
 
-    grouped = {key: [] for key, _ in KANBAN_COLUMNS}
+    attendants = _attendant_users()
+    attendant_ids = {user.id for user in attendants}
+    by_attendant = {user.id: [] for user in attendants}
+    abertos = []
+    fechados = []
+
     chamados = Chamado.objects.select_related("solicitante", "atendente_atual").order_by("-criado_em")
     for chamado in chamados:
-        grouped[_canonical_status(chamado.status)].append(_serialize_kanban_card(chamado, active_state))
+        card = _serialize_kanban_card(chamado, active_state)
+        if chamado.status in Chamado.STATUS_ENCERRADOS:
+            fechados.append(card)
+        elif chamado.atendente_atual_id in attendant_ids:
+            by_attendant[chamado.atendente_atual_id].append(card)
+        else:
+            abertos.append(card)
 
-    columns = [
-        {"key": key, "label": label, "tickets": grouped[key], "count": len(grouped[key])}
-        for key, label in KANBAN_COLUMNS
+    attendant_columns = [
+        {
+            "attendant_id": user.id,
+            "name": _attendant_display(user),
+            "username": user.username,
+            "tickets": by_attendant[user.id],
+            "count": len(by_attendant[user.id]),
+        }
+        for user in attendants
     ]
-    total = sum(col["count"] for col in columns)
-
-    stats = {
-        "total": total,
-        "em_aberto": sum(
-            col["count"] for col in columns if col["key"] not in Chamado.STATUS_ENCERRADOS
-        ),
-        "encerrados": sum(
-            col["count"] for col in columns if col["key"] in Chamado.STATUS_ENCERRADOS
-        ),
-    }
 
     context = {
         "page_title": "Painel de Chamados TI",
-        "columns": columns,
-        "stats": stats,
+        "open_column": {"tickets": abertos, "count": len(abertos)},
+        "attendant_columns": attendant_columns,
+        "closed_column": {"tickets": fechados, "count": len(fechados)},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
         "can_view_history": True,
@@ -291,35 +282,57 @@ def tickets_dashboard_view(request):
 
 @login_required
 @require_POST
-def update_ticket_status_view(request):
+def move_ticket_view(request):
     if not (is_admin_user(request.user) or is_attendant_user(request.user)):
-        return _json_error("Voce nao tem permissao para alterar o status de chamados.", status=403)
+        return _json_error("Voce nao tem permissao para movimentar chamados.", status=403)
 
     payload = _load_request_payload(request)
     if payload is None:
         return _json_error("Nao foi possivel ler os dados enviados.")
 
     ticket_number = (payload.get("ticket_number") or "").strip()
-    new_status = (payload.get("status") or "").strip()
+    target = (payload.get("target") or "").strip()
 
     if not ticket_number:
-        return _json_error("Informe o chamado a atualizar.")
-    if new_status not in {key for key, _ in Chamado.STATUS_CHOICES}:
-        return _json_error("Status invalido.")
+        return _json_error("Informe o chamado a movimentar.")
+    if target not in {"aberto", "atendente", "fechado"}:
+        return _json_error("Coluna de destino invalida.")
 
     chamado = Chamado.objects.select_related("atendente_atual").filter(numero=ticket_number).first()
     if not chamado:
         return _json_error("Chamado nao encontrado.", status=404)
 
-    autor = request.user.get_full_name() or request.user.username
-    previous_status = chamado.status
+    autor = _attendant_display(request.user)
     previous_status_label = chamado.status_label
+    previous_attendant = chamado.atendente_atual
     previous_attendant_id = chamado.atendente_atual_id
-    status_changed = previous_status != new_status
-    attendant_changed = previous_attendant_id != request.user.id
+    previous_closed = chamado.status in Chamado.STATUS_ENCERRADOS
+
+    novo_atendente = None
+    if target == "atendente":
+        try:
+            attendant_id = int(payload.get("attendant_id"))
+        except (TypeError, ValueError):
+            return _json_error("Atendente de destino invalido.")
+
+        User = get_user_model()
+        novo_atendente = (
+            User.objects.filter(pk=attendant_id, groups__name=ATTENDANT_GROUP_NAME).first()
+        )
+        if not novo_atendente:
+            return _json_error("O atendente de destino nao pertence ao perfil Atendente TI.", status=400)
+        new_status = Chamado.STATUS_EM_ATENDIMENTO
+    elif target == "aberto":
+        new_status = Chamado.STATUS_ABERTO
+    else:  # fechado
+        new_status = Chamado.STATUS_FECHADO
+        novo_atendente = request.user  # registra quem fechou como atendente atual
+
+    status_changed = chamado.status != new_status
+    attendant_changed = previous_attendant_id != (novo_atendente.id if novo_atendente else None)
 
     chamado.status = new_status
-    chamado.atendente_atual = request.user
+    chamado.atendente_atual = novo_atendente
     update_fields = ["status", "atendente_atual", "atualizado_em"]
 
     if new_status in Chamado.STATUS_ENCERRADOS and not chamado.fechado_em:
@@ -339,12 +352,37 @@ def update_ticket_status_view(request):
                 tipo=ChamadoEvento.TIPO_STATUS,
                 descricao=f"Status alterado de {previous_status_label} para {chamado.status_label} por {autor}.",
             )
-        if attendant_changed:
+
+        if target == "atendente" and attendant_changed:
+            destino = _attendant_display(novo_atendente)
+            if previous_attendant is None:
+                if novo_atendente.id == request.user.id:
+                    descricao = f"Chamado puxado para atendimento por {autor}."
+                else:
+                    descricao = f"Chamado atribuido a {destino} por {autor}."
+            else:
+                descricao = (
+                    f"Atendente alterado de {_attendant_display(previous_attendant)} para {destino} por {autor}."
+                )
             ChamadoEvento.registrar(
                 chamado=chamado,
                 usuario=request.user,
                 tipo=ChamadoEvento.TIPO_ATENDENTE,
-                descricao=f"Chamado assumido por {autor}.",
+                descricao=descricao,
+            )
+        elif target == "aberto" and previous_attendant is not None:
+            ChamadoEvento.registrar(
+                chamado=chamado,
+                usuario=request.user,
+                tipo=ChamadoEvento.TIPO_ATENDENTE,
+                descricao=f"Atendente atual removido por {autor}; chamado devolvido para a fila de abertos.",
+            )
+        elif target == "fechado" and not previous_closed:
+            ChamadoEvento.registrar(
+                chamado=chamado,
+                usuario=request.user,
+                tipo=ChamadoEvento.TIPO_ATENDENTE,
+                descricao=f"Chamado fechado por {autor}.",
             )
 
     return JsonResponse(
@@ -352,11 +390,11 @@ def update_ticket_status_view(request):
             "ok": True,
             "message": f"Chamado {ticket_number} movido para {chamado.status_label}.",
             "ticket_number": ticket_number,
-            "status": new_status,
+            "status": chamado.status,
             "status_label": chamado.status_label,
-            "status_class": _STATUS_BADGE_CLASS.get(new_status, "status-muted"),
-            "previous_status": previous_status,
-            "atendente_atual": autor,
+            "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+            "atendente_atual": _attendant_display(chamado.atendente_atual),
+            "atendente_atual_id": chamado.atendente_atual_id,
         }
     )
 
