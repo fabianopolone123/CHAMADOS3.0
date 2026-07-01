@@ -14,7 +14,9 @@
     data-start-attendance-url="{% url 'start_attendance' %}"
     data-finish-attendance-url="{% url 'finish_attendance' %}"
     data-move-ticket-url="{% url 'move_ticket' %}"
+    data-create-ticket-url="{% url 'create_ticket_kanban' %}"
 >
+    {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="chamados" %}
 
     <section class="tickets-main">
@@ -24,6 +26,7 @@
                 <h2 class="topbar-title">Fila de chamados por atendente</h2>
                 <p class="topbar-subtitle">Chamados abertos a esquerda, colunas por atendente no meio e chamados fechados a direita.</p>
             </div>
+            <button type="button" class="btn btn-primary portal-cta" id="createTicketButton" data-bs-toggle="modal" data-bs-target="#createTicketModal">+ Criar chamado</button>
         </header>
 
         <section class="kanban-wrapper">
@@ -89,6 +92,7 @@
 </main>
 
 {% include "partials/atendimento_modal.html" %}
+{% include "partials/criar_chamado_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

@@ -34,6 +34,10 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 18. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
 19. O detalhe do chamado exibe os anexos (nome, link de download, data e usuario que enviou) e o historico de eventos.
 20. Anexos so podem ser baixados pelo dono do chamado ou por TI/admin.
+21. A tela "Chamados" possui um botao "Criar chamado" (visivel apenas para TI/admin) que abre um modal para o atendente abrir um chamado em nome dele mesmo.
+22. Chamado criado pelo Kanban entra com status "Aberto", solicitante = atendente logado e sem atendente atual (aparece na coluna "Chamados abertos").
+23. O atendente atual do chamado criado so e definido quando o card e arrastado para a coluna de um atendente.
+24. A criacao pelo Kanban registra em `ChamadoEvento`: "Chamado criado manualmente pelo atendente X."
 
 ## Regras atuais de controle de tempo
 

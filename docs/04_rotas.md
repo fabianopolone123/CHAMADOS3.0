@@ -10,6 +10,7 @@
 | `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza o atendimento ativo com descricao obrigatoria | Implementada |
 | `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
+| `/chamados/criar/` | POST | Cria um chamado pelo Kanban (modal), com o atendente logado como solicitante; apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe do chamado com anexos, historico de eventos e timeline de atendimentos | Implementada |
@@ -42,6 +43,14 @@
 - Toda movimentacao registra eventos em `ChamadoEvento` (mudanca de status e/ou troca de atendente).
 - A resposta JSON retorna `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban atualizar texto e cor do badge e o atendente do card sem recarregar a pagina.
 - Usa CSRF via header `X-CSRFToken`.
+
+## Regras da criacao de chamado pelo Kanban
+
+- `/chamados/criar/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403`), aceita apenas `POST` (GET retorna `405`) e usa CSRF.
+- Reutiliza o `AberturaChamadoForm` (titulo, descricao e anexos), validando titulo e descricao no backend.
+- Salva o chamado com `solicitante` = usuario logado, `status` = "Aberto", `atendente_atual` vazio e `origem` = "Kanban TI".
+- Registra o evento de criacao ("Chamado criado manualmente pelo atendente X.") e retorna o HTML do card para insercao imediata na coluna "Chamados abertos" sem refresh.
+- O fluxo de criacao do usuario comum (`/meus-chamados/novo/`) permanece inalterado.
 
 ## Regras de acesso a anexos
 

@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
+from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date
 from django.utils import timezone
@@ -395,6 +396,70 @@ def move_ticket_view(request):
             "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
             "atendente_atual": _attendant_display(chamado.atendente_atual),
             "atendente_atual_id": chamado.atendente_atual_id,
+        }
+    )
+
+
+@login_required
+@require_POST
+def create_ticket_kanban_view(request):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para criar chamados pelo Kanban.", status=403)
+
+    form = AberturaChamadoForm(request.POST, request.FILES)
+    if not form.is_valid():
+        first_errors = next(iter(form.errors.values()), None)
+        message = first_errors[0] if first_errors else "Nao foi possivel validar o chamado."
+        return _json_error(message)
+
+    autor = _attendant_display(request.user)
+    chamado = form.save(commit=False)
+    chamado.solicitante = request.user
+    chamado.solicitante_nome = autor
+    chamado.solicitante_email = request.user.email or ""
+    chamado.status = Chamado.STATUS_ABERTO
+    chamado.atendente_atual = None
+    chamado.origem = "Kanban TI"
+    anexos = form.cleaned_data.get("anexos") or []
+
+    for _attempt in range(3):
+        chamado.numero = Chamado.gerar_numero()
+        try:
+            with transaction.atomic():
+                chamado.save()
+                for arquivo in anexos:
+                    ChamadoAnexo.objects.create(
+                        chamado=chamado,
+                        arquivo=arquivo,
+                        nome_original=arquivo.name,
+                        enviado_por=request.user,
+                    )
+                ChamadoEvento.registrar(
+                    chamado=chamado,
+                    usuario=request.user,
+                    tipo=ChamadoEvento.TIPO_CRIACAO,
+                    descricao=f"Chamado criado manualmente pelo atendente {autor}.",
+                )
+            break
+        except IntegrityError:
+            continue
+    else:
+        return _json_error("Nao foi possivel gerar o numero do chamado. Tente novamente.")
+
+    active_attendance = (
+        AtendimentoHistorico.objects.select_related("chamado")
+        .filter(atendente=request.user, finalizado_em__isnull=True)
+        .first()
+    )
+    card = _serialize_kanban_card(chamado, _serialize_attendance_state(active_attendance))
+    card_html = render_to_string("partials/kanban_card.html", {"ticket": card}, request=request)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Chamado {chamado.numero} criado com sucesso.",
+            "ticket_number": chamado.numero,
+            "card_html": card_html,
         }
     )
 

@@ -382,53 +382,139 @@
         }
     }
 
-    function initializeTicketCards() {
-        document.querySelectorAll(CARD_SELECTOR).forEach((card) => {
-            card.addEventListener("click", (event) => {
-                if (dragInProgress || event.target.closest(ACTION_SELECTOR)) {
-                    return;
-                }
-                navigateToDetail(card);
-            });
+    function bindActionButton(button) {
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
 
-            card.addEventListener("keydown", (event) => {
-                if (event.target.closest(ACTION_SELECTOR)) {
-                    return;
-                }
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    navigateToDetail(card);
-                }
-            });
+            const card = button.closest(".ticket-card");
+            if (!card) {
+                return;
+            }
+
+            const ticketNumber = card.dataset.ticketNumber;
+            const action = button.dataset.ticketAction;
+
+            if (action === "play") {
+                handlePlay(ticketNumber);
+                return;
+            }
+
+            if (activeTicketNumber !== ticketNumber) {
+                showToast("Este chamado nao possui atendimento ativo para voce.", "warning");
+                return;
+            }
+
+            openAttendanceModal(ticketNumber, action);
         });
     }
 
-    function initializeActionButtons() {
-        document.querySelectorAll(ACTION_SELECTOR).forEach((button) => {
-            button.addEventListener("click", (event) => {
+    function bindCard(card) {
+        if (card.dataset.bound === "true") {
+            return;
+        }
+        card.dataset.bound = "true";
+
+        card.addEventListener("click", (event) => {
+            if (dragInProgress || event.target.closest(ACTION_SELECTOR)) {
+                return;
+            }
+            navigateToDetail(card);
+        });
+
+        card.addEventListener("keydown", (event) => {
+            if (event.target.closest(ACTION_SELECTOR)) {
+                return;
+            }
+            if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                event.stopPropagation();
+                navigateToDetail(card);
+            }
+        });
 
-                const card = button.closest(".ticket-card");
-                if (!card) {
-                    return;
+        card.querySelectorAll(ACTION_SELECTOR).forEach(bindActionButton);
+    }
+
+    function initializeTicketCards() {
+        document.querySelectorAll(CARD_SELECTOR).forEach(bindCard);
+    }
+
+    function insertNewOpenCard(cardHtml) {
+        const openList = document.querySelector('.js-ticket-list[data-column-type="aberto"]');
+        if (!openList) {
+            window.location.reload();
+            return;
+        }
+
+        const emptyState = openList.querySelector(".kanban-empty");
+        if (emptyState) {
+            emptyState.remove();
+        }
+
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = cardHtml.trim();
+        const card = wrapper.firstElementChild;
+        if (!card) {
+            window.location.reload();
+            return;
+        }
+
+        openList.insertBefore(card, openList.firstChild);
+        bindCard(card);
+        updateColumnCounts();
+    }
+
+    function initializeCreateTicket() {
+        const createUrl = appElement.dataset.createTicketUrl;
+        const modalElement = document.getElementById("createTicketModal");
+        const form = document.getElementById("createTicketForm");
+        const submitButton = document.getElementById("createTicketSubmit");
+        if (!createUrl || !modalElement || !form) {
+            return;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            try {
+                const response = await fetch(createUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                    body: new FormData(form),
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (error) {
+                    data = { ok: false, message: "Resposta inesperada do servidor." };
                 }
 
-                const ticketNumber = card.dataset.ticketNumber;
-                const action = button.dataset.ticketAction;
-
-                if (action === "play") {
-                    handlePlay(ticketNumber);
-                    return;
+                if (!response.ok || data.ok === false) {
+                    throw data;
                 }
 
-                if (activeTicketNumber !== ticketNumber) {
-                    showToast("Este chamado nao possui atendimento ativo para voce.", "warning");
-                    return;
+                if (data.card_html) {
+                    insertNewOpenCard(data.card_html);
                 }
-
-                openAttendanceModal(ticketNumber, action);
-            });
+                modal.hide();
+                form.reset();
+                showToast(data.message || "Chamado criado com sucesso.", "success");
+            } catch (error) {
+                showToast(error.message || "Nao foi possivel criar o chamado.", "error");
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+            }
         });
     }
 
@@ -436,7 +522,7 @@
         attendanceForm.addEventListener("submit", handleAttendanceSubmit);
         initializeDragAndDrop();
         initializeTicketCards();
-        initializeActionButtons();
+        initializeCreateTicket();
         syncInitialActiveState();
     }
 

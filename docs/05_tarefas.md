@@ -7,6 +7,8 @@
 
 ## Concluidas
 
+- Adicionado botao "Criar chamado" no Kanban com modal para o atendente abrir chamado em nome proprio (entra em "Chamados abertos", sem atendente atual)
+- Padronizado o menu lateral da area de TI em um include reutilizavel (Chamados + Permissoes)
 - Reorganizado o Kanban por fila: coluna de abertos, colunas por Atendente TI e coluna de fechados
 - Simplificado o menu do Atendente TI para apenas Chamados e Permissoes
 - Criado o endpoint de movimentacao por coluna de destino (aberto/atendente/fechado) com validacao do atendente

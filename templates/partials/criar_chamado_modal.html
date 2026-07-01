@@ -1,0 +1,40 @@
+<div class="modal fade" id="createTicketModal" tabindex="-1" aria-labelledby="createTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <form id="createTicketForm" class="create-ticket-form" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <div>
+                        <span class="create-ticket-kicker">Novo chamado</span>
+                        <h5 class="modal-title" id="createTicketModalLabel">Criar chamado</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="create-ticket-hint">O chamado sera aberto em seu nome e entrara na fila de "Chamados abertos".</p>
+
+                    <div class="portal-field">
+                        <label for="createTicketTitulo">Titulo</label>
+                        <input type="text" id="createTicketTitulo" name="titulo" class="form-control form-control-lg" maxlength="255" placeholder="Resuma o problema em uma frase" required>
+                    </div>
+
+                    <div class="portal-field">
+                        <label for="createTicketDescricao">Descricao</label>
+                        <textarea id="createTicketDescricao" name="descricao" class="form-control" rows="5" placeholder="Descreva com detalhes o que esta acontecendo." required></textarea>
+                    </div>
+
+                    <div class="portal-field">
+                        <label for="createTicketAnexos">Anexos</label>
+                        <input type="file" id="createTicketAnexos" name="anexos" class="form-control" multiple>
+                        <span class="portal-field__hint">Voce pode anexar um ou mais arquivos (opcional).</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createTicketSubmit">Salvar chamado</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

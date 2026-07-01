@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    create_ticket_kanban_view,
     dashboard_redirect_view,
     download_anexo_view,
     finish_attendance_view,
@@ -24,6 +25,7 @@ urlpatterns = [
     path("chamados/atendimento/iniciar/", start_attendance_view, name="start_attendance"),
     path("chamados/atendimento/encerrar/", finish_attendance_view, name="finish_attendance"),
     path("chamados/mover/", move_ticket_view, name="move_ticket"),
+    path("chamados/criar/", create_ticket_kanban_view, name="create_ticket_kanban"),
     path("meus-chamados/", my_tickets_view, name="my_tickets"),
     path("meus-chamados/novo/", open_ticket_view, name="open_ticket"),
     path("meus-chamados/<str:numero>/", ticket_detail_view, name="ticket_detail"),

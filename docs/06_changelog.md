@@ -2,6 +2,9 @@
 
 ## 2026-07-01
 
+- Adicionado o botao "Criar chamado" na tela "Chamados" (Kanban) com modal responsivo, visivel apenas para TI/admin.
+- Criado o endpoint `POST /chamados/criar/` (TI/admin, CSRF) que abre chamado com o atendente logado como solicitante, status "Aberto" e sem atendente atual.
+- O card recem-criado e inserido na coluna "Chamados abertos" sem refresh; a criacao registra evento "Chamado criado manualmente pelo atendente X.".
 - Padronizado o menu lateral da area de TI em um unico include reutilizavel (`partials/ti_sidebar.html`), eliminando a inconsistencia entre as telas de Kanban, Permissoes e Historico.
 - Menu da area de TI passa a exibir apenas "Chamados" (Kanban) e "Permissoes"; removidos os itens antigos "Quadro de Atendimento", "Historico", "Chamados do Usuario" e "Relatorios".
 - Padronizado o nome do botao principal para "Chamados" (apontando para o Kanban) em todas as telas.

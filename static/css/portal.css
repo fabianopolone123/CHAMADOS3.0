@@ -223,6 +223,51 @@
     color: rgba(226, 232, 240, 0.7);
 }
 
+/* Modal de criacao de chamado pelo Kanban. */
+.create-ticket-modal {
+    border: 0;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 30px 70px -30px rgba(15, 23, 42, 0.6);
+}
+
+.create-ticket-modal .modal-header {
+    align-items: flex-start;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1.3rem 1.5rem;
+}
+
+.create-ticket-kicker {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #1d4ed8;
+}
+
+.create-ticket-modal .modal-title {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.create-ticket-form .modal-body {
+    display: grid;
+    gap: 1.1rem;
+    padding: 1.5rem;
+}
+
+.create-ticket-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.create-ticket-modal .modal-footer {
+    border-top: 1px solid #e2e8f0;
+    padding: 1.1rem 1.5rem;
+}
+
 .portal-attachments {
     list-style: none;
     margin: 0 0 0.5rem;
