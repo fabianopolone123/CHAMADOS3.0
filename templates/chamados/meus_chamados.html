@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app portal-app">
+    {% include "partials/portal_sidebar.html" with active="meus" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar">
+            <div>
+                <span class="topbar-kicker">Portal do Solicitante</span>
+                <h2 class="topbar-title">Meus Chamados</h2>
+                <p class="topbar-subtitle">Acompanhe o andamento das solicitacoes que voce abriu para a equipe de TI.</p>
+            </div>
+            <a href="{% url 'open_ticket' %}" class="btn btn-primary portal-cta">+ Abrir chamado</a>
+        </header>
+
+        <section class="portal-stats">
+            <div class="portal-stat">
+                <span class="portal-stat__label">Total</span>
+                <strong class="portal-stat__value">{{ stats.total }}</strong>
+            </div>
+            <div class="portal-stat">
+                <span class="portal-stat__label">Em aberto</span>
+                <strong class="portal-stat__value">{{ stats.em_aberto }}</strong>
+            </div>
+            <div class="portal-stat">
+                <span class="portal-stat__label">Encerrados</span>
+                <strong class="portal-stat__value">{{ stats.encerrados }}</strong>
+            </div>
+        </section>
+
+        <section class="portal-panel">
+            {% if tickets %}
+                <div class="portal-list">
+                    {% for ticket in tickets %}
+                        <a href="{% url 'ticket_detail' numero=ticket.number %}" class="portal-card{% if ticket.is_closed %} portal-card--closed{% endif %}">
+                            <div class="portal-card__head">
+                                <span class="portal-card__number">{{ ticket.number }}</span>
+                                <span class="status-badge {{ ticket.status_class }}">{{ ticket.status_label }}</span>
+                            </div>
+                            <h3 class="portal-card__title">{{ ticket.title }}</h3>
+                            <div class="portal-card__meta">
+                                <span class="priority-badge {{ ticket.priority_class }}">{{ ticket.priority_label }}</span>
+                                <span class="portal-card__category">{{ ticket.category }}</span>
+                                <span class="portal-card__date">Aberto em {{ ticket.created_at }}</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="portal-empty">
+                    <strong>Voce ainda nao abriu nenhum chamado.</strong>
+                    <p>Quando precisar de suporte da equipe de TI, abra um chamado e acompanhe o atendimento por aqui.</p>
+                    <a href="{% url 'open_ticket' %}" class="btn btn-primary">Abrir meu primeiro chamado</a>
+                </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+{% endblock %}

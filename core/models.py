@@ -10,19 +10,54 @@ from django.utils import timezone
 
 
 class Chamado(models.Model):
+    STATUS_ABERTO = "aberto"
+    STATUS_EM_ATENDIMENTO = "em_atendimento"
+    STATUS_AGUARDANDO_USUARIO = "aguardando_usuario"
+    STATUS_RESOLVIDO = "resolvido"
+    STATUS_FECHADO = "fechado"
+    STATUS_CHOICES = [
+        (STATUS_ABERTO, "Aberto"),
+        (STATUS_EM_ATENDIMENTO, "Em atendimento"),
+        (STATUS_AGUARDANDO_USUARIO, "Aguardando usuario"),
+        (STATUS_RESOLVIDO, "Resolvido"),
+        (STATUS_FECHADO, "Fechado"),
+    ]
+    STATUS_ENCERRADOS = {STATUS_RESOLVIDO, STATUS_FECHADO}
+
+    PRIORIDADE_BAIXA = "baixa"
+    PRIORIDADE_MEDIA = "media"
+    PRIORIDADE_ALTA = "alta"
+    PRIORIDADE_CRITICA = "critica"
+    PRIORIDADE_CHOICES = [
+        (PRIORIDADE_BAIXA, "Baixa"),
+        (PRIORIDADE_MEDIA, "Media"),
+        (PRIORIDADE_ALTA, "Alta"),
+        (PRIORIDADE_CRITICA, "Critica"),
+    ]
+
+    NUMERO_PREFIXO = "CH-"
+
     numero = models.CharField(max_length=30, unique=True)
     titulo = models.CharField(max_length=255)
     descricao = models.TextField(blank=True)
+    solicitante = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="chamados_abertos",
+    )
     solicitante_nome = models.CharField(max_length=255, blank=True)
     solicitante_email = models.EmailField(blank=True)
     departamento = models.CharField(max_length=255, blank=True)
     categoria = models.CharField(max_length=120, blank=True)
     subcategoria = models.CharField(max_length=120, blank=True)
     prioridade = models.CharField(max_length=30, blank=True)
-    status = models.CharField(max_length=60, blank=True)
+    status = models.CharField(max_length=60, blank=True, default=STATUS_ABERTO)
     origem = models.CharField(max_length=120, blank=True)
     aberto_em_referencia = models.CharField(max_length=60, blank=True)
     ultima_atualizacao_referencia = models.CharField(max_length=60, blank=True)
+    fechado_em = models.DateTimeField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -31,6 +66,31 @@ class Chamado(models.Model):
 
     def __str__(self) -> str:
         return f"{self.numero} - {self.titulo}"
+
+    @classmethod
+    def gerar_numero(cls) -> str:
+        """Gera um numero sequencial unico no formato CH-000123."""
+        ultimo = (
+            cls.objects.filter(numero__startswith=cls.NUMERO_PREFIXO)
+            .order_by("-numero")
+            .values_list("numero", flat=True)
+            .first()
+        )
+        proximo = 1
+        if ultimo:
+            try:
+                proximo = int(ultimo.replace(cls.NUMERO_PREFIXO, "")) + 1
+            except ValueError:
+                proximo = cls.objects.count() + 1
+        return f"{cls.NUMERO_PREFIXO}{proximo:06d}"
+
+    @property
+    def status_label(self) -> str:
+        return dict(self.STATUS_CHOICES).get(self.status, self.status or "-")
+
+    @property
+    def prioridade_label(self) -> str:
+        return dict(self.PRIORIDADE_CHOICES).get(self.prioridade, self.prioridade or "-")
 
 
 class AtendimentoHistorico(models.Model):

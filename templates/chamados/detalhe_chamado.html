@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app portal-app">
+    {% include "partials/portal_sidebar.html" with active="meus" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar">
+            <div>
+                <span class="topbar-kicker">Chamado {{ chamado.numero }}</span>
+                <h2 class="topbar-title">{{ chamado.titulo }}</h2>
+                <p class="topbar-subtitle">Abertura em {{ chamado.criado_em|date:"d/m/Y H:i" }} - Ultima atualizacao em {{ chamado.atualizado_em|date:"d/m/Y H:i" }}</p>
+            </div>
+            <a href="{% url 'my_tickets' %}" class="btn btn-light portal-cta">Voltar</a>
+        </header>
+
+        <section class="portal-detail">
+            <article class="portal-detail__main">
+                <div class="portal-detail__badges">
+                    <span class="status-badge {{ status_class }}">{{ status_label }}</span>
+                    <span class="priority-badge {{ priority_class }}">{{ priority_label }}</span>
+                    {% if chamado.categoria %}<span class="portal-chip">{{ chamado.categoria }}</span>{% endif %}
+                </div>
+
+                <h3 class="portal-detail__section-title">Descricao</h3>
+                <p class="portal-detail__description">{{ chamado.descricao|linebreaksbr|default:"Sem descricao informada." }}</p>
+
+                <h3 class="portal-detail__section-title">Andamento do atendimento</h3>
+                {% if timeline %}
+                    <ul class="portal-timeline">
+                        {% for entry in timeline %}
+                            <li class="portal-timeline__item">
+                                <div class="portal-timeline__head">
+                                    <strong>{{ entry.author }}</strong>
+                                    <span>{{ entry.action }}</span>
+                                    <time>{{ entry.timestamp }}</time>
+                                </div>
+                                <p class="portal-timeline__message">{{ entry.message }}</p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="portal-detail__empty">Este chamado ainda nao teve atendimento iniciado. Voce sera notificado quando a equipe de TI comecar a trabalhar nele.</p>
+                {% endif %}
+            </article>
+
+            <aside class="portal-detail__side">
+                <h3 class="portal-detail__section-title">Informacoes</h3>
+                <dl class="portal-detail__facts">
+                    <div>
+                        <dt>Numero</dt>
+                        <dd>{{ chamado.numero }}</dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd>{{ status_label }}</dd>
+                    </div>
+                    <div>
+                        <dt>Prioridade</dt>
+                        <dd>{{ priority_label }}</dd>
+                    </div>
+                    <div>
+                        <dt>Categoria</dt>
+                        <dd>{{ chamado.categoria|default:"-" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Solicitante</dt>
+                        <dd>{{ chamado.solicitante_nome|default:"-" }}</dd>
+                    </div>
+                    <div>
+                        <dt>Origem</dt>
+                        <dd>{{ chamado.origem|default:"-" }}</dd>
+                    </div>
+                    {% if chamado.fechado_em %}
+                        <div>
+                            <dt>Encerrado em</dt>
+                            <dd>{{ chamado.fechado_em|date:"d/m/Y H:i" }}</dd>
+                        </div>
+                    {% endif %}
+                </dl>
+            </aside>
+        </section>
+    </section>
+</main>
+{% endblock %}

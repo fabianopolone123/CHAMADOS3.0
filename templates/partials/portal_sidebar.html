@@ -1,0 +1,33 @@
+{% comment %}
+Sidebar reutilizavel do Portal do Solicitante.
+Uso: {% include "partials/portal_sidebar.html" with active="meus" %}
+Valores de active: "meus", "novo".
+{% endcomment %}
+<aside class="tickets-sidebar">
+    <div>
+        <div class="system-mark">TI</div>
+        <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+        <p class="sidebar-copy">Abra novos chamados para a equipe de TI e acompanhe o andamento das suas solicitacoes em um so lugar.</p>
+    </div>
+
+    <nav class="sidebar-menu">
+        <a href="{% url 'my_tickets' %}" class="menu-link{% if active == 'meus' %} active{% endif %}">Meus Chamados</a>
+        <a href="{% url 'open_ticket' %}" class="menu-link{% if active == 'novo' %} active{% endif %}">Abrir Chamado</a>
+        {% if is_admin or is_attendant %}
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Quadro de Atendimento</a>
+            <a href="{% url 'history' %}" class="menu-link">Historico</a>
+        {% endif %}
+        {% if is_admin %}
+            <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-user-card">
+            <span class="sidebar-user-label">Usuario logado</span>
+            <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+            <span>{{ request.user.username }}</span>
+        </div>
+        <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
+    </div>
+</aside>

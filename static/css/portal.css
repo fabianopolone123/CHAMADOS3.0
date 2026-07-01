@@ -1,0 +1,361 @@
+/* Portal do Solicitante - estilos especificos da visao do usuario comum. */
+
+.portal-cta {
+    align-self: center;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 0.6rem 1.3rem;
+    white-space: nowrap;
+}
+
+/* Badges de status reutilizaveis fora do modal. */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.status-badge.status-info {
+    color: #1d4ed8;
+    background: #dbeafe;
+}
+
+.status-badge.status-warning {
+    color: #b45309;
+    background: #ffedd5;
+}
+
+.status-badge.status-success {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.status-badge.status-danger {
+    color: #b91c1c;
+    background: #fee2e2;
+}
+
+.status-badge.status-muted {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+.status-badge.status-neutral {
+    color: #334155;
+    background: #cbd5e1;
+}
+
+/* Cartoes de estatistica. */
+.portal-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.portal-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.1rem 1.3rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px -24px rgba(15, 23, 42, 0.6);
+}
+
+.portal-stat__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.portal-stat__value {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* Painel e lista de chamados. */
+.portal-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 20px 45px -32px rgba(15, 23, 42, 0.55);
+}
+
+.portal-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.portal-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.2rem 1.3rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.portal-card:hover {
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+    box-shadow: 0 18px 40px -30px rgba(15, 23, 42, 0.65);
+}
+
+.portal-card--closed {
+    opacity: 0.72;
+}
+
+.portal-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.portal-card__number {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #1d4ed8;
+    letter-spacing: 0.04em;
+}
+
+.portal-card__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 750;
+    color: #0f172a;
+    line-height: 1.4;
+}
+
+.portal-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.7rem;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.portal-card__category {
+    font-weight: 600;
+}
+
+.portal-card__date {
+    margin-left: auto;
+}
+
+/* Estado vazio. */
+.portal-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 3rem 1.5rem;
+    text-align: center;
+    color: #475569;
+}
+
+.portal-empty strong {
+    font-size: 1.15rem;
+    color: #0f172a;
+}
+
+.portal-empty p {
+    max-width: 420px;
+    margin: 0;
+}
+
+/* Formulario de abertura. */
+.portal-form {
+    display: grid;
+    gap: 1.3rem;
+    max-width: 760px;
+}
+
+.portal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.portal-field label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.portal-field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.3rem;
+}
+
+.portal-field__error {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #b91c1c;
+}
+
+.portal-form__errors {
+    padding: 0.9rem 1.1rem;
+    border-radius: 12px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 600;
+}
+
+.portal-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+/* Detalhe do chamado. */
+.portal-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.portal-detail__main,
+.portal-detail__side {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: 0 20px 45px -32px rgba(15, 23, 42, 0.55);
+}
+
+.portal-detail__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 1.4rem;
+}
+
+.portal-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #334155;
+    background: #f1f5f9;
+}
+
+.portal-detail__section-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 1.4rem 0 0.7rem;
+}
+
+.portal-detail__section-title:first-of-type {
+    margin-top: 0;
+}
+
+.portal-detail__description {
+    color: #334155;
+    line-height: 1.6;
+}
+
+.portal-detail__empty {
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Timeline de atendimentos. */
+.portal-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+}
+
+.portal-timeline__item {
+    position: relative;
+    padding-left: 1.2rem;
+    border-left: 3px solid #e2e8f0;
+}
+
+.portal-timeline__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.portal-timeline__head strong {
+    color: #0f172a;
+}
+
+.portal-timeline__head time {
+    margin-left: auto;
+}
+
+.portal-timeline__message {
+    margin: 0.35rem 0 0;
+    color: #334155;
+    line-height: 1.5;
+}
+
+/* Ficha lateral. */
+.portal-detail__facts {
+    display: grid;
+    gap: 0.9rem;
+    margin: 0;
+}
+
+.portal-detail__facts div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.portal-detail__facts dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+}
+
+.portal-detail__facts dd {
+    margin: 0;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+@media (max-width: 900px) {
+    .portal-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .portal-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .portal-detail {
+        grid-template-columns: 1fr;
+    }
+}

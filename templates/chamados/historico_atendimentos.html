@@ -23,7 +23,7 @@
             {% if is_admin %}
                 <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
             {% endif %}
-            <a href="#" class="menu-link disabled-link">Chamados do Usuario</a>
+            <a href="{% url 'my_tickets' %}" class="menu-link">Chamados do Usuario</a>
             <a href="#" class="menu-link disabled-link">Relatorios</a>
             <a href="#" class="menu-link disabled-link">Configuracoes</a>
         </nav>

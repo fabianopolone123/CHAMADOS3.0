@@ -10,6 +10,9 @@
 
 ## Concluidas
 
+- Criado o portal do solicitante (visao do usuario comum) com abertura, listagem e detalhe de chamados
+- Adicionado roteamento pos-login por perfil (TI para o Kanban, usuario comum para o portal)
+- Vinculado o chamado ao usuario solicitante e adicionados choices de status e prioridade
 - Criada tela de login visual
 - Criada rota `/login/`
 - Criado redirecionamento da raiz `/`
@@ -28,8 +31,8 @@
 
 ## Proximas tarefas sugeridas
 
-1. Criar os models de chamados e atendentes
+1. Persistir chamados reais no Kanban e substituir os dados mockados
 2. Persistir a atribuicao dos cards no backend
-3. Implementar a listagem detalhada e a tela de chamado
-4. Criar a visao do usuario comum
-5. Definir perfis e permissoes de acesso
+3. Refletir no portal os status atualizados pelos atendentes durante o atendimento
+4. Permitir que o solicitante complemente/comente o proprio chamado
+5. Definir as transicoes formais de status do chamado

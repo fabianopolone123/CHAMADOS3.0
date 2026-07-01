@@ -42,15 +42,25 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 4. Apenas administradores podem atribuir ou remover o perfil `Atendente TI`.
 5. O grupo `Atendente TI` e a base inicial para a composicao das colunas do quadro Kanban.
 
+## Regras atuais do portal do solicitante
+
+1. O usuario comum e todo usuario autenticado que nao pertence aos grupos `Administrador` nem `Atendente TI`.
+2. Apos o login, o usuario comum e direcionado para `/meus-chamados/` e a equipe de TI para o Kanban.
+3. O usuario comum pode abrir chamados informando titulo, categoria, prioridade e descricao.
+4. Cada chamado aberto pelo portal recebe numero unico gerado no formato `CH-000123`.
+5. O chamado aberto nasce com status `aberto` e registra o usuario logado como solicitante.
+6. O usuario comum visualiza e acessa apenas os chamados que ele mesmo abriu.
+7. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
+8. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
+
 ## Regras previstas para o sistema de chamados
 
-1. O usuario autenticado deve poder abrir chamados.
-2. Cada chamado deve possuir identificacao unica.
-3. Cada chamado deve ter status de acompanhamento.
-4. O chamado deve registrar data de abertura e, quando aplicavel, data de fechamento.
-5. O chamado deve ser atribuivel a uma equipe ou atendente.
-6. O historico de alteracoes deve ser preservado.
-7. Comentarios e interacoes devem ficar vinculados ao chamado.
+1. Cada chamado deve ter status de acompanhamento com transicoes controladas.
+2. O chamado deve registrar data de abertura e, quando aplicavel, data de fechamento.
+3. O chamado deve ser atribuivel a uma equipe ou atendente com persistencia real no Kanban.
+4. O historico de alteracoes deve ser preservado.
+5. Comentarios e interacoes devem ficar vinculados ao chamado.
+6. O solicitante deve poder complementar ou acompanhar interacoes do chamado.
 
 ## Regras de seguranca
 

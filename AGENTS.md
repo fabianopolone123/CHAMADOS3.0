@@ -12,9 +12,12 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 - O backend de autenticacao esta em `core/auth_backend.py`.
 - O fluxo pos-login redireciona para `/chamados/`.
 - A interface inicial autenticada e um quadro Kanban para a visao de Atendente TI.
-- O sistema possui grupos iniciais `Administrador` e `Atendente TI`.
+- O sistema possui grupos iniciais `Administrador` e `Atendente TI`; usuario comum e quem nao pertence a nenhum deles.
+- Apos o login, admin e Atendente TI vao para o Kanban e o usuario comum para o portal `/meus-chamados/`.
 - O usuario `fabiano.polone` deve permanecer como administrador principal.
 - O projeto ja possui os modelos `Chamado` e `AtendimentoHistorico` para sustentar o controle inicial de tempo por atendimento.
+- O modelo `Chamado` possui vinculo `solicitante`, choices de `status`/`prioridade` e gerador de numero `CH-000123`.
+- O projeto possui o portal do solicitante em `/meus-chamados/` com abertura, listagem e detalhe read-only dos proprios chamados.
 - O projeto possui tela de Historico de Atendimentos em `/historico/` com busca dinamica por registros.
 - O arquivo `.env` na raiz concentra as configuracoes sensiveis de ambiente.
 - A base de documentacao do projeto fica em `docs/`.

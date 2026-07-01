@@ -18,24 +18,33 @@ Campos atuais:
 - `numero`
 - `titulo`
 - `descricao`
+- `solicitante` (FK opcional para o usuario que abriu o chamado no portal)
 - `solicitante_nome`
 - `solicitante_email`
 - `departamento`
 - `categoria`
 - `subcategoria`
-- `prioridade`
-- `status`
+- `prioridade` (choices: `baixa`, `media`, `alta`, `critica`)
+- `status` (choices: `aberto`, `em_atendimento`, `aguardando_usuario`, `resolvido`, `fechado`; default `aberto`)
 - `origem`
 - `aberto_em_referencia`
 - `ultima_atualizacao_referencia`
+- `fechado_em` (data de encerramento, quando aplicavel)
 - `criado_em`
 - `atualizado_em`
 
+Metodos e propriedades:
+
+- `Chamado.gerar_numero()` gera um numero sequencial unico no formato `CH-000123` para chamados abertos pelo portal do solicitante.
+- `status_label` e `prioridade_label` retornam o rotulo legivel do valor armazenado.
+- `STATUS_ENCERRADOS` agrupa os status `resolvido` e `fechado`.
+
 Observacoes:
 
-- Neste momento os chamados continuam nascendo de dados mockados da dashboard.
-- Ao abrir a dashboard, os mocks sao sincronizados com o banco via `update_or_create`.
-- O campo `numero` e unico e serve como chave de referencia entre o Kanban e o backend.
+- Chamados abertos pelo portal do solicitante nascem com `solicitante`, `numero` gerado, `status = aberto` e `origem = "Portal do solicitante"`.
+- Os chamados do Kanban ainda nascem de dados mockados sincronizados com o banco via `update_or_create` ao abrir a dashboard.
+- O campo `numero` e unico e serve como chave de referencia entre o Kanban, o portal e o backend.
+- `solicitante` usa `on_delete=SET_NULL` para preservar o chamado mesmo se o usuario for removido.
 
 ### AtendimentoHistorico
 

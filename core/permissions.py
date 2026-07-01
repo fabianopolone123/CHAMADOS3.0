@@ -48,3 +48,10 @@ def is_attendant_user(user) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return user.groups.filter(name=ATTENDANT_GROUP_NAME).exists()
+
+
+def is_common_user(user) -> bool:
+    """Usuario autenticado que nao e administrador nem atendente de TI."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return not is_admin_user(user) and not is_attendant_user(user)

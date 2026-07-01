@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/portal.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app portal-app">
+    {% include "partials/portal_sidebar.html" with active="novo" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar">
+            <div>
+                <span class="topbar-kicker">Portal do Solicitante</span>
+                <h2 class="topbar-title">Abrir Chamado</h2>
+                <p class="topbar-subtitle">Descreva sua necessidade com o maximo de detalhes para agilizar o atendimento da equipe de TI.</p>
+            </div>
+            <a href="{% url 'my_tickets' %}" class="btn btn-light portal-cta">Voltar</a>
+        </header>
+
+        <section class="portal-panel">
+            <form method="post" action="{% url 'open_ticket' %}" class="portal-form" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="portal-form__errors">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="portal-field">
+                    <label for="{{ form.titulo.id_for_label }}">{{ form.titulo.label }}</label>
+                    {{ form.titulo }}
+                    {% if form.titulo.errors %}<span class="portal-field__error">{{ form.titulo.errors.0 }}</span>{% endif %}
+                </div>
+
+                <div class="portal-field-row">
+                    <div class="portal-field">
+                        <label for="{{ form.categoria.id_for_label }}">{{ form.categoria.label }}</label>
+                        {{ form.categoria }}
+                        {% if form.categoria.errors %}<span class="portal-field__error">{{ form.categoria.errors.0 }}</span>{% endif %}
+                    </div>
+                    <div class="portal-field">
+                        <label for="{{ form.prioridade.id_for_label }}">{{ form.prioridade.label }}</label>
+                        {{ form.prioridade }}
+                        {% if form.prioridade.errors %}<span class="portal-field__error">{{ form.prioridade.errors.0 }}</span>{% endif %}
+                    </div>
+                </div>
+
+                <div class="portal-field">
+                    <label for="{{ form.descricao.id_for_label }}">{{ form.descricao.label }}</label>
+                    {{ form.descricao }}
+                    {% if form.descricao.errors %}<span class="portal-field__error">{{ form.descricao.errors.0 }}</span>{% endif %}
+                </div>
+
+                <div class="portal-form__actions">
+                    <a href="{% url 'my_tickets' %}" class="btn btn-light">Cancelar</a>
+                    <button type="submit" class="btn btn-primary">Abrir chamado</button>
+                </div>
+            </form>
+        </section>
+    </section>
+</main>
+{% endblock %}

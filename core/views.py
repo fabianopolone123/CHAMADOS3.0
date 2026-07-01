@@ -16,7 +16,7 @@ from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import LoginForm
+from .forms import AberturaChamadoForm, LoginForm
 from .models import AtendimentoHistorico, Chamado
 from .permissions import (
     ATTENDANT_GROUP_NAME,
@@ -26,6 +26,13 @@ from .permissions import (
     is_admin_user,
     is_attendant_user,
 )
+
+
+def _landing_route_for_user(user) -> str:
+    """Rota inicial pos-login de acordo com o perfil do usuario."""
+    if is_admin_user(user) or is_attendant_user(user):
+        return "tickets_dashboard"
+    return "my_tickets"
 
 
 def admin_required(view_func):
@@ -581,7 +588,7 @@ def _load_request_payload(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("tickets_dashboard")
+        return redirect(_landing_route_for_user(request.user))
 
     form = LoginForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -593,7 +600,7 @@ def login_view(request):
             ensure_user_permission_defaults(user)
             login(request, user)
             messages.success(request, "Login realizado com sucesso.")
-            return redirect("tickets_dashboard")
+            return redirect(_landing_route_for_user(user))
 
         messages.error(request, "Usuario ou senha invalidos. Verifique suas credenciais corporativas.")
 
@@ -746,6 +753,149 @@ def finish_attendance_view(request):
     )
 
 
+_STATUS_BADGE_CLASS = {
+    Chamado.STATUS_ABERTO: "status-info",
+    Chamado.STATUS_EM_ATENDIMENTO: "status-warning",
+    Chamado.STATUS_AGUARDANDO_USUARIO: "status-muted",
+    Chamado.STATUS_RESOLVIDO: "status-success",
+    Chamado.STATUS_FECHADO: "status-neutral",
+}
+
+_PRIORIDADE_BADGE_CLASS = {
+    Chamado.PRIORIDADE_BAIXA: "priority-low",
+    Chamado.PRIORIDADE_MEDIA: "priority-medium",
+    Chamado.PRIORIDADE_ALTA: "priority-high",
+    Chamado.PRIORIDADE_CRITICA: "priority-critical",
+}
+
+
+def _serialize_my_ticket(chamado: Chamado):
+    return {
+        "number": chamado.numero,
+        "title": chamado.titulo,
+        "category": chamado.categoria or "-",
+        "status_label": chamado.status_label,
+        "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+        "priority_label": chamado.prioridade_label,
+        "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
+        "created_at": timezone.localtime(chamado.criado_em).strftime("%d/%m/%Y %H:%M"),
+        "updated_at": timezone.localtime(chamado.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+        "is_closed": chamado.status in Chamado.STATUS_ENCERRADOS,
+    }
+
+
+def _serialize_ticket_timeline(chamado: Chamado):
+    timeline = []
+    for item in chamado.atendimentos.select_related("atendente").order_by("iniciado_em"):
+        author = item.atendente.get_full_name() or item.atendente.username
+        if item.finalizado_em:
+            action = (
+                "finalizou o atendimento"
+                if item.tipo_encerramento == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP
+                else "pausou o atendimento"
+            )
+            message = item.descricao_atividade or "-"
+            timestamp = timezone.localtime(item.finalizado_em)
+        else:
+            action = "iniciou o atendimento"
+            message = "Atendimento em andamento."
+            timestamp = timezone.localtime(item.iniciado_em)
+        timeline.append(
+            {
+                "author": author,
+                "action": action,
+                "message": message,
+                "timestamp": timestamp.strftime("%d/%m/%Y %H:%M"),
+            }
+        )
+    return timeline
+
+
+@login_required
+def my_tickets_view(request):
+    chamados = list(Chamado.objects.filter(solicitante=request.user).order_by("-criado_em"))
+    rows = [_serialize_my_ticket(chamado) for chamado in chamados]
+
+    stats = {
+        "total": len(chamados),
+        "em_aberto": sum(1 for c in chamados if c.status not in Chamado.STATUS_ENCERRADOS),
+        "encerrados": sum(1 for c in chamados if c.status in Chamado.STATUS_ENCERRADOS),
+    }
+
+    context = {
+        "page_title": "Meus Chamados",
+        "tickets": rows,
+        "stats": stats,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": is_admin_user(request.user) or is_attendant_user(request.user),
+    }
+    return render(request, "chamados/meus_chamados.html", context)
+
+
+@login_required
+def open_ticket_view(request):
+    form = AberturaChamadoForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        chamado = form.save(commit=False)
+        chamado.solicitante = request.user
+        chamado.solicitante_nome = request.user.get_full_name() or request.user.username
+        chamado.solicitante_email = request.user.email or ""
+        chamado.status = Chamado.STATUS_ABERTO
+        chamado.origem = "Portal do solicitante"
+
+        for _attempt in range(3):
+            chamado.numero = Chamado.gerar_numero()
+            try:
+                with transaction.atomic():
+                    chamado.save()
+                break
+            except IntegrityError:
+                continue
+        else:
+            messages.error(request, "Nao foi possivel gerar o numero do chamado. Tente novamente.")
+            context = {"page_title": "Abrir Chamado", "form": form, "can_view_history": False}
+            return render(request, "chamados/abrir_chamado.html", context)
+
+        messages.success(request, f"Chamado {chamado.numero} aberto com sucesso.")
+        return redirect("ticket_detail", numero=chamado.numero)
+
+    context = {
+        "page_title": "Abrir Chamado",
+        "form": form,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": is_admin_user(request.user) or is_attendant_user(request.user),
+    }
+    return render(request, "chamados/abrir_chamado.html", context)
+
+
+@login_required
+def ticket_detail_view(request, numero: str):
+    chamado = get_object_or_404(Chamado, numero=numero)
+
+    pode_ver_todos = is_admin_user(request.user) or is_attendant_user(request.user)
+    if not pode_ver_todos and chamado.solicitante_id != request.user.id:
+        messages.error(request, "Voce nao tem acesso a este chamado.")
+        return redirect("my_tickets")
+
+    context = {
+        "page_title": f"Chamado {chamado.numero}",
+        "chamado": chamado,
+        "status_label": chamado.status_label,
+        "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+        "priority_label": chamado.prioridade_label,
+        "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
+        "timeline": _serialize_ticket_timeline(chamado),
+        "is_owner": chamado.solicitante_id == request.user.id,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": pode_ver_todos,
+    }
+    return render(request, "chamados/detalhe_chamado.html", context)
+
+
 @history_access_required
 def history_view(request):
     history_items = list(_get_history_queryset_for_user(request.user)[:80])
@@ -842,8 +992,8 @@ def toggle_attendant_permission_view(request, user_id: int):
 
 
 @login_required
-def dashboard_redirect_view(_request):
-    return redirect("tickets_dashboard")
+def dashboard_redirect_view(request):
+    return redirect(_landing_route_for_user(request.user))
 
 
 @login_required

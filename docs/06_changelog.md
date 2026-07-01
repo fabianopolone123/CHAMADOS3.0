@@ -1,5 +1,16 @@
 # 06 - Changelog
 
+## 2026-07-01
+
+- Criado o portal do solicitante (visao do usuario comum) com as telas de abertura, listagem e detalhe de chamados.
+- Adicionado o vinculo `solicitante` no modelo `Chamado` para associar o chamado ao usuario que o abriu.
+- Definidos choices de `status` e `prioridade` no `Chamado`, com status default `aberto` e campo `fechado_em`.
+- Criado o gerador de numero sequencial unico `CH-000123` para chamados abertos pelo portal.
+- Adicionado o helper de permissao `is_common_user`.
+- Implementado o roteamento pos-login por perfil: TI vai para o Kanban e usuario comum para `/meus-chamados/`.
+- Adicionada a validacao de acesso para que o usuario comum veja apenas os proprios chamados.
+- Criado o CSS `portal.css` e o sidebar reutilizavel do portal do solicitante.
+
 ## 2026-06-30
 
 - Criada a base inicial do projeto Django.

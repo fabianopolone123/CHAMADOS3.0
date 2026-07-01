@@ -47,4 +47,7 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 ## Versionamento
 
 - Toda alteracao concluida deve gerar commit com mensagem descritiva.
-- Apos cada commit, o projeto deve ser enviado com push para o repositorio remoto.
+- Apos cada commit, o projeto deve ser enviado com push para o repositorio remoto (`origin/main`).
+- O push e obrigatorio e imediato: nenhuma funcionalidade e considerada finalizada enquanto nao estiver commitada e enviada ao remoto.
+- Nao acumular varias funcionalidades em um unico commit; commitar em unidades coerentes de trabalho.
+- Mensagens de commit devem seguir o padrao `tipo: descricao` (ex.: `feat:`, `fix:`, `docs:`, `refactor:`).
