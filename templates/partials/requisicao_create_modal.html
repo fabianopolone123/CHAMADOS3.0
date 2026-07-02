@@ -1,0 +1,37 @@
+<div class="modal fade" id="createRequisicaoModal" tabindex="-1" aria-labelledby="createRequisicaoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Contratos</span>
+                    <h5 class="modal-title" id="createRequisicaoModalLabel">Nova requisicao</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="createRequisicaoForm" class="create-ticket-form">
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Titulo</span>
+                        <input type="text" class="form-control" id="requisicaoTitulo" maxlength="255" placeholder="Ex.: Compra de notebooks para o setor" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Tipo</span>
+                        <select class="form-select" id="requisicaoTipo" required>
+                            <option value="fisica">Fisica</option>
+                            <option value="digital">Digital</option>
+                        </select>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Texto da requisicao</span>
+                        <textarea class="form-control" id="requisicaoTexto" rows="4" placeholder="Descreva a necessidade da requisicao."></textarea>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createRequisicaoSubmit">Criar requisicao</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

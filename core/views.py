@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from functools import wraps
 import json
 
@@ -26,7 +27,12 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    OrcamentoContrato,
+    OrcamentoDocumento,
     PendenciaTI,
+    RequisicaoContrato,
+    SuborcamentoContrato,
+    SuborcamentoDocumento,
 )
 from .permissions import (
     ATTENDANT_GROUP_NAME,
@@ -1354,6 +1360,333 @@ def toggle_attendant_permission_view(request, user_id: int):
         messages.success(request, f"{user.username} adicionado ao perfil Atendente TI.")
 
     return redirect("permissions")
+
+
+# ==========================================================================
+# Modulo Contratos
+# ==========================================================================
+
+
+def _is_ti(user) -> bool:
+    return is_admin_user(user) or is_attendant_user(user)
+
+
+def _parse_money_field(raw, label: str) -> Decimal:
+    """Converte um valor monetario do formulario, bloqueando negativos."""
+    texto = (raw or "").strip().replace(" ", "")
+    if texto == "":
+        return Decimal("0.00")
+    texto = texto.replace(".", "").replace(",", ".") if ("," in texto and "." in texto) else texto.replace(",", ".")
+    try:
+        valor = Decimal(texto)
+    except (InvalidOperation, ValueError):
+        raise ValueError(f"{label} invalido.")
+    if valor < 0:
+        raise ValueError(f"{label} nao pode ser negativo.")
+    return valor.quantize(Decimal("0.01"))
+
+
+def _parse_item_fields(post):
+    """Valida e normaliza os campos comuns de orcamento/suborcamento.
+
+    Retorna um dict de campos limpos ou levanta ValueError com mensagem amigavel.
+    """
+    titulo = (post.get("titulo") or "").strip()
+    if len(titulo) < 2:
+        raise ValueError("Informe um titulo com pelo menos 2 caracteres.")
+
+    moeda = (post.get("moeda") or "").strip().upper()
+    if moeda not in {OrcamentoContrato.MOEDA_BRL, OrcamentoContrato.MOEDA_USD}:
+        raise ValueError("Moeda invalida. Use Real (BRL) ou Dolar (USD).")
+
+    try:
+        quantidade = int((post.get("quantidade") or "1").strip() or "1")
+    except (TypeError, ValueError):
+        raise ValueError("Quantidade invalida.")
+    if quantidade < 1:
+        raise ValueError("A quantidade deve ser pelo menos 1.")
+
+    return {
+        "titulo": titulo,
+        "loja": (post.get("loja") or "").strip(),
+        "moeda": moeda,
+        "valor": _parse_money_field(post.get("valor"), "Valor"),
+        "quantidade": quantidade,
+        "frete": _parse_money_field(post.get("frete"), "Frete"),
+        "desconto": _parse_money_field(post.get("desconto"), "Desconto"),
+        "link": (post.get("link") or "").strip(),
+    }
+
+
+def _fmt_money(value, moeda: str) -> str:
+    symbol = "R$" if moeda == OrcamentoContrato.MOEDA_BRL else "US$"
+    quant = Decimal(value or 0).quantize(Decimal("0.01"))
+    texto = f"{quant:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{symbol} {texto}"
+
+
+def _serialize_orcamento_documento(doc: OrcamentoDocumento):
+    return {"nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_orcamento_documento", args=[doc.id])}
+
+
+def _serialize_suborcamento_documento(doc: SuborcamentoDocumento):
+    return {"nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_suborcamento_documento", args=[doc.id])}
+
+
+def _serialize_suborcamento(sub: SuborcamentoContrato):
+    return {
+        "id": sub.id,
+        "titulo": sub.titulo,
+        "loja": sub.loja or "-",
+        "moeda": sub.moeda,
+        "valor": f"{sub.valor:.2f}",
+        "quantidade": sub.quantidade,
+        "frete": f"{sub.frete:.2f}",
+        "desconto": f"{sub.desconto:.2f}",
+        "link": sub.link,
+        "subtotal_display": _fmt_money(sub.subtotal, sub.moeda),
+        "total_display": _fmt_money(sub.total, sub.moeda),
+        "foto_url": reverse("contrato_suborcamento_foto", args=[sub.id]) if sub.foto_produto else "",
+        "documentos": [_serialize_suborcamento_documento(d) for d in sub.documentos.all()],
+    }
+
+
+def _serialize_orcamento(orc: OrcamentoContrato):
+    suborcamentos = list(orc.suborcamentos.all())
+    total_com_sub = orc.total + sum((s.total for s in suborcamentos), Decimal("0"))
+    return {
+        "id": orc.id,
+        "titulo": orc.titulo,
+        "loja": orc.loja or "-",
+        "moeda": orc.moeda,
+        "valor": f"{orc.valor:.2f}",
+        "quantidade": orc.quantidade,
+        "frete": f"{orc.frete:.2f}",
+        "desconto": f"{orc.desconto:.2f}",
+        "link": orc.link,
+        "subtotal_display": _fmt_money(orc.subtotal, orc.moeda),
+        "total_display": _fmt_money(orc.total, orc.moeda),
+        "total_com_suborcamentos_display": _fmt_money(total_com_sub, orc.moeda),
+        "foto_url": reverse("contrato_orcamento_foto", args=[orc.id]) if orc.foto_produto else "",
+        "documentos": [_serialize_orcamento_documento(d) for d in orc.documentos.all()],
+        "suborcamentos": [_serialize_suborcamento(s) for s in suborcamentos],
+    }
+
+
+@ti_required
+def contratos_dashboard_view(request):
+    requisicoes = list(RequisicaoContrato.objects.select_related("criado_por").all())
+    rows = [
+        {
+            "id": req.id,
+            "titulo": req.titulo,
+            "status": req.status,
+            "status_label": req.status_label,
+        }
+        for req in requisicoes
+    ]
+    context = {
+        "page_title": "Contratos",
+        "requisicoes": rows,
+        "requisicoes_total": len(rows),
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/contratos.html", context)
+
+
+@login_required
+@require_POST
+def requisicao_create_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    payload = _load_request_payload(request) or {}
+    titulo = (payload.get("titulo") or "").strip()
+    tipo = (payload.get("tipo") or "").strip().lower()
+    texto = (payload.get("texto") or "").strip()
+
+    if len(titulo) < 3:
+        return _json_error("Informe um titulo com pelo menos 3 caracteres.")
+    if tipo not in {RequisicaoContrato.TIPO_FISICA, RequisicaoContrato.TIPO_DIGITAL}:
+        return _json_error("Selecione o tipo da requisicao (Fisica ou Digital).")
+
+    requisicao = RequisicaoContrato.objects.create(
+        titulo=titulo,
+        tipo=tipo,
+        texto=texto,
+        status=RequisicaoContrato.STATUS_ABERTA,
+        criado_por=request.user,
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Requisicao criada com sucesso.",
+            "requisicao": {
+                "id": requisicao.id,
+                "titulo": requisicao.titulo,
+                "status": requisicao.status,
+                "status_label": requisicao.status_label,
+            },
+        }
+    )
+
+
+@login_required
+def requisicao_detail_view(request, requisicao_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = (
+        RequisicaoContrato.objects.select_related("criado_por")
+        .filter(pk=requisicao_id)
+        .first()
+    )
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+
+    orcamentos = (
+        requisicao.orcamentos.prefetch_related("suborcamentos", "documentos", "suborcamentos__documentos")
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "requisicao": {
+                "id": requisicao.id,
+                "titulo": requisicao.titulo,
+                "tipo": requisicao.tipo,
+                "tipo_label": requisicao.tipo_label,
+                "texto": requisicao.texto,
+                "status": requisicao.status,
+                "status_label": requisicao.status_label,
+                "criado_por": _attendant_display(requisicao.criado_por) or "-",
+                "criado_em": timezone.localtime(requisicao.criado_em).strftime("%d/%m/%Y %H:%M"),
+            },
+            "orcamentos": [_serialize_orcamento(orc) for orc in orcamentos],
+        }
+    )
+
+
+def _salvar_documentos(model_cls, fk_name, item, arquivos):
+    for arquivo in arquivos:
+        model_cls.objects.create(
+            **{fk_name: item},
+            arquivo=arquivo,
+            nome_original=arquivo.name,
+        )
+
+
+@login_required
+@require_POST
+def orcamento_create_view(request, requisicao_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+
+    try:
+        campos = _parse_item_fields(request.POST)
+    except ValueError as exc:
+        return _json_error(str(exc))
+
+    foto = request.FILES.get("foto_produto")
+    documentos = request.FILES.getlist("documentos")
+
+    with transaction.atomic():
+        orcamento = OrcamentoContrato.objects.create(
+            requisicao=requisicao, criado_por=request.user, **campos
+        )
+        if foto:
+            orcamento.foto_produto = foto
+            orcamento.save(update_fields=["foto_produto", "atualizado_em"])
+        _salvar_documentos(OrcamentoDocumento, "orcamento", orcamento, documentos)
+
+    return JsonResponse(
+        {"ok": True, "message": "Orcamento adicionado com sucesso.", "orcamento_id": orcamento.id}
+    )
+
+
+@login_required
+@require_POST
+def suborcamento_create_view(request, orcamento_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    orcamento = OrcamentoContrato.objects.filter(pk=orcamento_id).first()
+    if not orcamento:
+        return _json_error("Orcamento nao encontrado.", status=404)
+
+    try:
+        campos = _parse_item_fields(request.POST)
+    except ValueError as exc:
+        return _json_error(str(exc))
+
+    foto = request.FILES.get("foto_produto")
+    documentos = request.FILES.getlist("documentos")
+
+    with transaction.atomic():
+        suborcamento = SuborcamentoContrato.objects.create(
+            orcamento_pai=orcamento, criado_por=request.user, **campos
+        )
+        if foto:
+            suborcamento.foto_produto = foto
+            suborcamento.save(update_fields=["foto_produto", "atualizado_em"])
+        _salvar_documentos(SuborcamentoDocumento, "suborcamento", suborcamento, documentos)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Suborcamento adicionado com sucesso.",
+            "suborcamento_id": suborcamento.id,
+            "orcamento_id": orcamento.id,
+        }
+    )
+
+
+def _serve_file(field_file, *, as_attachment: bool, filename: str):
+    try:
+        return FileResponse(field_file.open("rb"), as_attachment=as_attachment, filename=filename)
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+@login_required
+def contrato_orcamento_foto_view(request, orcamento_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    orcamento = get_object_or_404(OrcamentoContrato, pk=orcamento_id)
+    if not orcamento.foto_produto:
+        raise Http404("Sem foto.")
+    return _serve_file(orcamento.foto_produto, as_attachment=False, filename=orcamento.foto_produto.name)
+
+
+@login_required
+def contrato_suborcamento_foto_view(request, suborcamento_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    sub = get_object_or_404(SuborcamentoContrato, pk=suborcamento_id)
+    if not sub.foto_produto:
+        raise Http404("Sem foto.")
+    return _serve_file(sub.foto_produto, as_attachment=False, filename=sub.foto_produto.name)
+
+
+@login_required
+def contrato_orcamento_documento_view(request, documento_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    doc = get_object_or_404(OrcamentoDocumento, pk=documento_id)
+    return _serve_file(doc.arquivo, as_attachment=True, filename=doc.nome_original or doc.arquivo.name)
+
+
+@login_required
+def contrato_suborcamento_documento_view(request, documento_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    doc = get_object_or_404(SuborcamentoDocumento, pk=documento_id)
+    return _serve_file(doc.arquivo, as_attachment=True, filename=doc.nome_original or doc.arquivo.name)
 
 
 @login_required

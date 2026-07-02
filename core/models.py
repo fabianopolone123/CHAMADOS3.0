@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -309,3 +311,194 @@ class AtendimentoHistorico(models.Model):
         self.descricao_atividade = descricao_atividade.strip()
         self.duracao = self.calcular_duracao()
         self.full_clean()
+
+
+# ==========================================================================
+# Modulo Contratos: requisicoes, orcamentos e suborcamentos (complementos)
+# ==========================================================================
+
+
+class RequisicaoContrato(models.Model):
+    """Requisicao de contrato/compra. Agrupa varios orcamentos."""
+
+    TIPO_FISICA = "fisica"
+    TIPO_DIGITAL = "digital"
+    TIPO_CHOICES = [
+        (TIPO_FISICA, "Fisica"),
+        (TIPO_DIGITAL, "Digital"),
+    ]
+
+    STATUS_ABERTA = "aberta"
+    STATUS_EM_COTACAO = "em_cotacao"
+    STATUS_FINALIZADA = "finalizada"
+    STATUS_CANCELADA = "cancelada"
+    STATUS_CHOICES = [
+        (STATUS_ABERTA, "Aberta"),
+        (STATUS_EM_COTACAO, "Em cotacao"),
+        (STATUS_FINALIZADA, "Finalizada"),
+        (STATUS_CANCELADA, "Cancelada"),
+    ]
+
+    titulo = models.CharField(max_length=255)
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default=TIPO_FISICA)
+    texto = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ABERTA)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requisicoes_contrato",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+
+    def __str__(self) -> str:
+        return self.titulo
+
+    @property
+    def status_label(self) -> str:
+        return dict(self.STATUS_CHOICES).get(self.status, self.status or "-")
+
+    @property
+    def tipo_label(self) -> str:
+        return dict(self.TIPO_CHOICES).get(self.tipo, self.tipo or "-")
+
+
+class _ItemOrcamentoBase(models.Model):
+    """Campos e regras de calculo comuns a orcamento e suborcamento.
+
+    Regra de calculo:
+    - subtotal = valor * quantidade
+    - total    = subtotal + frete - desconto
+    """
+
+    MOEDA_BRL = "BRL"
+    MOEDA_USD = "USD"
+    MOEDA_CHOICES = [
+        (MOEDA_BRL, "Real (BRL)"),
+        (MOEDA_USD, "Dolar (USD)"),
+    ]
+
+    titulo = models.CharField(max_length=255)
+    loja = models.CharField(max_length=255, blank=True)
+    moeda = models.CharField(max_length=3, choices=MOEDA_CHOICES, default=MOEDA_BRL)
+    valor = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))]
+    )
+    quantidade = models.PositiveIntegerField(default=1)
+    frete = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))]
+    )
+    desconto = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))]
+    )
+    link = models.URLField(max_length=1000, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="%(class)s_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def subtotal(self) -> Decimal:
+        return (self.valor or Decimal("0")) * (self.quantidade or 0)
+
+    @property
+    def total(self) -> Decimal:
+        return self.subtotal + (self.frete or Decimal("0")) - (self.desconto or Decimal("0"))
+
+
+def orcamento_foto_path(instance, filename):
+    return f"contratos/orcamentos/{instance.pk or 'novo'}/foto/{filename}"
+
+
+def orcamento_doc_path(instance, filename):
+    return f"contratos/orcamentos/{instance.orcamento_id}/docs/{filename}"
+
+
+def suborcamento_foto_path(instance, filename):
+    return f"contratos/suborcamentos/{instance.pk or 'novo'}/foto/{filename}"
+
+
+def suborcamento_doc_path(instance, filename):
+    return f"contratos/suborcamentos/{instance.suborcamento_id}/docs/{filename}"
+
+
+class OrcamentoContrato(_ItemOrcamentoBase):
+    """Orcamento principal vinculado a uma requisicao. Pode ter suborcamentos."""
+
+    requisicao = models.ForeignKey(
+        RequisicaoContrato, on_delete=models.CASCADE, related_name="orcamentos"
+    )
+    foto_produto = models.ImageField(upload_to=orcamento_foto_path, null=True, blank=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.titulo} ({self.requisicao_id})"
+
+    @property
+    def total_suborcamentos(self) -> Decimal:
+        return sum((sub.total for sub in self.suborcamentos.all()), Decimal("0"))
+
+    @property
+    def total_com_suborcamentos(self) -> Decimal:
+        """Total do orcamento principal somado ao total de todos os suborcamentos."""
+        return self.total + self.total_suborcamentos
+
+
+class OrcamentoDocumento(models.Model):
+    orcamento = models.ForeignKey(
+        OrcamentoContrato, on_delete=models.CASCADE, related_name="documentos"
+    )
+    arquivo = models.FileField(upload_to=orcamento_doc_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em", "id"]
+
+    def __str__(self) -> str:
+        return self.nome_original or self.arquivo.name
+
+
+class SuborcamentoContrato(_ItemOrcamentoBase):
+    """Complemento de um orcamento principal. Nao aparece como orcamento independente."""
+
+    orcamento_pai = models.ForeignKey(
+        OrcamentoContrato, on_delete=models.CASCADE, related_name="suborcamentos"
+    )
+    foto_produto = models.ImageField(upload_to=suborcamento_foto_path, null=True, blank=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.titulo} (sub de {self.orcamento_pai_id})"
+
+
+class SuborcamentoDocumento(models.Model):
+    suborcamento = models.ForeignKey(
+        SuborcamentoContrato, on_delete=models.CASCADE, related_name="documentos"
+    )
+    arquivo = models.FileField(upload_to=suborcamento_doc_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em", "id"]
+
+    def __str__(self) -> str:
+        return self.nome_original or self.arquivo.name

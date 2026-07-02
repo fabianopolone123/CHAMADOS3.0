@@ -2,7 +2,9 @@
 
 ## Situacao atual
 
-O projeto possui sete modelos persistidos para sustentar o fluxo de atendimento:
+O projeto possui doze modelos persistidos:
+
+Fluxo de atendimento (Chamados):
 
 - `Chamado`
 - `ChamadoEvento`
@@ -11,6 +13,14 @@ O projeto possui sete modelos persistidos para sustentar o fluxo de atendimento:
 - `ChamadoMensagemAnexo`
 - `PendenciaTI`
 - `AtendimentoHistorico`
+
+Modulo Contratos:
+
+- `RequisicaoContrato`
+- `OrcamentoContrato`
+- `OrcamentoDocumento`
+- `SuborcamentoContrato`
+- `SuborcamentoDocumento`
 
 ## Modelos implementados
 
@@ -174,6 +184,72 @@ Regras atuais:
 - `tipo_encerramento` usa inicialmente os valores `pause` e `stop`.
 - `descricao_atividade` e obrigatoria no encerramento do periodo.
 - `duracao` e calculada ao pausar ou finalizar.
+
+### RequisicaoContrato
+
+Requisicao de contrato/compra do modulo Contratos. Agrupa varios orcamentos.
+
+Campos atuais:
+
+- `titulo`
+- `tipo` (choices: `fisica`, `digital`; default `fisica`)
+- `texto`
+- `status` (choices: `aberta`, `em_cotacao`, `finalizada`, `cancelada`; default `aberta`, definido automaticamente na criacao)
+- `criado_por` (FK opcional para o usuario, `on_delete=SET_NULL`)
+- `criado_em`
+- `atualizado_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin criam/veem requisicoes (validado no backend).
+- O status inicial e sempre `aberta`; o fluxo de aprovacao nao foi implementado (campo apenas preparado).
+
+### OrcamentoContrato
+
+Orcamento principal vinculado a uma requisicao. Pode ter varios suborcamentos.
+
+Campos atuais:
+
+- `requisicao` (FK para `RequisicaoContrato`, `on_delete=CASCADE`, related_name `orcamentos`)
+- `titulo`, `loja`
+- `moeda` (choices: `BRL`, `USD`; default `BRL`)
+- `valor`, `frete`, `desconto` (Decimal, nao negativos)
+- `quantidade` (inteiro positivo, minimo 1)
+- `link` (URL opcional)
+- `foto_produto` (`ImageField`, opcional; usa Pillow)
+- `criado_por`, `criado_em`, `atualizado_em`
+
+Regras de calculo:
+
+- `subtotal = valor * quantidade`
+- `total = subtotal + frete - desconto`
+- `total_com_suborcamentos = total do orcamento + soma do total de todos os suborcamentos vinculados`
+
+### OrcamentoDocumento
+
+Documento anexo de um orcamento (sem restricao de tipo ou tamanho no codigo).
+
+- `orcamento` (FK `on_delete=CASCADE`, related_name `documentos`)
+- `arquivo` (`FileField`), `nome_original`, `enviado_em`
+
+### SuborcamentoContrato
+
+Complemento de um orcamento principal. Nao aparece como orcamento independente na lista.
+
+Campos atuais: os mesmos de `OrcamentoContrato`, com `orcamento_pai` (FK para `OrcamentoContrato`, `on_delete=CASCADE`, related_name `suborcamentos`) no lugar de `requisicao`. Usa `subtotal`/`total` com a mesma regra de calculo.
+
+### SuborcamentoDocumento
+
+Documento anexo de um suborcamento.
+
+- `suborcamento` (FK `on_delete=CASCADE`, related_name `documentos`)
+- `arquivo` (`FileField`), `nome_original`, `enviado_em`
+
+### Relacao entre os modelos de Contratos
+
+- `RequisicaoContrato` 1--N `OrcamentoContrato` 1--N `SuborcamentoContrato`.
+- Orcamentos e suborcamentos possuem 1--N documentos cada.
+- Fotos e documentos ficam sob `MEDIA_ROOT/contratos/...` e sao servidos por rotas protegidas (nao expostos diretamente por `MEDIA` para quem nao tem permissao).
 
 ## Modelos previstos para proximas fases
 

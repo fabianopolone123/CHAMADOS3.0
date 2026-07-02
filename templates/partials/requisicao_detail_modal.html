@@ -1,0 +1,52 @@
+<div class="modal fade" id="requisicaoDetailModal" tabindex="-1" aria-labelledby="requisicaoDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal requisicao-detail-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Requisicao</span>
+                    <h5 class="modal-title" id="requisicaoDetailModalLabel" data-req-detail="titulo">Requisicao</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body requisicao-detail__body">
+                <dl class="requisicao-detail__meta">
+                    <div>
+                        <dt>Tipo</dt>
+                        <dd data-req-detail="tipo">-</dd>
+                    </div>
+                    <div>
+                        <dt>Status</dt>
+                        <dd><span class="status-badge contrato-status" data-req-detail="status">-</span></dd>
+                    </div>
+                    <div>
+                        <dt>Criado por</dt>
+                        <dd data-req-detail="criado_por">-</dd>
+                    </div>
+                    <div>
+                        <dt>Criado em</dt>
+                        <dd data-req-detail="criado_em">-</dd>
+                    </div>
+                </dl>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Texto da requisicao</h6>
+                    <p class="requisicao-detail__texto" data-req-detail="texto"></p>
+                </section>
+
+                <section class="requisicao-detail__section">
+                    <div class="requisicao-detail__orcamentos-head">
+                        <h6 class="requisicao-detail__section-title">Orcamentos</h6>
+                        <button type="button" class="btn btn-sm btn-primary" data-add-orcamento>+ Orcamento</button>
+                    </div>
+                    <div class="orcamentos-container" data-orcamentos></div>
+                    <p class="orcamentos-empty" data-orcamentos-empty>Nenhum orcamento cadastrado nesta requisicao.</p>
+                </section>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>

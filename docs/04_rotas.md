@@ -22,6 +22,15 @@
 | `/meus-chamados/<numero>/mensagens/` | POST | Envia uma mensagem na conversa do chamado, com anexos opcionais | Implementada |
 | `/meus-chamados/<numero>/anexo/<anexo_id>/` | GET | Download protegido de anexo do chamado (solicitante ou TI/admin) | Implementada |
 | `/meus-chamados/<numero>/mensagens/anexo/<anexo_id>/` | GET | Download protegido de anexo de mensagem (solicitante ou TI/admin) | Implementada |
+| `/contratos/` | GET | Modulo Contratos: lista de requisicoes (titulo + status) e botao "+" (apenas TI/admin) | Implementada |
+| `/contratos/requisicoes/criar/` | POST | Cria uma requisicao (titulo, tipo fisica/digital, texto); status inicial "Aberta" (apenas TI/admin) | Implementada |
+| `/contratos/requisicoes/<id>/` | GET | Detalhe (JSON) da requisicao com orcamentos, suborcamentos e totais (apenas TI/admin) | Implementada |
+| `/contratos/requisicoes/<id>/orcamentos/criar/` | POST | Cria orcamento na requisicao (multipart: campos + foto + documentos) (apenas TI/admin) | Implementada |
+| `/contratos/orcamentos/<id>/suborcamentos/criar/` | POST | Cria suborcamento vinculado ao orcamento (multipart) (apenas TI/admin) | Implementada |
+| `/contratos/orcamentos/<id>/foto/` | GET | Serve a foto do orcamento (inline, protegida) (apenas TI/admin) | Implementada |
+| `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
+| `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
+| `/contratos/documentos/suborcamento/<id>/` | GET | Download protegido de documento de suborcamento (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -96,6 +105,16 @@
 - O download de anexos (do chamado e das mensagens) exige `login_required` e usa rotas dedicadas (nao expoe a URL direta de `MEDIA`).
 - Usuario comum so acessa anexos dos chamados que ele mesmo abriu; administrador e Atendente TI acessam anexos de qualquer chamado.
 - Acesso nao autorizado retorna `404`.
+
+## Regras do modulo Contratos
+
+- `/contratos/` usa `ti_required` (admin e Atendente TI acessam; usuario comum e redirecionado). O botao "Contratos" no menu lateral so aparece para TI/admin, e todas as rotas do modulo validam a permissao no backend (usuario comum recebe `403` nos endpoints JSON/POST e `404` ao tentar baixar arquivos).
+- A criacao de requisicao (`requisicoes/criar/`) aceita `POST` JSON com CSRF: valida titulo (minimo 3 caracteres) e tipo (`fisica`/`digital`); grava `status=aberta`, `criado_por=usuario logado` e datas automaticas; retorna os dados para inserir o item na lista sem refresh.
+- O detalhe (`requisicoes/<id>/`) retorna JSON com a requisicao, seus orcamentos e, aninhados, os suborcamentos de cada orcamento, alem dos totais formatados.
+- A criacao de orcamento e de suborcamento usa `POST` multipart (`enctype="multipart/form-data"`) com CSRF. Campos: titulo, loja, moeda (`BRL`/`USD`), valor, quantidade, frete, desconto, link, `foto_produto` (imagem) e `documentos` (multiplos, sem restricao de tipo/tamanho no codigo). O backend valida a moeda, exige quantidade >= 1 e bloqueia valores negativos em valor/frete/desconto (mensagens amigaveis). O suborcamento e sempre vinculado ao orcamento pai e nao aparece como orcamento independente.
+- Regra de calculo: `total do orcamento = valor*quantidade + frete - desconto`; `total com suborcamentos = total do orcamento + soma dos totais dos suborcamentos`.
+- Foto do print: o botao "Tirar print" usa `navigator.mediaDevices.getDisplayMedia` no frontend, desenha o frame em canvas, permite recortar uma regiao e anexa o recorte como `foto_produto`. Se o navegador nao suportar, exibe mensagem e permite anexar imagem manualmente; cancelar a captura nao trava o formulario.
+- Fotos e documentos sao servidos por rotas dedicadas e protegidas (nao expoem a URL direta de `MEDIA`); acesso sem permissao retorna `404`.
 
 ## Regras das rotas de historico
 

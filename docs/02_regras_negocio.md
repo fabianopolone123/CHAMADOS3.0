@@ -111,6 +111,19 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. Apos enviar, o usuario permanece no detalhe do chamado e ve uma notificacao de sucesso ou erro.
 11. O historico tecnico aparece recolhido por padrao no detalhe e expande/recolhe ao ser clicado, sem trocar de tela e sem remover registros.
 
+## Regras atuais do modulo Contratos
+
+1. O modulo Contratos e acessivel apenas para Administrador e Atendente TI; o botao "Contratos" no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao, e redirecionado na tela e recebe `403`/`404` nos endpoints).
+2. A tela principal lista as requisicoes cadastradas mostrando apenas titulo e status, com um botao "+" para criar nova requisicao.
+3. A requisicao tem titulo, tipo (Fisica ou Digital) e texto; o status inicial e sempre "Aberta" (definido pelo sistema), com `criado_por` = usuario logado e data automatica. Status disponiveis: Aberta, Em cotacao, Finalizada, Cancelada (sem fluxo de aprovacao por enquanto).
+4. Clicar em uma requisicao abre um modal com todos os seus dados e os orcamentos vinculados; cada orcamento exibe seus suborcamentos logo abaixo, indentados.
+5. Uma requisicao pode ter varios orcamentos; cada orcamento pode ter varios suborcamentos (complementos). O suborcamento nunca aparece como orcamento independente.
+6. Orcamento e suborcamento tem os mesmos campos: titulo, loja, moeda (Real/Dolar), valor, quantidade, frete, desconto, link, foto do produto e documentos anexos (multiplos, sem restricao de tipo/tamanho no codigo).
+7. Regra de calculo: total do orcamento = valor x quantidade + frete - desconto; o total exibido do orcamento tambem considera a soma dos totais de todos os seus suborcamentos.
+8. O backend valida a moeda, exige quantidade minima 1 e bloqueia valores negativos em valor, frete e desconto, com mensagens amigaveis.
+9. O botao "Tirar print" captura a tela pelo navegador (`getDisplayMedia`), permite recortar uma regiao, pre-visualizar e refazer/remover; o recorte e salvo como foto do produto. Sem suporte do navegador, o sistema orienta a anexar imagem manualmente e nao trava o formulario se a captura for cancelada.
+10. Fotos e documentos ficam em `MEDIA_ROOT/contratos/...` e sao servidos por rotas protegidas; usuario sem permissao nao acessa os arquivos.
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.

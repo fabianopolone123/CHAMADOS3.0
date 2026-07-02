@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app contratos-app"
+    data-requisicao-create-url="{% url 'requisicao_create' %}"
+    data-requisicao-detail-url="{% url 'requisicao_detail' requisicao_id=0 %}"
+    data-orcamento-create-url="{% url 'orcamento_create' requisicao_id=0 %}"
+    data-suborcamento-create-url="{% url 'suborcamento_create' orcamento_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="contratos" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div>
+                <span class="topbar-kicker">Contratos</span>
+                <h2 class="topbar-title">Requisicoes de contrato</h2>
+                <p class="topbar-subtitle">Cadastre requisicoes, adicione orcamentos e complementos, e acompanhe os totais.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createRequisicaoButton" aria-label="Nova requisicao" title="Nova requisicao">+</button>
+        </header>
+
+        <section class="contratos-panel">
+            <ul class="requisicoes-list" id="requisicoesList" data-empty-text="Nenhuma requisicao cadastrada ainda.">
+                {% for req in requisicoes %}
+                    <li>
+                        <button type="button" class="requisicao-item" data-requisicao-id="{{ req.id }}">
+                            <span class="requisicao-item__title">{{ req.titulo }}</span>
+                            <span class="status-badge contrato-status contrato-status--{{ req.status }}">{{ req.status_label }}</span>
+                        </button>
+                    </li>
+                {% empty %}
+                    <p class="requisicoes-empty">Nenhuma requisicao cadastrada ainda.</p>
+                {% endfor %}
+            </ul>
+        </section>
+    </section>
+</main>
+
+{% include "partials/requisicao_create_modal.html" %}
+{% include "partials/requisicao_detail_modal.html" %}
+{% include "partials/orcamento_form_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/contratos.js' %}"></script>
+{% endblock %}
