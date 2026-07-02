@@ -111,10 +111,12 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. Apos enviar, o usuario permanece no detalhe do chamado e ve uma notificacao de sucesso ou erro.
 11. O historico tecnico aparece recolhido por padrao no detalhe e expande/recolhe ao ser clicado, sem trocar de tela e sem remover registros.
 
-## Regras atuais do modulo Contratos
+## Regras atuais do modulo Requisicoes
 
-1. O modulo Contratos e acessivel apenas para Administrador e Atendente TI; o botao "Contratos" no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao, e redirecionado na tela e recebe `403`/`404` nos endpoints).
-2. A tela principal lista as requisicoes cadastradas mostrando apenas titulo e status, com um botao "+" para criar nova requisicao.
+> Observacao: na interface o modulo se chama "Requisicoes". Os nomes tecnicos internos (models `RequisicaoContrato`/`OrcamentoContrato`/..., rotas `/contratos/...` e arquivos `contratos.*`) ainda usam o prefixo `Contrato` e foram mantidos para nao gerar migration/quebra; nao ha mais o termo "Contratos" na interface.
+
+1. O modulo Requisicoes e acessivel apenas para Administrador e Atendente TI; o botao "Requisicoes" no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao, e redirecionado na tela e recebe `403`/`404` nos endpoints).
+2. A tela principal lista as requisicoes cadastradas mostrando apenas titulo e status, com um botao "+ Adicionar" (responsivo: mostra apenas "+" em telas menores) para criar nova requisicao. O card superior e compacto, alinhando titulo, subtitulo e botao na mesma linha em telas maiores.
 3. A requisicao tem titulo, tipo (Fisica ou Digital) e texto; o status inicial e sempre "Aberta" (definido pelo sistema), com `criado_por` = usuario logado e data automatica. Status disponiveis: Aberta, Em cotacao, Finalizada, Cancelada (sem fluxo de aprovacao por enquanto).
 4. Clicar em uma requisicao abre um modal com todos os seus dados e os orcamentos vinculados; cada orcamento exibe seus suborcamentos logo abaixo, indentados.
 5. Uma requisicao pode ter varios orcamentos; cada orcamento pode ter varios suborcamentos (complementos). O suborcamento nunca aparece como orcamento independente.

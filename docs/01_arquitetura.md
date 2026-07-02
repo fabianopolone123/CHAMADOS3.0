@@ -7,7 +7,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 ## Componentes atuais
 
 - `chamados_ti`: configuracao principal do projeto
-- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes, historico e modulo Contratos
+- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes, historico e modulo Requisicoes (nomes tecnicos internos com prefixo `Contrato`)
 - `templates/core`: templates da autenticacao e de permissoes
 - `templates/chamados`: templates do Kanban, do portal do solicitante e do historico
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)

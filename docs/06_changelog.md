@@ -2,6 +2,9 @@
 
 ## 2026-07-02
 
+- Renomeado o modulo na interface de "Contratos" para "Requisicoes": menu lateral, `<title>`, card superior (titulo "Requisicoes", subtitulo "Cadastro de requisicoes" e descricao curta) e kicker do modal de criacao. Removidas as referencias visuais a "Contratos"/"Requisicoes de contrato". Os nomes tecnicos internos (models `*Contrato`, rotas `/contratos/...`, arquivos `contratos.css`/`contratos.js` e classes CSS) foram mantidos para nao gerar migration nem risco de quebra; nenhuma migration foi criada (mudanca apenas visual/textual).
+- Melhorado o botao de nova requisicao: virou uma pill "+ Adicionar" (icone + rotulo) com hover/transicao; responsivo, mostrando apenas "+" em telas menores (<=640px). Abre o mesmo modal de cadastro.
+- Compactado o card superior da tela de Requisicoes: menos padding e margens, titulo menor, e alinhamento de titulo/subtitulo/botao na mesma linha em telas maiores (com quebra responsiva em telas menores), liberando area util para a lista.
 - Adicionado o modulo "Contratos" (menu lateral, apenas TI/admin). Tela principal lista as requisicoes (titulo + status) com botao "+" para cadastro em modal; clicar em uma requisicao abre um modal com todos os dados e seus orcamentos, cada um com os suborcamentos indentados abaixo e os totais destacados. Toda a interacao e por `fetch`/`JsonResponse` com CSRF, sem refresh.
 - Criados os models `RequisicaoContrato`, `OrcamentoContrato`, `OrcamentoDocumento`, `SuborcamentoContrato` e `SuborcamentoDocumento` (migration `0007`). Requisicao 1--N orcamento 1--N suborcamento; orcamentos e suborcamentos tem 1--N documentos. Requisicao nasce com status "Aberta" e `criado_por` = usuario logado.
 - Regra de calculo: total do orcamento = valor x quantidade + frete - desconto; o total exibido considera tambem a soma dos totais dos suborcamentos. O backend valida moeda (BRL/USD), exige quantidade >= 1 e bloqueia valores negativos em valor/frete/desconto.

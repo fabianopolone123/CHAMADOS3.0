@@ -14,7 +14,7 @@ Fluxo de atendimento (Chamados):
 - `PendenciaTI`
 - `AtendimentoHistorico`
 
-Modulo Contratos:
+Modulo Requisicoes (exibido como "Requisicoes" na interface; os models mantem o prefixo tecnico `Contrato`):
 
 - `RequisicaoContrato`
 - `OrcamentoContrato`

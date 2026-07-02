@@ -1486,7 +1486,7 @@ def contratos_dashboard_view(request):
         for req in requisicoes
     ]
     context = {
-        "page_title": "Contratos",
+        "page_title": "Requisicoes",
         "requisicoes": rows,
         "requisicoes_total": len(rows),
         "is_admin": is_admin_user(request.user),

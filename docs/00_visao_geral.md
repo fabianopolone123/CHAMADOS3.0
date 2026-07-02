@@ -17,7 +17,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Consulta de chamados encerrados pelo Kanban: modal com pesquisa inteligente (por ID, titulo, descricao, solicitante, atendente, mensagens e historico) e detalhe completo, restrito a TI/admin
 - Controle de tempo por atendimento (iniciar, pausar, finalizar) e tela de historico
 - Portal do solicitante: abertura, listagem e detalhe dos proprios chamados, com anexos
-- Modulo Contratos (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), com foto do produto, documentos anexos, captura de print e calculo de totais
+- Modulo Requisicoes (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), com foto do produto, documentos anexos, captura de print e calculo de totais
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional
 - Documentacao tecnica e funcional do projeto

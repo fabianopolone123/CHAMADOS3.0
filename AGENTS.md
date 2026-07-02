@@ -19,7 +19,7 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 - O modelo `Chamado` possui vinculo `solicitante`, choices de `status`/`prioridade` e gerador de numero `CH-000123`.
 - O projeto possui o portal do solicitante em `/meus-chamados/` com abertura, listagem e detalhe read-only dos proprios chamados.
 - O projeto possui tela de Historico de Atendimentos em `/historico/` com busca dinamica por registros.
-- O projeto possui o modulo Contratos em `/contratos/` (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), foto do produto, documentos anexos, captura de print e calculo de totais.
+- O projeto possui o modulo Requisicoes em `/contratos/` (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), foto do produto, documentos anexos, captura de print e calculo de totais. Na interface chama-se "Requisicoes"; os nomes tecnicos internos (models, rotas, arquivos) mantem o prefixo `Contrato`.
 - O arquivo `.env` na raiz concentra as configuracoes sensiveis de ambiente.
 - A base de documentacao do projeto fica em `docs/`.
 
