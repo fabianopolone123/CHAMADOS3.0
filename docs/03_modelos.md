@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui doze modelos persistidos:
+O projeto possui quatorze modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -21,6 +21,11 @@ Modulo Requisicoes (exibido como "Requisicoes" na interface; os models mantem o 
 - `OrcamentoDocumento`
 - `SuborcamentoContrato`
 - `SuborcamentoDocumento`
+
+Modulo Insumos:
+
+- `InsumoTI`
+- `RetiradaInsumoTI`
 
 ## Modelos implementados
 
@@ -250,6 +255,45 @@ Documento anexo de um suborcamento.
 - `RequisicaoContrato` 1--N `OrcamentoContrato` 1--N `SuborcamentoContrato`.
 - Orcamentos e suborcamentos possuem 1--N documentos cada.
 - Fotos e documentos ficam sob `MEDIA_ROOT/contratos/...` e sao servidos por rotas protegidas (nao expostos diretamente por `MEDIA` para quem nao tem permissao).
+
+### InsumoTI
+
+Item de estoque de TI (teclados, mouses, cabos, adaptadores, fontes, perifericos, etc.).
+
+Campos atuais:
+
+- `nome`
+- `descricao`
+- `quantidade_atual` (inteiro positivo; e o estoque atual)
+- `observacao`
+- `ativo` (booleano, default `True`; preparado para desativacao futura sem exclusao)
+- `criado_por` (FK opcional, `on_delete=SET_NULL`)
+- `criado_em`, `atualizado_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin cadastram, veem e retiram insumos (validado no backend).
+- Propriedade `status_estoque`/`status_label`: `disponivel`, `baixo` (quantidade <= `LIMITE_BAIXO_ESTOQUE`, hoje 5) ou `zerado` (quantidade 0).
+- A quantidade inicial e obrigatoria e nao pode ser negativa.
+
+### RetiradaInsumoTI
+
+Registro historico de cada retirada/baixa de estoque de um insumo.
+
+Campos atuais:
+
+- `insumo` (FK para `InsumoTI`, `on_delete=CASCADE`, related_name `retiradas`)
+- `quantidade` (inteiro positivo; > 0)
+- `entregue_para`
+- `motivo`
+- `registrado_por` (FK opcional, `on_delete=SET_NULL`)
+- `criado_em`
+
+Regras atuais:
+
+- Cada retirada valida no backend: quantidade > 0 e menor/igual ao estoque disponivel (`409` se insuficiente); campos `entregue_para` e `motivo` obrigatorios.
+- Ao registrar a retirada, o `quantidade_atual` do insumo e abatido na mesma transacao (`select_for_update`).
+- O historico de retiradas nao e apagado; os insumos nao sao excluidos automaticamente.
 
 ## Modelos previstos para proximas fases
 

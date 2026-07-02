@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/insumos.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app insumos-app"
+    data-insumo-create-url="{% url 'insumo_create' %}"
+    data-retirada-create-url="{% url 'retirada_create' insumo_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="insumos" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Insumos</h2>
+                <p class="contratos-topbar__subtitle">Estoque de materiais de TI</p>
+                <p class="topbar-subtitle">Cadastre insumos, registre retiradas e acompanhe o estoque e o historico.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createInsumoButton" aria-label="Adicionar insumo" title="Adicionar insumo">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Adicionar</span>
+            </button>
+        </header>
+
+        <section class="insumos-layout">
+            <section class="insumos-section">
+                <h3 class="insumos-section__title">Estoque de insumos</h3>
+                <div class="insumos-grid" id="insumosGrid" data-empty-text="Nenhum insumo cadastrado ainda.">
+                    {% for insumo in insumos %}
+                        <article class="insumo-card insumo-card--{{ insumo.status }}" data-insumo-id="{{ insumo.id }}" data-insumo-nome="{{ insumo.nome }}">
+                            <div class="insumo-card__head">
+                                <h4 class="insumo-card__name">{{ insumo.nome }}</h4>
+                                <span class="status-badge insumo-status insumo-status--{{ insumo.status }}" data-insumo-status>{{ insumo.status_label }}</span>
+                            </div>
+                            <p class="insumo-card__desc">{{ insumo.descricao|default:"Sem descricao." }}</p>
+                            <div class="insumo-card__foot">
+                                <span class="insumo-card__qty">Em estoque: <strong data-insumo-qty>{{ insumo.quantidade_atual }}</strong></span>
+                                <button type="button" class="btn btn-sm btn-outline-primary insumo-retirar-btn" data-retirar aria-label="Retirar insumo">Retirar</button>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <p class="insumos-empty">Nenhum insumo cadastrado ainda.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="insumos-section">
+                <h3 class="insumos-section__title">Ultimas retiradas</h3>
+                <div class="insumos-table-wrap">
+                    <table class="insumos-table">
+                        <thead>
+                            <tr>
+                                <th>Insumo</th>
+                                <th>Qtd</th>
+                                <th>Entregue para</th>
+                                <th>Motivo</th>
+                                <th>Registrado por</th>
+                                <th>Data/Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="retiradasBody" data-empty-text="Nenhuma retirada registrada ainda.">
+                            {% for r in retiradas %}
+                                <tr>
+                                    <td>{{ r.insumo }}</td>
+                                    <td>{{ r.quantidade }}</td>
+                                    <td>{{ r.entregue_para }}</td>
+                                    <td class="insumos-table__motivo">{{ r.motivo }}</td>
+                                    <td>{{ r.registrado_por }}</td>
+                                    <td>{{ r.criado_em }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr data-retiradas-empty>
+                                    <td colspan="6" class="insumos-empty">Nenhuma retirada registrada ainda.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+    </section>
+</main>
+
+{% include "partials/insumo_create_modal.html" %}
+{% include "partials/retirada_create_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/insumos.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,38 @@
+<div class="modal fade" id="createInsumoModal" tabindex="-1" aria-labelledby="createInsumoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Insumos</span>
+                    <h5 class="modal-title" id="createInsumoModalLabel">Novo insumo</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="createInsumoForm" class="create-ticket-form">
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Nome</span>
+                        <input type="text" class="form-control" id="insumoNome" maxlength="255" placeholder="Ex.: Mouse USB" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Descricao</span>
+                        <input type="text" class="form-control" id="insumoDescricao" maxlength="255" placeholder="Descricao curta (opcional)">
+                    </label>
+                    <label class="contrato-field">
+                        <span>Quantidade inicial</span>
+                        <input type="number" class="form-control" id="insumoQuantidade" min="0" step="1" value="0" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Observacao</span>
+                        <textarea class="form-control" id="insumoObservacao" rows="3" placeholder="Observacoes (opcional)"></textarea>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createInsumoSubmit">Cadastrar insumo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

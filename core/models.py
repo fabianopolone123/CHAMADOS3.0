@@ -502,3 +502,79 @@ class SuborcamentoDocumento(models.Model):
 
     def __str__(self) -> str:
         return self.nome_original or self.arquivo.name
+
+
+# ==========================================================================
+# Modulo Insumos: controle simples de estoque e retirada de materiais de TI
+# ==========================================================================
+
+
+class InsumoTI(models.Model):
+    """Item de estoque de TI (teclados, mouses, cabos, adaptadores, etc.)."""
+
+    # Abaixo (ou igual a) este valor, o insumo entra em "baixo estoque".
+    LIMITE_BAIXO_ESTOQUE = 5
+
+    STATUS_DISPONIVEL = "disponivel"
+    STATUS_BAIXO = "baixo"
+    STATUS_ZERADO = "zerado"
+
+    nome = models.CharField(max_length=255)
+    descricao = models.CharField(max_length=255, blank=True)
+    quantidade_atual = models.PositiveIntegerField(default=0)
+    observacao = models.TextField(blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="insumos_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.nome} ({self.quantidade_atual})"
+
+    @property
+    def status_estoque(self) -> str:
+        if self.quantidade_atual <= 0:
+            return self.STATUS_ZERADO
+        if self.quantidade_atual <= self.LIMITE_BAIXO_ESTOQUE:
+            return self.STATUS_BAIXO
+        return self.STATUS_DISPONIVEL
+
+    @property
+    def status_label(self) -> str:
+        return {
+            self.STATUS_DISPONIVEL: "Disponivel",
+            self.STATUS_BAIXO: "Baixo estoque",
+            self.STATUS_ZERADO: "Sem estoque",
+        }.get(self.status_estoque, "Disponivel")
+
+
+class RetiradaInsumoTI(models.Model):
+    """Registro historico de uma retirada/baixa de estoque de um insumo."""
+
+    insumo = models.ForeignKey(InsumoTI, on_delete=models.CASCADE, related_name="retiradas")
+    quantidade = models.PositiveIntegerField()
+    entregue_para = models.CharField(max_length=255)
+    motivo = models.TextField()
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="retiradas_registradas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.quantidade}x {self.insumo.nome} -> {self.entregue_para}"

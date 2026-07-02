@@ -27,10 +27,12 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    InsumoTI,
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
     RequisicaoContrato,
+    RetiradaInsumoTI,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -1713,6 +1715,139 @@ def contrato_suborcamento_documento_view(request, documento_id: int):
         raise Http404("Nao encontrado.")
     doc = get_object_or_404(SuborcamentoDocumento, pk=documento_id)
     return _serve_file(doc.arquivo, as_attachment=True, filename=doc.nome_original or doc.arquivo.name)
+
+
+# ==========================================================================
+# Modulo Insumos
+# ==========================================================================
+
+
+def _serialize_insumo(insumo: InsumoTI):
+    return {
+        "id": insumo.id,
+        "nome": insumo.nome,
+        "descricao": insumo.descricao or "",
+        "quantidade_atual": insumo.quantidade_atual,
+        "observacao": insumo.observacao or "",
+        "status": insumo.status_estoque,
+        "status_label": insumo.status_label,
+    }
+
+
+def _serialize_retirada(retirada: RetiradaInsumoTI):
+    return {
+        "id": retirada.id,
+        "insumo": retirada.insumo.nome,
+        "quantidade": retirada.quantidade,
+        "entregue_para": retirada.entregue_para,
+        "motivo": retirada.motivo,
+        "registrado_por": _attendant_display(retirada.registrado_por) or "-",
+        "criado_em": timezone.localtime(retirada.criado_em).strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+@ti_required
+def insumos_dashboard_view(request):
+    insumos = list(InsumoTI.objects.filter(ativo=True))
+    retiradas = list(
+        RetiradaInsumoTI.objects.select_related("insumo", "registrado_por")[:50]
+    )
+    context = {
+        "page_title": "Insumos",
+        "insumos": [_serialize_insumo(i) for i in insumos],
+        "retiradas": [_serialize_retirada(r) for r in retiradas],
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/insumos.html", context)
+
+
+@login_required
+@require_POST
+def insumo_create_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para cadastrar insumos.", status=403)
+
+    payload = _load_request_payload(request) or {}
+    nome = (payload.get("nome") or "").strip()
+    descricao = (payload.get("descricao") or "").strip()
+    observacao = (payload.get("observacao") or "").strip()
+
+    if len(nome) < 2:
+        return _json_error("Informe um nome com pelo menos 2 caracteres.")
+
+    quantidade_raw = payload.get("quantidade_inicial")
+    if quantidade_raw is None or str(quantidade_raw).strip() == "":
+        return _json_error("Informe a quantidade inicial.")
+    try:
+        quantidade = int(quantidade_raw)
+    except (TypeError, ValueError):
+        return _json_error("Quantidade inicial invalida.")
+    if quantidade < 0:
+        return _json_error("A quantidade inicial nao pode ser negativa.")
+
+    insumo = InsumoTI.objects.create(
+        nome=nome,
+        descricao=descricao,
+        quantidade_atual=quantidade,
+        observacao=observacao,
+        criado_por=request.user,
+    )
+    return JsonResponse(
+        {"ok": True, "message": "Insumo cadastrado com sucesso.", "insumo": _serialize_insumo(insumo)}
+    )
+
+
+@login_required
+@require_POST
+def retirada_create_view(request, insumo_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para registrar retiradas.", status=403)
+
+    payload = _load_request_payload(request) or {}
+    entregue_para = (payload.get("entregue_para") or "").strip()
+    motivo = (payload.get("motivo") or "").strip()
+
+    try:
+        quantidade = int(payload.get("quantidade"))
+    except (TypeError, ValueError):
+        return _json_error("Quantidade invalida.")
+
+    if quantidade <= 0:
+        return _json_error("A quantidade retirada deve ser maior que zero.")
+    if not entregue_para:
+        return _json_error("Informe para quem o insumo foi entregue.")
+    if not motivo:
+        return _json_error("Informe o motivo da retirada.")
+
+    with transaction.atomic():
+        insumo = InsumoTI.objects.select_for_update().filter(pk=insumo_id, ativo=True).first()
+        if not insumo:
+            return _json_error("Insumo nao encontrado.", status=404)
+        if quantidade > insumo.quantidade_atual:
+            return _json_error(
+                f"Estoque insuficiente. Disponivel: {insumo.quantidade_atual}.", status=409
+            )
+
+        insumo.quantidade_atual -= quantidade
+        insumo.save(update_fields=["quantidade_atual", "atualizado_em"])
+        retirada = RetiradaInsumoTI.objects.create(
+            insumo=insumo,
+            quantidade=quantidade,
+            entregue_para=entregue_para,
+            motivo=motivo,
+            registrado_por=request.user,
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Retirada registrada com sucesso.",
+            "insumo": _serialize_insumo(insumo),
+            "retirada": _serialize_retirada(retirada),
+        }
+    )
 
 
 @login_required

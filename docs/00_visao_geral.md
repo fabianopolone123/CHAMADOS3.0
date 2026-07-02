@@ -18,6 +18,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Controle de tempo por atendimento (iniciar, pausar, finalizar) e tela de historico
 - Portal do solicitante: abertura, listagem e detalhe dos proprios chamados, com anexos
 - Modulo Requisicoes (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), com foto do produto, documentos anexos, captura de print e calculo de totais
+- Modulo Insumos (apenas TI/admin): controle simples de estoque de materiais de TI com cadastro, retirada com baixa de estoque e historico de retiradas
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional
 - Documentacao tecnica e funcional do projeto

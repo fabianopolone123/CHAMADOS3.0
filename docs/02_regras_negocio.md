@@ -128,6 +128,16 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 11. Ao abrir o detalhe de uma requisicao, o Atendente TI/Admin ve a opcao "Excluir" (discreta, no rodape do modal). O clique abre uma confirmacao obrigatoria ("Tem certeza que deseja excluir esta requisicao? Esta acao nao podera ser desfeita.") com os botoes "Cancelar" e "Excluir definitivamente" (estilo perigoso); nada e excluido sem confirmacao.
 12. A exclusao e feita via `POST` com CSRF (nunca por GET) e validada no backend (usuario comum recebe `403`). Ela remove a requisicao e, por cascata, todos os orcamentos, suborcamentos e documentos vinculados. Apos excluir, a requisicao some da lista sem refresh; em caso de erro, ela permanece visivel e uma mensagem e exibida. Os arquivos fisicos anexados nao sao removidos do disco (pendencia conhecida).
 
+## Regras atuais do modulo Insumos
+
+1. O modulo Insumos e acessivel apenas para Administrador e Atendente TI; o botao "Insumos" no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao e recebe `403`/redirecionamento).
+2. A tela tem duas areas: "Estoque de insumos" (cards com nome, descricao, quantidade atual, status visual e botao "Retirar") e "Ultimas retiradas" (tabela com insumo, quantidade, entregue para, motivo, quem registrou e data/hora).
+3. O status visual do insumo e: "Disponivel", "Baixo estoque" (quantidade <= 5) ou "Sem estoque" (quantidade 0), com destaque discreto por cor.
+4. O cadastro de insumo pede nome, descricao, quantidade inicial (obrigatoria, nao negativa) e observacao; o insumo aparece no estoque sem refresh.
+5. A retirada pede quantidade, para quem vai e motivo (todos obrigatorios). O backend valida que a quantidade e maior que zero e nao excede o estoque; caso contrario, bloqueia com mensagem.
+6. Ao confirmar a retirada, o estoque e abatido, um registro e gravado no historico e o card e a tabela sao atualizados sem refresh.
+7. O historico de retiradas nunca e apagado; insumos nao sao excluidos automaticamente (ha o campo `ativo` preparado para desativacao futura, ainda nao usado na interface).
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.

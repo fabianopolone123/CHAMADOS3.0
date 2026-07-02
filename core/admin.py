@@ -1,9 +1,11 @@
 from django.contrib import admin
 
 from .models import (
+    InsumoTI,
     OrcamentoContrato,
     OrcamentoDocumento,
     RequisicaoContrato,
+    RetiradaInsumoTI,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -48,3 +50,25 @@ class SuborcamentoContratoAdmin(admin.ModelAdmin):
     list_filter = ("moeda",)
     search_fields = ("titulo", "loja")
     inlines = [SuborcamentoDocumentoInline]
+
+
+class RetiradaInsumoTIInline(admin.TabularInline):
+    model = RetiradaInsumoTI
+    extra = 0
+    fields = ("quantidade", "entregue_para", "motivo", "registrado_por", "criado_em")
+    readonly_fields = ("criado_em",)
+
+
+@admin.register(InsumoTI)
+class InsumoTIAdmin(admin.ModelAdmin):
+    list_display = ("nome", "quantidade_atual", "ativo", "atualizado_em")
+    list_filter = ("ativo",)
+    search_fields = ("nome", "descricao")
+    inlines = [RetiradaInsumoTIInline]
+
+
+@admin.register(RetiradaInsumoTI)
+class RetiradaInsumoTIAdmin(admin.ModelAdmin):
+    list_display = ("insumo", "quantidade", "entregue_para", "registrado_por", "criado_em")
+    search_fields = ("insumo__nome", "entregue_para", "motivo")
+    date_hierarchy = "criado_em"

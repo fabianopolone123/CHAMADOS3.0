@@ -32,6 +32,9 @@
 | `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
 | `/contratos/documentos/suborcamento/<id>/` | GET | Download protegido de documento de suborcamento (apenas TI/admin) | Implementada |
+| `/insumos/` | GET | Modulo Insumos: estoque (cards) e ultimas retiradas, com botao "+ Adicionar" (apenas TI/admin) | Implementada |
+| `/insumos/criar/` | POST | Cadastra um insumo (nome, descricao, quantidade inicial, observacao); quantidade obrigatoria e nao negativa (apenas TI/admin) | Implementada |
+| `/insumos/<id>/retirar/` | POST | Registra retirada (quantidade, para quem, motivo), valida estoque e abate a quantidade (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -118,6 +121,14 @@
 - Foto do print: o botao "Tirar print" usa `navigator.mediaDevices.getDisplayMedia` no frontend, desenha o frame em canvas, permite recortar uma regiao e anexa o recorte como `foto_produto`. Se o navegador nao suportar, exibe mensagem e permite anexar imagem manualmente; cancelar a captura nao trava o formulario.
 - Fotos e documentos sao servidos por rotas dedicadas e protegidas (nao expoem a URL direta de `MEDIA`); acesso sem permissao retorna `404`.
 - A exclusao de requisicao (`requisicoes/<id>/excluir/`) exige `login_required` + permissao TI/admin (usuario comum recebe `403`), aceita apenas `POST` com CSRF (GET retorna `405`) e responde JSON. Remove a requisicao e, por cascata (`on_delete=CASCADE`), seus orcamentos, suborcamentos e os documentos vinculados. No frontend abre uma confirmacao obrigatoria antes de excluir; em caso de sucesso o item some da lista sem refresh. Observacao: os arquivos fisicos em `MEDIA_ROOT` nao sao apagados (pendencia registrada em `docs/05_tarefas.md`).
+
+## Regras do modulo Insumos
+
+- `/insumos/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Insumos" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend (usuario comum recebe `403` nos endpoints).
+- A tela mostra o estoque em cards (nome, descricao, quantidade e status: Disponivel/Baixo estoque/Sem estoque) e uma tabela com as ultimas retiradas (insumo, quantidade, entregue para, motivo, quem registrou, data/hora).
+- `criar/` e `<id>/retirar/` usam `POST` JSON com CSRF (GET retorna `405`). O cadastro valida nome e quantidade inicial obrigatoria e nao negativa.
+- A retirada valida no backend: quantidade > 0 (bloqueia zero/negativo com `400`) e menor/igual ao estoque (`409` se insuficiente); `entregue_para` e `motivo` obrigatorios. Em uma transacao com `select_for_update`, abate `quantidade_atual` e cria o registro em `RetiradaInsumoTI`. A resposta traz o insumo atualizado (quantidade e status) e a retirada, para atualizar o card e o historico sem refresh.
+- O historico de retiradas nao e apagado e insumos nao sao excluidos automaticamente (campo `ativo` preparado para desativacao futura).
 
 ## Regras das rotas de historico
 

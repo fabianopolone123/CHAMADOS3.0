@@ -1,0 +1,36 @@
+<div class="modal fade" id="retiradaModal" tabindex="-1" aria-labelledby="retiradaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Retirada</span>
+                    <h5 class="modal-title" id="retiradaModalLabel">Retirar insumo</h5>
+                    <p class="create-ticket-subtitle mb-0" data-retirada-insumo>Insumo</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="retiradaForm" class="create-ticket-form">
+                <div class="modal-body">
+                    <p class="retirada-estoque">Disponivel em estoque: <strong data-retirada-disponivel>0</strong></p>
+                    <label class="contrato-field">
+                        <span>Quantidade retirada</span>
+                        <input type="number" class="form-control" id="retiradaQuantidade" min="1" step="1" value="1" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Para quem vai</span>
+                        <input type="text" class="form-control" id="retiradaEntreguePara" maxlength="255" placeholder="Nome de quem recebeu" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Motivo da retirada</span>
+                        <textarea class="form-control" id="retiradaMotivo" rows="3" placeholder="Por que o insumo esta sendo retirado" required></textarea>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="retiradaSubmit">Confirmar retirada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
