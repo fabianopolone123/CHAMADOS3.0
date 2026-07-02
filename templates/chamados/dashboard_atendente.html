@@ -15,6 +15,7 @@
     data-finish-attendance-url="{% url 'finish_attendance' %}"
     data-move-ticket-url="{% url 'move_ticket' %}"
     data-create-ticket-url="{% url 'create_ticket_kanban' %}"
+    data-create-pendencia-url="{% url 'pendencia_create' %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="chamados" %}
@@ -44,6 +45,24 @@
                             {% include "partials/kanban_card.html" %}
                         {% empty %}
                             <p class="kanban-empty">Nenhum chamado aberto na fila.</p>
+                        {% endfor %}
+                    </div>
+                </article>
+
+                {# Coluna fixa: Pendencias #}
+                <article class="kanban-column kanban-column--pendencias">
+                    <div class="column-header">
+                        <div>
+                            <span class="column-kicker">Backlog TI</span>
+                            <h3 class="column-title">Pendencias</h3>
+                        </div>
+                        <button type="button" class="pendencia-add-btn" id="createPendenciaButton" data-bs-toggle="modal" data-bs-target="#createPendenciaModal" aria-label="Nova pendencia" title="Nova pendencia">+</button>
+                    </div>
+                    <div class="ticket-list js-pendencia-list" data-column-type="pendencia" data-empty-text="Nenhuma pendencia cadastrada.">
+                        {% for p in pendencia_column.pendencias %}
+                            {% include "partials/pendencia_card.html" %}
+                        {% empty %}
+                            <p class="kanban-empty">Nenhuma pendencia cadastrada.</p>
                         {% endfor %}
                     </div>
                 </article>
@@ -92,6 +111,8 @@
 
 {% include "partials/atendimento_modal.html" %}
 {% include "partials/criar_chamado_modal.html" %}
+{% include "partials/pendencia_create_modal.html" %}
+{% include "partials/pendencia_detail_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

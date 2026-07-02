@@ -25,6 +25,7 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    PendenciaTI,
 )
 from .permissions import (
     ATTENDANT_GROUP_NAME,
@@ -276,9 +277,14 @@ def tickets_dashboard_view(request):
         for user in attendants
     ]
 
+    pendencias = list(
+        PendenciaTI.objects.filter(convertido_em_chamado=False).select_related("criado_por")
+    )
+
     context = {
         "page_title": "Painel de Chamados TI",
         "open_column": {"tickets": abertos, "count": len(abertos)},
+        "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "attendant_columns": attendant_columns,
         "closed_column": {"tickets": fechados, "count": len(fechados)},
         "is_admin": is_admin_user(request.user),
@@ -466,6 +472,161 @@ def create_ticket_kanban_view(request):
             "ok": True,
             "message": f"Chamado {chamado.numero} criado com sucesso.",
             "ticket_number": chamado.numero,
+            "card_html": card_html,
+        }
+    )
+
+
+def _render_pendencia_card(request, pendencia: PendenciaTI) -> str:
+    return render_to_string("partials/pendencia_card.html", {"p": pendencia}, request=request)
+
+
+@login_required
+@require_POST
+def pendencia_create_view(request):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para criar pendencias.", status=403)
+
+    payload = _load_request_payload(request)
+    if payload is None:
+        return _json_error("Nao foi possivel ler os dados enviados.")
+
+    titulo = (payload.get("titulo") or "").strip()
+    descricao = (payload.get("descricao") or "").strip()
+
+    if len(titulo) < 3:
+        return _json_error("Informe um titulo com pelo menos 3 caracteres.")
+    if not descricao:
+        return _json_error("Descreva a pendencia.")
+
+    pendencia = PendenciaTI.objects.create(
+        titulo=titulo,
+        descricao=descricao,
+        criado_por=request.user,
+    )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Pendencia criada com sucesso.",
+            "pendencia_id": pendencia.id,
+            "card_html": _render_pendencia_card(request, pendencia),
+        }
+    )
+
+
+@login_required
+def pendencia_detail_view(request, pendencia_id: int):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para ver pendencias.", status=403)
+
+    pendencia = get_object_or_404(PendenciaTI, pk=pendencia_id)
+    return JsonResponse(
+        {
+            "ok": True,
+            "titulo": pendencia.titulo,
+            "descricao": pendencia.descricao,
+            "criado_em": timezone.localtime(pendencia.criado_em).strftime("%d/%m/%Y %H:%M"),
+            "criado_por": _attendant_display(pendencia.criado_por) or "Usuario removido",
+        }
+    )
+
+
+@login_required
+@require_POST
+def pendencia_convert_view(request, pendencia_id: int):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para converter pendencias.", status=403)
+
+    payload = _load_request_payload(request)
+    if payload is None:
+        return _json_error("Nao foi possivel ler os dados enviados.")
+
+    try:
+        attendant_id = int(payload.get("attendant_id"))
+    except (TypeError, ValueError):
+        return _json_error("Atendente de destino invalido.")
+
+    User = get_user_model()
+    attendant = User.objects.filter(pk=attendant_id, groups__name=ATTENDANT_GROUP_NAME).first()
+    if not attendant:
+        return _json_error("O atendente de destino nao pertence ao perfil Atendente TI.", status=400)
+
+    pendencia = get_object_or_404(PendenciaTI, pk=pendencia_id)
+    if pendencia.convertido_em_chamado:
+        return _json_error("Esta pendencia ja foi convertida em chamado.", status=409)
+
+    autor = _attendant_display(request.user)
+    destino = _attendant_display(attendant)
+    solicitante = pendencia.criado_por
+
+    chamado = Chamado(
+        titulo=pendencia.titulo,
+        descricao=pendencia.descricao,
+        solicitante=solicitante,
+        solicitante_nome=_attendant_display(solicitante),
+        solicitante_email=(getattr(solicitante, "email", "") or ""),
+        status=Chamado.STATUS_EM_ATENDIMENTO,
+        atendente_atual=attendant,
+        origem="Pendencia TI",
+    )
+
+    for _attempt in range(3):
+        chamado.numero = Chamado.gerar_numero()
+        try:
+            with transaction.atomic():
+                chamado.save()
+                pendencia.convertido_em_chamado = True
+                pendencia.chamado_gerado = chamado
+                pendencia.convertido_por = request.user
+                pendencia.convertido_em = timezone.now()
+                pendencia.save(
+                    update_fields=[
+                        "convertido_em_chamado",
+                        "chamado_gerado",
+                        "convertido_por",
+                        "convertido_em",
+                    ]
+                )
+                ChamadoEvento.registrar(
+                    chamado=chamado,
+                    usuario=request.user,
+                    tipo=ChamadoEvento.TIPO_CRIACAO,
+                    descricao=f"Chamado criado a partir da pendencia #{pendencia.id} por {autor}.",
+                )
+                ChamadoEvento.registrar(
+                    chamado=chamado,
+                    usuario=request.user,
+                    tipo=ChamadoEvento.TIPO_ATENDENTE,
+                    descricao=f"Pendencia atribuida para atendimento de {destino} por {autor}.",
+                )
+            break
+        except IntegrityError:
+            continue
+    else:
+        return _json_error("Nao foi possivel gerar o numero do chamado. Tente novamente.")
+
+    active_attendance = (
+        AtendimentoHistorico.objects.select_related("chamado")
+        .filter(atendente=request.user, finalizado_em__isnull=True)
+        .first()
+    )
+    card = _serialize_kanban_card(chamado, _serialize_attendance_state(active_attendance))
+    card_html = render_to_string("partials/kanban_card.html", {"ticket": card}, request=request)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Pendencia convertida no chamado {chamado.numero}.",
+            "pendencia_id": pendencia.id,
+            "chamado_id": chamado.id,
+            "ticket_number": chamado.numero,
+            "titulo": chamado.titulo,
+            "status": chamado.status,
+            "status_label": chamado.status_label,
+            "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+            "atendente_atual": _attendant_display(chamado.atendente_atual),
+            "atendente_atual_id": chamado.atendente_atual_id,
             "card_html": card_html,
         }
     )

@@ -3,6 +3,8 @@
     const ATTENDANCE_FORM_ID = "attendanceActionForm";
     const CARD_SELECTOR = ".ticket-card[data-ticket-number]";
     const LIST_SELECTOR = ".js-ticket-list";
+    const PENDENCIA_LIST_SELECTOR = ".js-pendencia-list";
+    const PENDENCIA_CARD_SELECTOR = ".pendencia-card[data-pendencia-id]";
     const ACTION_SELECTOR = "[data-ticket-action]";
 
     const appElement = document.querySelector(".tickets-app");
@@ -367,12 +369,80 @@
         }
     }
 
+    function isPendenciaEl(el) {
+        return !!(el && el.dataset && el.dataset.pendenciaId);
+    }
+
+    // Regras de destino do drag: pendencia so vai para coluna de atendente;
+    // chamado normal nao pode entrar na coluna de pendencias.
+    function canDrop(dragged, toList) {
+        if (!toList || !toList.dataset) {
+            return false;
+        }
+        const toType = toList.dataset.columnType;
+        if (isPendenciaEl(dragged)) {
+            return toType === "atendente" || toType === "pendencia";
+        }
+        return toType !== "pendencia";
+    }
+
+    function handleTicketDrop(event) {
+        const ticketNumber = event.item.dataset.ticketNumber;
+        const target = event.to.dataset.columnType;
+        const attendantId = event.to.dataset.attendantId;
+        const fromAttendantId = event.from.dataset.attendantId;
+
+        if (!ticketNumber || !target) {
+            return;
+        }
+        if (event.from === event.to) {
+            return;
+        }
+        if (target === "atendente" && attendantId === fromAttendantId) {
+            return;
+        }
+
+        const payload = { ticket_number: ticketNumber, target: target };
+        if (target === "atendente") {
+            payload.attendant_id = attendantId;
+        }
+
+        // Atualiza o estado de vazio na hora (otimista); o POST confirma ou reverte.
+        refreshEmptyStates();
+        persistMove(payload, event);
+    }
+
+    function handlePendenciaDrop(event) {
+        const target = event.to.dataset.columnType;
+        // So converte quando cai em uma coluna de atendente (regra tambem no backend).
+        if (event.from === event.to || target !== "atendente") {
+            return;
+        }
+        const pendenciaId = event.item.dataset.pendenciaId;
+        const attendantId = event.to.dataset.attendantId;
+        refreshEmptyStates();
+        convertPendencia(pendenciaId, attendantId, event);
+    }
+
+    function handleDragEnd(event) {
+        window.setTimeout(() => {
+            dragInProgress = false;
+        }, 0);
+
+        if (isPendenciaEl(event.item)) {
+            handlePendenciaDrop(event);
+            return;
+        }
+        handleTicketDrop(event);
+    }
+
     function initializeDragAndDrop() {
         if (typeof Sortable === "undefined") {
             return;
         }
 
-        document.querySelectorAll(LIST_SELECTOR).forEach((listElement) => {
+        const lists = document.querySelectorAll(`${LIST_SELECTOR}, ${PENDENCIA_LIST_SELECTOR}`);
+        lists.forEach((listElement) => {
             Sortable.create(listElement, {
                 group: "tickets-board",
                 animation: 180,
@@ -381,43 +451,41 @@
                 dragClass: "ticket-card-drag",
                 filter: "button, textarea",
                 preventOnFilter: false,
+                onMove: (evt) => canDrop(evt.dragged, evt.to),
                 onStart: () => {
                     dragInProgress = true;
                 },
-                onEnd: (event) => {
-                    window.setTimeout(() => {
-                        dragInProgress = false;
-                    }, 0);
-
-                    const ticketNumber = event.item.dataset.ticketNumber;
-                    const target = event.to.dataset.columnType;
-                    const attendantId = event.to.dataset.attendantId;
-                    const fromAttendantId = event.from.dataset.attendantId;
-
-                    if (!ticketNumber || !target) {
-                        return;
-                    }
-
-                    // sem mudanca real de coluna
-                    if (event.from === event.to) {
-                        return;
-                    }
-                    // mesma coluna de atendente (por seguranca)
-                    if (target === "atendente" && attendantId === fromAttendantId) {
-                        return;
-                    }
-
-                    const payload = { ticket_number: ticketNumber, target: target };
-                    if (target === "atendente") {
-                        payload.attendant_id = attendantId;
-                    }
-
-                    // Atualiza o estado de vazio na hora (otimista); o POST confirma ou reverte.
-                    refreshEmptyStates();
-                    persistMove(payload, event);
-                },
+                onEnd: handleDragEnd,
             });
         });
+    }
+
+    async function convertPendencia(pendenciaId, attendantId, event) {
+        const card = event.item;
+        const convertUrl = card.dataset.convertUrl;
+        try {
+            const result = await sendJson(convertUrl, { attendant_id: attendantId });
+            // Remove o card de pendencia e insere o card do novo chamado na coluna destino.
+            card.remove();
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = (result.card_html || "").trim();
+            const newCard = wrapper.firstElementChild;
+            if (newCard) {
+                event.to.appendChild(newCard);
+                bindCard(newCard);
+            }
+            updateColumnCounts();
+            refreshEmptyStates();
+            showToast(result.message || "Pendencia convertida em chamado.", "success");
+        } catch (error) {
+            // Reverte a pendencia para a coluna original.
+            const origin = event.from;
+            const reference = origin.children[event.oldIndex] || null;
+            origin.insertBefore(card, reference);
+            updateColumnCounts();
+            refreshEmptyStates();
+            showToast(error.message || "Nao foi possivel converter a pendencia.", "error");
+        }
     }
 
     function navigateToDetail(card) {
@@ -563,11 +631,132 @@
         });
     }
 
+    const pendenciaDetailModalElement = document.getElementById("pendenciaDetailModal");
+    const pendenciaDetailModal = pendenciaDetailModalElement
+        ? bootstrap.Modal.getOrCreateInstance(pendenciaDetailModalElement)
+        : null;
+
+    function setPendenciaDetailField(key, value) {
+        if (!pendenciaDetailModalElement) {
+            return;
+        }
+        const el = pendenciaDetailModalElement.querySelector(`[data-pendencia-detail="${key}"]`);
+        if (el) {
+            el.textContent = value || "-";
+        }
+    }
+
+    async function openPendenciaDetail(card) {
+        if (!pendenciaDetailModal) {
+            return;
+        }
+        try {
+            const response = await fetch(card.dataset.detailUrl, {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+            });
+            const data = await response.json();
+            if (!response.ok || data.ok === false) {
+                throw data;
+            }
+            setPendenciaDetailField("titulo", data.titulo);
+            setPendenciaDetailField("descricao", data.descricao);
+            setPendenciaDetailField("criado_por", data.criado_por);
+            setPendenciaDetailField("criado_em", data.criado_em);
+            pendenciaDetailModal.show();
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel abrir a pendencia.", "error");
+        }
+    }
+
+    function bindPendenciaCard(card) {
+        if (card.dataset.bound === "true") {
+            return;
+        }
+        card.dataset.bound = "true";
+
+        card.addEventListener("click", () => {
+            if (dragInProgress) {
+                return;
+            }
+            openPendenciaDetail(card);
+        });
+
+        card.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openPendenciaDetail(card);
+            }
+        });
+    }
+
+    function initializePendenciaCards() {
+        document.querySelectorAll(PENDENCIA_CARD_SELECTOR).forEach(bindPendenciaCard);
+    }
+
+    function insertNewPendenciaCard(cardHtml) {
+        const list = document.querySelector(PENDENCIA_LIST_SELECTOR);
+        if (!list) {
+            window.location.reload();
+            return;
+        }
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = (cardHtml || "").trim();
+        const card = wrapper.firstElementChild;
+        if (!card) {
+            window.location.reload();
+            return;
+        }
+        list.appendChild(card);
+        bindPendenciaCard(card);
+        updateColumnCounts();
+        refreshEmptyStates();
+    }
+
+    function initializeCreatePendencia() {
+        const createUrl = appElement.dataset.createPendenciaUrl;
+        const modalElement = document.getElementById("createPendenciaModal");
+        const form = document.getElementById("createPendenciaForm");
+        const submitButton = document.getElementById("createPendenciaSubmit");
+        if (!createUrl || !modalElement || !form) {
+            return;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            const titulo = form.querySelector("#createPendenciaTitulo").value.trim();
+            const descricao = form.querySelector("#createPendenciaDescricao").value.trim();
+
+            try {
+                const data = await sendJson(createUrl, { titulo, descricao });
+                if (data.card_html) {
+                    insertNewPendenciaCard(data.card_html);
+                }
+                modal.hide();
+                form.reset();
+                showToast(data.message || "Pendencia criada com sucesso.", "success");
+            } catch (error) {
+                showToast(error.message || "Nao foi possivel criar a pendencia.", "error");
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+            }
+        });
+    }
+
     function initialize() {
         attendanceForm.addEventListener("submit", handleAttendanceSubmit);
         initializeDragAndDrop();
         initializeTicketCards();
+        initializePendenciaCards();
         initializeCreateTicket();
+        initializeCreatePendencia();
         syncInitialActiveState();
     }
 

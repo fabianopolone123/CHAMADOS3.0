@@ -1,0 +1,14 @@
+{% comment %}
+Card compacto de pendencia no Kanban. Mostra apenas o titulo; o clique abre o
+modal de detalhe. Arrastavel apenas para colunas de Atendente TI (regra no JS/backend).
+{% endcomment %}
+<article
+    class="ticket-card pendencia-card"
+    tabindex="0"
+    data-pendencia-id="{{ p.id }}"
+    data-detail-url="{% url 'pendencia_detail' p.id %}"
+    data-convert-url="{% url 'pendencia_convert' p.id %}"
+    aria-label="Pendencia: {{ p.titulo }}"
+>
+    <h4 class="pendencia-card__title">{{ p.titulo }}</h4>
+</article>

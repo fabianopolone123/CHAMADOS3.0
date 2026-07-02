@@ -14,6 +14,7 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    PendenciaTI,
 )
 from .permissions import ATTENDANT_GROUP_NAME
 
@@ -181,3 +182,105 @@ class EncerramentoChamadoTests(TestCase):
 
         self.chamado.refresh_from_db()
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PendenciaTITests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.creator = User.objects.create_user(username="ti1", password="x")
+        self.attendant = User.objects.create_user(username="ti2", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        grupo = Group.objects.get(name=ATTENDANT_GROUP_NAME)
+        self.creator.groups.add(grupo)
+        self.attendant.groups.add(grupo)
+
+    def _create_pendencia(self, autor):
+        return PendenciaTI.objects.create(
+            titulo="Trocar switch", descricao="Switch do 2o andar", criado_por=autor
+        )
+
+    def test_attendant_creates_pendencia(self):
+        self.client.force_login(self.creator)
+        resp = self.client.post(
+            reverse("pendencia_create"),
+            data=json.dumps({"titulo": "Comprar toner", "descricao": "Impressora sala 3"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(PendenciaTI.objects.filter(titulo="Comprar toner").exists())
+
+    def test_common_user_cannot_create_or_view_pendencia(self):
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("pendencia_create"),
+            data=json.dumps({"titulo": "Invadindo", "descricao": "nao pode"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+        pend = self._create_pendencia(self.creator)
+        resp = self.client.get(reverse("pendencia_detail", args=[pend.id]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_convert_pendencia_creates_chamado(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("pendencia_convert", args=[pend.id]),
+            data=json.dumps({"attendant_id": self.attendant.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        chamado = Chamado.objects.get(numero=data["ticket_number"])
+        self.assertEqual(chamado.titulo, "Trocar switch")
+        self.assertEqual(chamado.solicitante, self.creator)  # solicitante = quem criou a pendencia
+        self.assertEqual(chamado.atendente_atual, self.attendant)  # atendente da coluna destino
+        self.assertEqual(chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+
+        pend.refresh_from_db()
+        self.assertTrue(pend.convertido_em_chamado)
+        self.assertEqual(pend.chamado_gerado, chamado)
+        self.assertEqual(pend.convertido_por, self.attendant)
+
+        self.assertTrue(
+            ChamadoEvento.objects.filter(chamado=chamado, descricao__icontains="pendencia").exists()
+        )
+
+    def test_convert_twice_does_not_duplicate(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        url = reverse("pendencia_convert", args=[pend.id])
+        body = json.dumps({"attendant_id": self.attendant.id})
+
+        first = self.client.post(url, data=body, content_type="application/json")
+        self.assertEqual(first.status_code, 200)
+        second = self.client.post(url, data=body, content_type="application/json")
+        self.assertEqual(second.status_code, 409)
+
+        self.assertEqual(Chamado.objects.filter(pendencias_origem=pend).count(), 1)
+
+    def test_convert_rejects_non_attendant_target(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("pendencia_convert", args=[pend.id]),
+            data=json.dumps({"attendant_id": self.common.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        pend.refresh_from_db()
+        self.assertFalse(pend.convertido_em_chamado)
+
+    def test_common_user_cannot_convert(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("pendencia_convert", args=[pend.id]),
+            data=json.dumps({"attendant_id": self.attendant.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)

@@ -6,6 +6,7 @@
 
 ## Concluidas
 
+- Adicionada a coluna "Pendencias" no Kanban com cadastro (modal), detalhe (modal) e conversao em chamado por drag-and-drop para a coluna do atendente (model `PendenciaTI`), restrito a TI/admin
 - Tornados responsivos os cards e colunas do Kanban (largura/altura fluidas, scroll por coluna, ellipsis para textos longos) para melhor aproveitamento do monitor
 - Compactado o header da tela "Chamados" (Quadro de Atendimento) para liberar mais espaco vertical ao Kanban, sem afetar os headers das demais telas
 - Ajustado o "Stop" para encerrar o chamado (status Fechado), registrar quem encerrou no historico e mover o card automaticamente para "Chamados fechados" no Kanban sem refresh; encerramento restrito a TI/admin

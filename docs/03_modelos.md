@@ -2,13 +2,14 @@
 
 ## Situacao atual
 
-O projeto possui seis modelos persistidos para sustentar o fluxo de atendimento:
+O projeto possui sete modelos persistidos para sustentar o fluxo de atendimento:
 
 - `Chamado`
 - `ChamadoEvento`
 - `ChamadoAnexo`
 - `ChamadoMensagem`
 - `ChamadoMensagemAnexo`
+- `PendenciaTI`
 - `AtendimentoHistorico`
 
 ## Modelos implementados
@@ -126,6 +127,29 @@ Regras atuais:
 - Uma mensagem pode ter varios anexos, todos opcionais.
 - Nao ha restricao de tamanho nem de extensao neste momento.
 - O download usa rota dedicada e protegida (nao expoe a URL direta de `MEDIA`).
+
+### PendenciaTI
+
+Pendencia da equipe de TI exibida na coluna "Pendencias" do Kanban. Pode ser convertida em chamado ao ser arrastada para a coluna de um atendente. Apos a conversao e mantida como rastro (marcada como convertida, nao apagada).
+
+Campos atuais:
+
+- `titulo`
+- `descricao`
+- `criado_por` (FK opcional para quem criou, `on_delete=SET_NULL`, related_name `pendencias_criadas`)
+- `criado_em`
+- `convertido_em_chamado` (booleano, default `False`)
+- `chamado_gerado` (FK opcional para o `Chamado` criado, `on_delete=SET_NULL`, related_name `pendencias_origem`)
+- `convertido_por` (FK opcional para quem converteu, `on_delete=SET_NULL`, related_name `pendencias_convertidas`)
+- `convertido_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin criam, veem e convertem pendencias; usuario comum nao acessa.
+- A coluna "Pendencias" lista apenas pendencias com `convertido_em_chamado = False`.
+- Ao converter: cria um `Chamado` com titulo/descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Em atendimento".
+- A conversao e idempotente: uma pendencia ja convertida nao gera chamado duplicado.
+- A conversao registra eventos no chamado (criacao a partir da pendencia e atribuicao ao atendente).
 
 ### AtendimentoHistorico
 

@@ -210,6 +210,45 @@ class ChamadoEvento(models.Model):
         return cls.objects.create(chamado=chamado, usuario=usuario, tipo=tipo, descricao=descricao)
 
 
+class PendenciaTI(models.Model):
+    """Pendencia da equipe de TI no Kanban, convertivel em chamado ao ser
+    arrastada para a coluna de um atendente. Mantida como rastro apos a
+    conversao (marcada como convertida, nao apagada)."""
+
+    titulo = models.CharField(max_length=255)
+    descricao = models.TextField(blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pendencias_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    convertido_em_chamado = models.BooleanField(default=False)
+    chamado_gerado = models.ForeignKey(
+        Chamado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pendencias_origem",
+    )
+    convertido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pendencias_convertidas",
+    )
+    convertido_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"Pendencia #{self.pk} - {self.titulo}"
+
+
 class AtendimentoHistorico(models.Model):
     TIPO_ENCERRAMENTO_PAUSE = "pause"
     TIPO_ENCERRAMENTO_STOP = "stop"

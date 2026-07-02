@@ -17,7 +17,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 1. O Kanban e acessivel apenas para administrador e Atendente TI; o usuario comum e redirecionado para o portal.
 2. O menu do Atendente TI mostra apenas "Chamados" (o Kanban) e "Permissoes".
 3. O quadro lista os chamados reais do banco (model `Chamado`), sem dados mockados.
-4. A primeira coluna e fixa: "Chamados abertos" (chamados nao encerrados e sem atendente atual).
+4. A primeira coluna e fixa: "Chamados abertos" (chamados nao encerrados e sem atendente atual); logo apos vem a coluna fixa "Pendencias" (ver secao de pendencias).
 5. As colunas do meio sao dinamicas: uma para cada usuario do grupo `Atendente TI`, exibindo os chamados nao encerrados cujo `atendente_atual` e aquele usuario.
 6. A ultima coluna e fixa: "Chamados fechados" (status `resolvido` ou `fechado`).
 7. Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir).
@@ -74,6 +74,20 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 8. O usuario comum visualiza e acessa apenas os chamados que ele mesmo abriu.
 9. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
 10. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
+
+## Regras atuais das pendencias (Kanban)
+
+1. O Kanban possui a coluna "Pendencias" entre "Chamados abertos" e as colunas dos atendentes.
+2. Apenas Atendente TI/Admin podem ver a coluna, criar pendencia, abrir o detalhe e converter em chamado; usuario comum nao acessa nenhum endpoint de pendencia (validado no backend).
+3. A pendencia e criada pelo usuario logado, com titulo e descricao; na coluna exibe somente o titulo.
+4. O clique na pendencia abre um modal com titulo, descricao, data de criacao e quem criou.
+5. Arrastar uma pendencia para a coluna de um atendente a converte em um novo chamado; nao e permitido arrastar para "Chamados abertos" nem para "Chamados fechados" (destino invalido devolve a pendencia a coluna de origem).
+6. O chamado gerado recebe: titulo e descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Em atendimento".
+7. Apos converter, a pendencia sai da coluna "Pendencias" e o novo chamado aparece na coluna do atendente, sem refresh.
+8. A pendencia nao e apagada: fica marcada como convertida (rastreabilidade) e nao pode gerar chamado duplicado se arrastada novamente.
+9. O atendente de destino e validado no backend (precisa pertencer ao grupo Atendente TI); a conversao usa POST com CSRF.
+10. Se a conversao falhar, a pendencia volta para a coluna "Pendencias" e um erro e exibido.
+11. A conversao registra no historico do chamado a criacao a partir da pendencia e a atribuicao ao atendente; quando quem criou e quem converteu sao a mesma pessoa, o registro permanece claro e sem duplicidade.
 
 ## Regras atuais da conversa do chamado
 

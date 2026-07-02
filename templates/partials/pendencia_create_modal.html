@@ -1,0 +1,34 @@
+<div class="modal fade" id="createPendenciaModal" tabindex="-1" aria-labelledby="createPendenciaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <form id="createPendenciaForm" class="create-ticket-form">
+                <div class="modal-header">
+                    <div>
+                        <span class="create-ticket-kicker">Nova pendencia</span>
+                        <h5 class="modal-title" id="createPendenciaModalLabel">Cadastrar pendencia</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="create-ticket-hint">A pendencia entra na coluna "Pendencias" e pode virar chamado ao ser arrastada para um atendente.</p>
+
+                    <div class="portal-field">
+                        <label for="createPendenciaTitulo">Titulo</label>
+                        <input type="text" id="createPendenciaTitulo" name="titulo" class="form-control form-control-lg" maxlength="255" placeholder="Resuma a pendencia em uma frase" required>
+                    </div>
+
+                    <div class="portal-field">
+                        <label for="createPendenciaDescricao">Descricao</label>
+                        <textarea id="createPendenciaDescricao" name="descricao" class="form-control" rows="5" placeholder="Descreva a pendencia." required></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createPendenciaSubmit">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
