@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    DocumentoTI,
+    DocumentoTIAnexo,
     InsumoTI,
     OrcamentoContrato,
     OrcamentoDocumento,
@@ -72,3 +74,26 @@ class RetiradaInsumoTIAdmin(admin.ModelAdmin):
     list_display = ("insumo", "quantidade", "entregue_para", "registrado_por", "criado_em")
     search_fields = ("insumo__nome", "entregue_para", "motivo")
     date_hierarchy = "criado_em"
+
+
+class DocumentoTIAnexoInline(admin.TabularInline):
+    model = DocumentoTIAnexo
+    extra = 0
+    fields = ("arquivo", "nome_original", "enviado_por", "enviado_em")
+    readonly_fields = ("enviado_em",)
+
+
+@admin.register(DocumentoTI)
+class DocumentoTIAdmin(admin.ModelAdmin):
+    list_display = ("nome", "criado_por", "ativo", "criado_em", "atualizado_em")
+    list_filter = ("ativo",)
+    search_fields = ("nome", "observacao")
+    date_hierarchy = "criado_em"
+    inlines = [DocumentoTIAnexoInline]
+
+
+@admin.register(DocumentoTIAnexo)
+class DocumentoTIAnexoAdmin(admin.ModelAdmin):
+    list_display = ("nome_original", "documento", "enviado_por", "enviado_em")
+    search_fields = ("nome_original", "documento__nome")
+    date_hierarchy = "enviado_em"

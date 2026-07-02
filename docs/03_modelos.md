@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui quatorze modelos persistidos:
+O projeto possui dezesseis modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -26,6 +26,11 @@ Modulo Insumos:
 
 - `InsumoTI`
 - `RetiradaInsumoTI`
+
+Modulo Documentos:
+
+- `DocumentoTI`
+- `DocumentoTIAnexo`
 
 ## Modelos implementados
 
@@ -294,6 +299,40 @@ Regras atuais:
 - Cada retirada valida no backend: quantidade > 0 e menor/igual ao estoque disponivel (`409` se insuficiente); campos `entregue_para` e `motivo` obrigatorios.
 - Ao registrar a retirada, o `quantidade_atual` do insumo e abatido na mesma transacao (`select_for_update`).
 - O historico de retiradas nao e apagado; os insumos nao sao excluidos automaticamente.
+
+### DocumentoTI
+
+Cadastro de um documento interno, com um ou mais anexos vinculados.
+
+Campos atuais:
+
+- `nome`
+- `observacao`
+- `ativo` (booleano, default `True`; preparado para desativacao futura sem exclusao)
+- `criado_por` (FK opcional, `on_delete=SET_NULL`)
+- `criado_em`, `atualizado_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin cadastram, veem e baixam documentos/anexos (validado no backend).
+- Um documento pode ter varios anexos; nome obrigatorio (minimo 2 caracteres).
+
+### DocumentoTIAnexo
+
+Arquivo anexado a um `DocumentoTI` (sem restricao de tipo ou tamanho no codigo).
+
+Campos atuais:
+
+- `documento` (FK para `DocumentoTI`, `on_delete=CASCADE`, related_name `anexos`)
+- `arquivo` (`FileField`, salvo em `MEDIA_ROOT/documentos/<documento_id>/<arquivo>`)
+- `nome_original`
+- `enviado_por` (FK opcional, `on_delete=SET_NULL`)
+- `enviado_em`
+
+Regras atuais:
+
+- Multiplos anexos por documento; download por rota dedicada e protegida (nao expoe a URL direta de `MEDIA`), acesso sem permissao retorna `404`.
+- Documentos e anexos nao sao apagados automaticamente.
 
 ## Modelos previstos para proximas fases
 

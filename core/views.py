@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
@@ -27,6 +27,8 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    DocumentoTI,
+    DocumentoTIAnexo,
     InsumoTI,
     OrcamentoContrato,
     OrcamentoDocumento,
@@ -1715,6 +1717,121 @@ def contrato_suborcamento_documento_view(request, documento_id: int):
         raise Http404("Nao encontrado.")
     doc = get_object_or_404(SuborcamentoDocumento, pk=documento_id)
     return _serve_file(doc.arquivo, as_attachment=True, filename=doc.nome_original or doc.arquivo.name)
+
+
+# ==========================================================================
+# Modulo Documentos
+# ==========================================================================
+
+
+def _serialize_documento_anexo(anexo: DocumentoTIAnexo):
+    return {
+        "nome": anexo.nome_original or anexo.arquivo.name,
+        "url": reverse("documento_anexo_download", args=[anexo.id]),
+    }
+
+
+def _serialize_documento_row(documento: DocumentoTI, anexos_count=None):
+    count = anexos_count if anexos_count is not None else documento.anexos.count()
+    return {
+        "id": documento.id,
+        "nome": documento.nome,
+        "observacao": documento.observacao or "",
+        "anexos_count": count,
+        "criado_por": _attendant_display(documento.criado_por) or "-",
+        "criado_em": timezone.localtime(documento.criado_em).strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+@ti_required
+def documentos_dashboard_view(request):
+    documentos = (
+        DocumentoTI.objects.filter(ativo=True)
+        .select_related("criado_por")
+        .annotate(anexos_total=Count("anexos"))
+    )
+    rows = [_serialize_documento_row(doc, doc.anexos_total) for doc in documentos]
+    context = {
+        "page_title": "Documentos",
+        "documentos": rows,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/documentos.html", context)
+
+
+@login_required
+@require_POST
+def documento_create_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para cadastrar documentos.", status=403)
+
+    nome = (request.POST.get("nome") or "").strip()
+    observacao = (request.POST.get("observacao") or "").strip()
+    anexos = request.FILES.getlist("anexos")
+
+    if len(nome) < 2:
+        return _json_error("Informe um nome com pelo menos 2 caracteres.")
+
+    with transaction.atomic():
+        documento = DocumentoTI.objects.create(
+            nome=nome, observacao=observacao, criado_por=request.user
+        )
+        for arquivo in anexos:
+            DocumentoTIAnexo.objects.create(
+                documento=documento,
+                arquivo=arquivo,
+                nome_original=arquivo.name,
+                enviado_por=request.user,
+            )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Documento cadastrado com sucesso.",
+            "documento": _serialize_documento_row(documento, len(anexos)),
+        }
+    )
+
+
+@login_required
+def documento_detail_view(request, documento_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver documentos.", status=403)
+
+    documento = (
+        DocumentoTI.objects.select_related("criado_por").filter(pk=documento_id).first()
+    )
+    if not documento:
+        return _json_error("Documento nao encontrado.", status=404)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": documento.id,
+            "nome": documento.nome,
+            "observacao": documento.observacao or "",
+            "criado_por": _attendant_display(documento.criado_por) or "-",
+            "criado_em": timezone.localtime(documento.criado_em).strftime("%d/%m/%Y %H:%M"),
+            "anexos": [_serialize_documento_anexo(a) for a in documento.anexos.all()],
+        }
+    )
+
+
+@login_required
+def documento_anexo_download_view(request, anexo_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    anexo = get_object_or_404(DocumentoTIAnexo, pk=anexo_id)
+    try:
+        return FileResponse(
+            anexo.arquivo.open("rb"),
+            as_attachment=True,
+            filename=anexo.nome_original or anexo.arquivo.name,
+        )
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
 
 
 # ==========================================================================

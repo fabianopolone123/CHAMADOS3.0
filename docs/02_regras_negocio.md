@@ -138,6 +138,14 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 6. Ao confirmar a retirada, o estoque e abatido, um registro e gravado no historico e o card e a tabela sao atualizados sem refresh.
 7. O historico de retiradas nunca e apagado; insumos nao sao excluidos automaticamente (ha o campo `ativo` preparado para desativacao futura, ainda nao usado na interface).
 
+## Regras atuais do modulo Documentos
+
+1. O modulo Documentos e acessivel apenas para Administrador e Atendente TI; o botao "Documentos" no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao, recebe `403` nos endpoints e `404` ao tentar baixar anexos por URL direta).
+2. A tela lista os documentos cadastrados mostrando nome, observacao resumida, quantidade de anexos, data de cadastro e quem cadastrou.
+3. O cadastro pede nome (obrigatorio), observacao e permite anexar multiplos arquivos (sem restricao de tipo ou tamanho no codigo); ao salvar, o documento e seus anexos sao gravados e o item aparece na lista sem refresh.
+4. Clicar em um documento abre um modal com nome, observacao completa, anexos vinculados (com link para abrir/baixar), data de cadastro e quem cadastrou.
+5. Os anexos sao servidos por rota protegida; apenas TI/admin conseguem abrir/baixar. Documentos e anexos nao sao apagados automaticamente (ha o campo `ativo` preparado para desativacao futura, ainda nao usado na interface).
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.

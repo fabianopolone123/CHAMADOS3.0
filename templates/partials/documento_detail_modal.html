@@ -1,0 +1,35 @@
+<div class="modal fade" id="documentoDetailModal" tabindex="-1" aria-labelledby="documentoDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Documento</span>
+                    <h5 class="modal-title" id="documentoDetailModalLabel" data-doc-detail="nome">Documento</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="documento-detail__meta">
+                    <span>Cadastrado por <strong data-doc-detail="criado_por">-</strong></span>
+                    <span data-doc-detail="criado_em">-</span>
+                </div>
+
+                <section class="documento-detail__section">
+                    <h6 class="documento-detail__section-title">Observacao</h6>
+                    <p class="documento-detail__obs" data-doc-detail="observacao"></p>
+                </section>
+
+                <section class="documento-detail__section">
+                    <h6 class="documento-detail__section-title">Anexos</h6>
+                    <ul class="documento-detail__anexos" data-doc-anexos></ul>
+                    <p class="documentos-empty" data-doc-anexos-empty>Nenhum anexo vinculado.</p>
+                </section>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>

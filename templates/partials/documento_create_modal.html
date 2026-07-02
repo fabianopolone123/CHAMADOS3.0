@@ -1,0 +1,35 @@
+<div class="modal fade" id="createDocumentoModal" tabindex="-1" aria-labelledby="createDocumentoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Documentos</span>
+                    <h5 class="modal-title" id="createDocumentoModalLabel">Novo documento</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="createDocumentoForm" class="create-ticket-form" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Nome</span>
+                        <input type="text" class="form-control" name="nome" maxlength="255" placeholder="Ex.: Manual de instalacao da impressora" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Observacao</span>
+                        <textarea class="form-control" name="observacao" rows="4" placeholder="Observacoes sobre o documento (opcional)"></textarea>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Anexar documentos</span>
+                        <input type="file" class="form-control" name="anexos" multiple>
+                        <small class="contrato-field__help">Aceita multiplos arquivos, sem restricao de tipo ou tamanho.</small>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createDocumentoSubmit">Cadastrar documento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -32,6 +32,10 @@
 | `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
 | `/contratos/documentos/suborcamento/<id>/` | GET | Download protegido de documento de suborcamento (apenas TI/admin) | Implementada |
+| `/documentos/` | GET | Modulo Documentos: lista de documentos (nome, observacao, qtd anexos, data, autor) e botao "+ Adicionar" (apenas TI/admin) | Implementada |
+| `/documentos/criar/` | POST | Cadastra documento (nome, observacao, anexos multiplos, multipart) (apenas TI/admin) | Implementada |
+| `/documentos/<id>/` | GET | Detalhe (JSON) do documento com observacao completa e anexos (apenas TI/admin) | Implementada |
+| `/documentos/anexos/<id>/` | GET | Download protegido de anexo de documento (apenas TI/admin) | Implementada |
 | `/insumos/` | GET | Modulo Insumos: estoque (cards) e ultimas retiradas, com botao "+ Adicionar" (apenas TI/admin) | Implementada |
 | `/insumos/criar/` | POST | Cadastra um insumo (nome, descricao, quantidade inicial, observacao); quantidade obrigatoria e nao negativa (apenas TI/admin) | Implementada |
 | `/insumos/<id>/retirar/` | POST | Registra retirada (quantidade, para quem, motivo), valida estoque e abate a quantidade (apenas TI/admin) | Implementada |
@@ -121,6 +125,14 @@
 - Foto do print: o botao "Tirar print" usa `navigator.mediaDevices.getDisplayMedia` no frontend, desenha o frame em canvas, permite recortar uma regiao e anexa o recorte como `foto_produto`. Se o navegador nao suportar, exibe mensagem e permite anexar imagem manualmente; cancelar a captura nao trava o formulario.
 - Fotos e documentos sao servidos por rotas dedicadas e protegidas (nao expoem a URL direta de `MEDIA`); acesso sem permissao retorna `404`.
 - A exclusao de requisicao (`requisicoes/<id>/excluir/`) exige `login_required` + permissao TI/admin (usuario comum recebe `403`), aceita apenas `POST` com CSRF (GET retorna `405`) e responde JSON. Remove a requisicao e, por cascata (`on_delete=CASCADE`), seus orcamentos, suborcamentos e os documentos vinculados. No frontend abre uma confirmacao obrigatoria antes de excluir; em caso de sucesso o item some da lista sem refresh. Observacao: os arquivos fisicos em `MEDIA_ROOT` nao sao apagados (pendencia registrada em `docs/05_tarefas.md`).
+
+## Regras do modulo Documentos
+
+- `/documentos/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Documentos" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend (usuario comum recebe `403` nos endpoints e `404` nos anexos).
+- A tela lista os documentos cadastrados (nome, observacao resumida, quantidade de anexos, data de cadastro e usuario). Clicar em um documento abre um modal com nome, observacao completa, anexos e dados de cadastro.
+- `criar/` usa `POST` multipart (`enctype="multipart/form-data"`) com CSRF (GET retorna `405`): valida nome (minimo 2 caracteres), cria o `DocumentoTI` e salva os anexos (`DocumentoTIAnexo`) sem restricao de tipo ou tamanho no codigo. O novo documento aparece na lista sem refresh.
+- `<id>/` retorna JSON com o documento e a lista de anexos (nome + URL de download). `anexos/<id>/` faz o download protegido do arquivo (nao expoe a URL direta de `MEDIA`).
+- Documentos e anexos nao sao apagados automaticamente (campo `ativo` preparado para desativacao futura, ainda nao usado na interface).
 
 ## Regras do modulo Insumos
 

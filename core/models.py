@@ -578,3 +578,55 @@ class RetiradaInsumoTI(models.Model):
 
     def __str__(self) -> str:
         return f"{self.quantidade}x {self.insumo.nome} -> {self.entregue_para}"
+
+
+# ==========================================================================
+# Modulo Documentos: cadastro e armazenamento de documentos internos
+# ==========================================================================
+
+
+class DocumentoTI(models.Model):
+    """Cadastro de um documento interno, com um ou mais anexos vinculados."""
+
+    nome = models.CharField(max_length=255)
+    observacao = models.TextField(blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_ti_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+def documento_ti_anexo_path(instance, filename):
+    return f"documentos/{instance.documento_id}/{filename}"
+
+
+class DocumentoTIAnexo(models.Model):
+    documento = models.ForeignKey(DocumentoTI, on_delete=models.CASCADE, related_name="anexos")
+    arquivo = models.FileField(upload_to=documento_ti_anexo_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_ti_anexos_enviados",
+    )
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em", "id"]
+
+    def __str__(self) -> str:
+        return self.nome_original or self.arquivo.name

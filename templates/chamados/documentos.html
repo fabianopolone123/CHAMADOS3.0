@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/documentos.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app documentos-app"
+    data-documento-create-url="{% url 'documento_create' %}"
+    data-documento-detail-url="{% url 'documento_detail' documento_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="documentos" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Documentos</h2>
+                <p class="contratos-topbar__subtitle">Cadastro de documentos internos</p>
+                <p class="topbar-subtitle">Cadastre documentos, adicione observacoes e anexe arquivos relacionados.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createDocumentoButton" aria-label="Adicionar documento" title="Adicionar documento">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Adicionar</span>
+            </button>
+        </header>
+
+        <section class="contratos-panel">
+            <ul class="documentos-list" id="documentosList" data-empty-text="Nenhum documento cadastrado ainda.">
+                {% for doc in documentos %}
+                    <li>
+                        <button type="button" class="documento-item" data-documento-id="{{ doc.id }}">
+                            <span class="documento-item__main">
+                                <span class="documento-item__name">{{ doc.nome }}</span>
+                                <span class="documento-item__obs">{{ doc.observacao|default:"Sem observacao."|truncatechars:90 }}</span>
+                            </span>
+                            <span class="documento-item__meta">
+                                <span class="documento-item__badge">{{ doc.anexos_count }} anexo(s)</span>
+                                <span class="documento-item__sub">{{ doc.criado_em }} - {{ doc.criado_por }}</span>
+                            </span>
+                        </button>
+                    </li>
+                {% empty %}
+                    <p class="documentos-empty">Nenhum documento cadastrado ainda.</p>
+                {% endfor %}
+            </ul>
+        </section>
+    </section>
+</main>
+
+{% include "partials/documento_create_modal.html" %}
+{% include "partials/documento_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/documentos.js' %}"></script>
+{% endblock %}
