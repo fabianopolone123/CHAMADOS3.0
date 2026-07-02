@@ -1731,6 +1731,14 @@ def contrato_suborcamento_documento_view(request, documento_id: int):
 # ==========================================================================
 
 
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+def _is_image_name(nome: str) -> bool:
+    nome = (nome or "").lower()
+    return any(nome.endswith(ext) for ext in _IMAGE_EXTS)
+
+
 def _serialize_assinatura(assinatura: AssinaturaResponsavelTI):
     return {"id": assinatura.id, "nome_responsavel": assinatura.nome_responsavel}
 
@@ -1938,7 +1946,11 @@ def emprestimo_detail_view(request, emprestimo_id: int):
                 "patrimonio_etiqueta": equip.patrimonio_etiqueta or "-",
                 "acessorios_entregues": equip.acessorios_entregues or "-",
                 "fotos": [
-                    {"url": foto.imagem.url, "nome": foto.nome_original or foto.imagem.name}
+                    {
+                        "url": reverse("emprestimo_foto", args=[foto.id]),
+                        "nome": foto.nome_original or foto.imagem.name,
+                        "is_image": _is_image_name(foto.nome_original or foto.imagem.name),
+                    }
                     for foto in equip.fotos.all()
                 ],
             }
@@ -1960,7 +1972,7 @@ def emprestimo_detail_view(request, emprestimo_id: int):
             "status_label": emp.status_label,
             "assinatura_responsavel": emp.assinatura_responsavel.nome_responsavel if emp.assinatura_responsavel else "-",
             "termo_pdf_url": reverse("emprestimo_baixar_termo", args=[emp.id]) if emp.termo_pdf else "",
-            "termo_assinado_url": emp.termo_assinado.url if emp.termo_assinado else "",
+            "termo_assinado_url": reverse("emprestimo_termo_assinado", args=[emp.id]) if emp.termo_assinado else "",
             "termo_assinado_ok": emp.termo_assinado_ok,
             "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M") if emp.termo_assinado_em else "",
             "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "",
@@ -1988,6 +2000,36 @@ def emprestimo_baixar_termo_view(request, emprestimo_id: int):
 
 
 @login_required
+def emprestimo_foto_view(request, foto_id: int):
+    """Serve a foto de um equipamento inline, por rota protegida (TI/admin).
+
+    Necessario porque `MEDIA` so e servido diretamente com DEBUG=True; alem
+    disso protege as fotos de acesso sem permissao.
+    """
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    foto = get_object_or_404(FotoEquipamentoEmprestimoTI, pk=foto_id)
+    try:
+        return FileResponse(foto.imagem.open("rb"), filename=foto.nome_original or foto.imagem.name)
+    except FileNotFoundError:
+        raise Http404("Imagem nao encontrada no armazenamento.")
+
+
+@login_required
+def emprestimo_termo_assinado_view(request, emprestimo_id: int):
+    """Serve o termo assinado anexado, por rota protegida (TI/admin)."""
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    emp = get_object_or_404(EmprestimoTI, pk=emprestimo_id)
+    if not emp.termo_assinado:
+        raise Http404("Termo assinado nao anexado.")
+    try:
+        return FileResponse(emp.termo_assinado.open("rb"), filename=emp.termo_assinado.name.split("/")[-1])
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+@login_required
 @require_POST
 def emprestimo_anexar_termo_assinado_view(request, emprestimo_id: int):
     if not _is_ti(request.user):
@@ -2010,7 +2052,7 @@ def emprestimo_anexar_termo_assinado_view(request, emprestimo_id: int):
         {
             "ok": True,
             "message": "Termo assinado anexado com sucesso.",
-            "termo_assinado_url": emp.termo_assinado.url,
+            "termo_assinado_url": reverse("emprestimo_termo_assinado", args=[emp.id]),
             "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M"),
             "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "-",
         }

@@ -173,17 +173,152 @@
 .emp-equip-fotos {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
+    gap: 0.6rem;
+    margin-top: 0.55rem;
 }
 
-.emp-equip-fotos img {
-    width: 60px;
-    height: 60px;
+.emp-foto {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.emp-foto__thumb {
+    width: 78px;
+    height: 78px;
     object-fit: cover;
-    border-radius: 0.5rem;
+    border-radius: 0.6rem;
     border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
     cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.emp-foto__thumb:hover {
+    transform: translateY(-2px) scale(1.03);
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 12px 22px rgba(15, 23, 42, 0.2);
+}
+
+.emp-foto__link {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-decoration: none;
+}
+
+.emp-foto__link:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+.emp-foto-doc {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.emp-foto-doc::before {
+    content: "\1F4C4"; /* icone de documento */
+}
+
+.emp-foto-doc:hover {
+    text-decoration: underline;
+}
+
+/* Lightbox de imagem ampliada */
+.emp-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3vh 3vw;
+}
+
+.emp-lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(2px);
+    animation: emp-fade-in 0.18s ease;
+}
+
+.emp-lightbox__content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    max-width: 94vw;
+    max-height: 94vh;
+    animation: emp-lightbox-in 0.2s ease;
+}
+
+@keyframes emp-lightbox-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.emp-lightbox__img {
+    max-width: 94vw;
+    max-height: 82vh;
+    object-fit: contain;
+    border-radius: 0.6rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    background: #fff;
+}
+
+.emp-lightbox__close {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 0;
+    background: #fff;
+    color: #0f172a;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.emp-lightbox__close:hover {
+    transform: scale(1.08);
+    background: #f1f5f9;
+}
+
+.emp-lightbox__bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+}
+
+.emp-lightbox__open {
+    color: #93c5fd;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.emp-lightbox__open:hover {
+    text-decoration: underline;
 }
 
 .emprestimo-termo a,

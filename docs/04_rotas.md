@@ -36,6 +36,8 @@
 | `/emprestimos/criar/` | POST | Cria emprestimo com 1+ equipamentos e fotos, valida senha da assinatura e gera o termo PDF (multipart) (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/` | GET | Detalhe (JSON) do emprestimo: dados, equipamentos, fotos, termo e status (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/baixar-termo/` | GET | Download do termo PDF gerado pelo sistema (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/termo-assinado/` | GET | Serve o termo assinado anexado, por rota protegida (apenas TI/admin) | Implementada |
+| `/emprestimos/fotos/<id>/` | GET | Serve a foto de um equipamento inline, por rota protegida (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/anexar-termo-assinado/` | POST | Anexa o termo assinado devolvido pelo colaborador (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/marcar-documentacao-ok/` | POST | Marca a documentacao como OK (status "Documentacao assinada / OK") (apenas TI/admin) | Implementada |
 | `/emprestimos/assinaturas/` | GET | Lista (JSON) as assinaturas ativas (apenas TI/admin) | Implementada |
@@ -143,6 +145,7 @@
 - O termo em PDF e gerado por ReportLab (sem servico externo) espelhando o modelo institucional (cabecalho Sidertec / Departamento de TI, titulo, dados do colaborador, equipamentos, condicoes, responsabilidades, assinaturas, rubrica e data de geracao), fica salvo em `termo_pdf` e pode ser baixado.
 - O termo assinado devolvido e anexado por `anexar-termo-assinado/` (registra data e usuario) e, por `marcar-documentacao-ok/`, o status muda para "Documentacao assinada / OK" (exige o termo assinado ja anexado, senao `409`). Status possiveis: Aguardando documentacao assinada (inicial), Documentacao assinada / OK, Em andamento, Devolvido, Cancelado.
 - O historico de uso de assinatura nao e apagado.
+- As fotos dos equipamentos e o termo assinado sao servidos por rotas protegidas (`/emprestimos/fotos/<id>/` e `/emprestimos/<id>/termo-assinado/`), nao pela URL crua de `MEDIA` (que so e servida com `DEBUG=True`); usuario sem permissao recebe `404`. No detalhe, as fotos aparecem como miniaturas e o clique abre a imagem ampliada em um lightbox.
 
 ## Regras do modulo Documentos
 

@@ -185,6 +185,44 @@
         if (el) el.textContent = value || "-";
     }
 
+    // ---- Lightbox de imagem (overlay proprio, acima do modal) ----
+    const IMG_EXT = /\.(jpe?g|png|webp|gif)$/i;
+    let lightboxEl = null;
+
+    function onLbKey(event) {
+        if (event.key === "Escape") closeLightbox();
+    }
+    function ensureLightbox() {
+        if (lightboxEl) return lightboxEl;
+        lightboxEl = document.createElement("div");
+        lightboxEl.className = "emp-lightbox is-hidden";
+        lightboxEl.innerHTML =
+            '<div class="emp-lightbox__backdrop" data-lb-close></div>' +
+            '<div class="emp-lightbox__content">' +
+            '<button type="button" class="emp-lightbox__close" data-lb-close aria-label="Fechar">&times;</button>' +
+            '<img class="emp-lightbox__img" alt="">' +
+            '<div class="emp-lightbox__bar">' +
+            '<span class="emp-lightbox__name"></span>' +
+            '<a class="emp-lightbox__open" target="_blank" rel="noopener">Abrir original</a>' +
+            "</div></div>";
+        document.body.appendChild(lightboxEl);
+        lightboxEl.querySelectorAll("[data-lb-close]").forEach((el) => el.addEventListener("click", closeLightbox));
+        return lightboxEl;
+    }
+    function openLightbox(url, nome) {
+        ensureLightbox();
+        lightboxEl.querySelector(".emp-lightbox__img").src = url;
+        lightboxEl.querySelector(".emp-lightbox__img").alt = nome || "";
+        lightboxEl.querySelector(".emp-lightbox__name").textContent = nome || "";
+        lightboxEl.querySelector(".emp-lightbox__open").href = url;
+        lightboxEl.classList.remove("is-hidden");
+        document.addEventListener("keydown", onLbKey);
+    }
+    function closeLightbox() {
+        if (lightboxEl) lightboxEl.classList.add("is-hidden");
+        document.removeEventListener("keydown", onLbKey);
+    }
+
     function renderEquipamentos(equipamentos) {
         const container = detailModalEl.querySelector("[data-emp-equipamentos]");
         container.innerHTML = "";
@@ -204,11 +242,36 @@
                 const fotos = document.createElement("div");
                 fotos.className = "emp-equip-fotos";
                 eq.fotos.forEach((f) => {
-                    const img = document.createElement("img");
-                    img.src = f.url;
-                    img.alt = f.nome;
-                    img.addEventListener("click", () => window.open(f.url, "_blank"));
-                    fotos.appendChild(img);
+                    const ehImagem = f.is_image || IMG_EXT.test(f.nome || "");
+                    if (ehImagem) {
+                        const figure = document.createElement("figure");
+                        figure.className = "emp-foto";
+                        const img = document.createElement("img");
+                        img.className = "emp-foto__thumb";
+                        img.src = f.url;
+                        img.alt = f.nome || "Foto do equipamento";
+                        img.title = f.nome || "";
+                        img.loading = "lazy";
+                        img.addEventListener("click", () => openLightbox(f.url, f.nome));
+                        const link = document.createElement("a");
+                        link.className = "emp-foto__link";
+                        link.href = f.url;
+                        link.target = "_blank";
+                        link.rel = "noopener";
+                        link.textContent = "abrir original";
+                        figure.appendChild(img);
+                        figure.appendChild(link);
+                        fotos.appendChild(figure);
+                    } else {
+                        // Nao-imagem: mantem como link/icone de documento.
+                        const a = document.createElement("a");
+                        a.className = "emp-foto-doc";
+                        a.href = f.url;
+                        a.target = "_blank";
+                        a.rel = "noopener";
+                        a.textContent = f.nome || "Arquivo";
+                        fotos.appendChild(a);
+                    }
                 });
                 card.appendChild(fotos);
             }
