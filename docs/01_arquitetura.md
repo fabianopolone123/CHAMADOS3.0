@@ -31,6 +31,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - O template usa `SortableJS` via CDN para o drag-and-drop, controlado por `static/js/chamados.js`
 - A movimentacao persiste no backend via `POST /chamados/mover/`, atualizando `status` e `atendente_atual` e registrando eventos em `ChamadoEvento`
 - O front-end atualiza badge de status, atendente do card, contadores e mensagens de coluna vazia na hora, sem refresh; falhas no POST revertem a movimentacao visual
+- O titulo da coluna "Chamados fechados" abre um modal de consulta (lista + pesquisa e detalhe completo) alimentado por dois endpoints somente-leitura (`GET /chamados/fechados/buscar/` e `GET /chamados/fechados/<numero>/`), com pesquisa dinamica (debounce) e recorte de permissao TI/admin validado no backend
 
 ## Tecnologias base
 

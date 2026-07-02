@@ -14,6 +14,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Roteamento pos-login por perfil (TI/admin para o Kanban, usuario comum para o portal)
 - Quadro Kanban por atendente em `/chamados/` com chamados reais do banco
 - Drag-and-drop com persistencia da movimentacao (status e atendente atual) e registro de eventos
+- Consulta de chamados encerrados pelo Kanban: modal com pesquisa inteligente (por ID, titulo, descricao, solicitante, atendente, mensagens e historico) e detalhe completo, restrito a TI/admin
 - Controle de tempo por atendimento (iniciar, pausar, finalizar) e tela de historico
 - Portal do solicitante: abertura, listagem e detalhe dos proprios chamados, com anexos
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
