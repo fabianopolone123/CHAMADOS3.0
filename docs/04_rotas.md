@@ -10,7 +10,7 @@
 | `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza (Stop) o atendimento; o Stop encerra o chamado e o move para "Chamados fechados" (apenas TI/admin) | Implementada |
 | `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
-| `/chamados/criar/` | POST | Cria um chamado pelo Kanban (modal), com o atendente logado como solicitante; apenas TI/admin | Implementada |
+| `/chamados/criar/` | POST | Cria um chamado pelo Kanban (botao "+" no topo da coluna "Chamados abertos"), com o atendente logado como solicitante; apenas TI/admin | Implementada |
 | `/chamados/pendencias/criar/` | POST | Cria uma pendencia na coluna "Pendencias" (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/` | GET | Detalhe (JSON) da pendencia para o modal: titulo, descricao, data e autor (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/converter/` | POST | Converte a pendencia em chamado ao ser arrastada para um atendente (apenas TI/admin) | Implementada |
@@ -54,6 +54,7 @@
 
 ## Regras da criacao de chamado pelo Kanban
 
+- A acao e acionada pelo botao "+" no topo da coluna "Chamados abertos" (a tela nao tem mais header superior), que abre o modal de criacao.
 - `/chamados/criar/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403`), aceita apenas `POST` (GET retorna `405`) e usa CSRF.
 - Reutiliza o `AberturaChamadoForm` (titulo, descricao e anexos), validando titulo e descricao no backend.
 - Salva o chamado com `solicitante` = usuario logado, `status` = "Aberto", `atendente_atual` vazio e `origem` = "Kanban TI".

@@ -21,14 +21,6 @@
     {% include "partials/ti_sidebar.html" with active="chamados" %}
 
     <section class="tickets-main">
-        <header class="tickets-topbar tickets-topbar--compact">
-            <div>
-                <h2 class="topbar-title">Quadro de Atendimento</h2>
-                <p class="topbar-subtitle">Fila de chamados por atendente: abertos a esquerda, atendentes no centro e fechados a direita.</p>
-            </div>
-            <button type="button" class="btn btn-primary portal-cta" id="createTicketButton" data-bs-toggle="modal" data-bs-target="#createTicketModal">+ Criar chamado</button>
-        </header>
-
         <section class="kanban-wrapper">
             <div class="kanban-columns">
                 {# Coluna fixa: Chamados abertos #}
@@ -38,7 +30,10 @@
                             <span class="column-kicker">Fila inicial</span>
                             <h3 class="column-title">Chamados abertos</h3>
                         </div>
-                        <span class="column-count">{{ open_column.count }}</span>
+                        <div class="column-header__actions">
+                            <span class="column-count">{{ open_column.count }}</span>
+                            <button type="button" class="column-add-btn" id="createTicketButton" data-bs-toggle="modal" data-bs-target="#createTicketModal" aria-label="Criar chamado" title="Criar chamado">+</button>
+                        </div>
                     </div>
                     <div class="ticket-list js-ticket-list" data-column-type="aberto" data-empty-text="Nenhum chamado aberto na fila.">
                         {% for ticket in open_column.tickets %}
@@ -56,7 +51,7 @@
                             <span class="column-kicker">Backlog TI</span>
                             <h3 class="column-title">Pendencias</h3>
                         </div>
-                        <button type="button" class="pendencia-add-btn" id="createPendenciaButton" data-bs-toggle="modal" data-bs-target="#createPendenciaModal" aria-label="Nova pendencia" title="Nova pendencia">+</button>
+                        <button type="button" class="column-add-btn" id="createPendenciaButton" data-bs-toggle="modal" data-bs-target="#createPendenciaModal" aria-label="Nova pendencia" title="Nova pendencia">+</button>
                     </div>
                     <div class="ticket-list js-pendencia-list" data-column-type="pendencia" data-empty-text="Nenhuma pendencia cadastrada.">
                         {% for p in pendencia_column.pendencias %}

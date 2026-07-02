@@ -6,6 +6,7 @@
 
 ## Concluidas
 
+- Removido o header superior da tela "Chamados" e movida a criacao de chamado para um botao "+" no topo da coluna "Chamados abertos", liberando mais altura para o Kanban
 - Adicionada a coluna "Pendencias" no Kanban com cadastro (modal), detalhe (modal) e conversao em chamado por drag-and-drop para a coluna do atendente (model `PendenciaTI`), restrito a TI/admin
 - Tornados responsivos os cards e colunas do Kanban (largura/altura fluidas, scroll por coluna, ellipsis para textos longos) para melhor aproveitamento do monitor
 - Compactado o header da tela "Chamados" (Quadro de Atendimento) para liberar mais espaco vertical ao Kanban, sem afetar os headers das demais telas
