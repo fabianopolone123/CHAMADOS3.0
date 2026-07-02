@@ -13,8 +13,10 @@
 | `/chamados/criar/` | POST | Cria um chamado pelo Kanban (modal), com o atendente logado como solicitante; apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
-| `/meus-chamados/<numero>/` | GET | Detalhe do chamado com anexos, historico de eventos e timeline de atendimentos | Implementada |
-| `/meus-chamados/<numero>/anexo/<anexo_id>/` | GET | Download protegido de anexo (dono do chamado ou TI/admin) | Implementada |
+| `/meus-chamados/<numero>/` | GET | Detalhe do chamado com conversa, anexos, historico tecnico (recolhido) e timeline de atendimentos | Implementada |
+| `/meus-chamados/<numero>/mensagens/` | POST | Envia uma mensagem na conversa do chamado, com anexos opcionais | Implementada |
+| `/meus-chamados/<numero>/anexo/<anexo_id>/` | GET | Download protegido de anexo do chamado (solicitante ou TI/admin) | Implementada |
+| `/meus-chamados/<numero>/mensagens/anexo/<anexo_id>/` | GET | Download protegido de anexo de mensagem (solicitante ou TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -52,9 +54,18 @@
 - Registra o evento de criacao ("Chamado criado manualmente pelo atendente X.") e retorna o HTML do card para insercao imediata na coluna "Chamados abertos" sem refresh.
 - O fluxo de criacao do usuario comum (`/meus-chamados/novo/`) permanece inalterado.
 
+## Regras da conversa do chamado
+
+- `/meus-chamados/<numero>/mensagens/` exige `login_required`, aceita apenas `POST` e usa CSRF.
+- A permissao de envio reutiliza a regra de acesso ao chamado: solicitante so envia nos proprios chamados; TI/admin enviam em qualquer chamado.
+- O formulario usa `enctype="multipart/form-data"` e aceita multiplos anexos opcionais no campo `anexos`.
+- Uma mensagem precisa ter texto ou pelo menos um anexo; caso contrario retorna ao detalhe com mensagem de erro.
+- Cada envio cria a mensagem (e seus anexos) e registra um evento resumido em `ChamadoEvento` (tipo `comentario`), sem duplicar o texto da conversa.
+- Apos o envio, o usuario e redirecionado de volta ao detalhe do chamado com notificacao de sucesso.
+
 ## Regras de acesso a anexos
 
-- O download de anexos exige `login_required` e usa uma rota dedicada (nao expoe a URL direta de `MEDIA`).
+- O download de anexos (do chamado e das mensagens) exige `login_required` e usa rotas dedicadas (nao expoe a URL direta de `MEDIA`).
 - Usuario comum so acessa anexos dos chamados que ele mesmo abriu; administrador e Atendente TI acessam anexos de qualquer chamado.
 - Acesso nao autorizado retorna `404`.
 

@@ -17,8 +17,15 @@ from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import AberturaChamadoForm, LoginForm
-from .models import AtendimentoHistorico, Chamado, ChamadoAnexo, ChamadoEvento
+from .forms import AberturaChamadoForm, LoginForm, MensagemChamadoForm
+from .models import (
+    AtendimentoHistorico,
+    Chamado,
+    ChamadoAnexo,
+    ChamadoEvento,
+    ChamadoMensagem,
+    ChamadoMensagemAnexo,
+)
 from .permissions import (
     ATTENDANT_GROUP_NAME,
     PRIMARY_ADMIN_USERNAME,
@@ -731,6 +738,31 @@ def _serialize_ticket_events(chamado: Chamado):
     return eventos
 
 
+def _serialize_ticket_messages(chamado: Chamado):
+    """Serializa a conversa do chamado para o template.
+
+    A origem da mensagem (solicitante x TI) e definida comparando o autor com o
+    solicitante do chamado, o que e estavel mesmo que os grupos mudem depois.
+    """
+    mensagens = []
+    for mensagem in chamado.mensagens.select_related("autor").prefetch_related("anexos"):
+        from_requester = (
+            mensagem.autor_id is not None and mensagem.autor_id == chamado.solicitante_id
+        )
+        mensagens.append(
+            {
+                "id": mensagem.id,
+                "author": _attendant_display(mensagem.autor) or "Usuario removido",
+                "from_requester": from_requester,
+                "origin_label": "Solicitante" if from_requester else "Equipe de TI",
+                "texto": mensagem.texto,
+                "timestamp": timezone.localtime(mensagem.criado_em).strftime("%d/%m/%Y %H:%M"),
+                "anexos": list(mensagem.anexos.all()),
+            }
+        )
+    return mensagens
+
+
 def _user_can_access_ticket(user, chamado) -> bool:
     if is_admin_user(user) or is_attendant_user(user):
         return True
@@ -758,6 +790,9 @@ def ticket_detail_view(request, numero: str):
         "current_attendant": _attendant_display(chamado.atendente_atual),
         "timeline": _serialize_ticket_timeline(chamado),
         "eventos": _serialize_ticket_events(chamado),
+        "eventos_total": chamado.eventos.count(),
+        "mensagens": _serialize_ticket_messages(chamado),
+        "mensagem_form": MensagemChamadoForm(),
         "anexos": list(chamado.anexos.select_related("enviado_por").all()),
         "is_owner": chamado.solicitante_id == request.user.id,
         "is_admin": is_admin_user(request.user),
@@ -777,6 +812,78 @@ def download_anexo_view(request, numero: str, anexo_id: int):
     anexo = get_object_or_404(ChamadoAnexo, pk=anexo_id, chamado=chamado)
     try:
         return FileResponse(anexo.arquivo.open("rb"), as_attachment=True, filename=anexo.nome_original or anexo.arquivo.name)
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+@login_required
+@require_POST
+def ticket_message_create_view(request, numero: str):
+    """Registra uma mensagem da conversa do chamado (com anexos opcionais).
+
+    Mantem o usuario no detalhe do chamado apos o envio e grava apenas um resumo
+    no historico tecnico, sem duplicar o conteudo da conversa.
+    """
+    chamado = get_object_or_404(Chamado, numero=numero)
+
+    if not _user_can_access_ticket(request.user, chamado):
+        messages.error(request, "Voce nao tem acesso a este chamado.")
+        return redirect("my_tickets")
+
+    form = MensagemChamadoForm(request.POST, request.FILES)
+    if not form.is_valid():
+        erro = next(iter(form.errors.values()))[0] if form.errors else "Nao foi possivel enviar a mensagem."
+        messages.error(request, erro)
+        return redirect("ticket_detail", numero=chamado.numero)
+
+    texto = form.cleaned_data["texto"]
+    anexos = form.cleaned_data.get("anexos") or []
+
+    with transaction.atomic():
+        mensagem = ChamadoMensagem.objects.create(
+            chamado=chamado,
+            autor=request.user,
+            texto=texto,
+        )
+        for arquivo in anexos:
+            ChamadoMensagemAnexo.objects.create(
+                mensagem=mensagem,
+                arquivo=arquivo,
+                nome_original=arquivo.name,
+            )
+
+        autor = request.user.get_full_name() or request.user.username
+        eh_solicitante = chamado.solicitante_id == request.user.id
+        quem = f"pelo solicitante {autor}" if eh_solicitante else f"por {autor}"
+        if anexos:
+            resumo = f"Mensagem enviada com {len(anexos)} anexo(s) {quem}."
+        else:
+            resumo = f"Mensagem enviada {quem}."
+        ChamadoEvento.registrar(
+            chamado=chamado,
+            usuario=request.user,
+            tipo=ChamadoEvento.TIPO_COMENTARIO,
+            descricao=resumo,
+        )
+
+    messages.success(request, "Mensagem enviada com sucesso.")
+    return redirect("ticket_detail", numero=chamado.numero)
+
+
+@login_required
+def download_message_anexo_view(request, numero: str, anexo_id: int):
+    chamado = get_object_or_404(Chamado, numero=numero)
+
+    if not _user_can_access_ticket(request.user, chamado):
+        raise Http404("Anexo nao encontrado.")
+
+    anexo = get_object_or_404(ChamadoMensagemAnexo, pk=anexo_id, mensagem__chamado=chamado)
+    try:
+        return FileResponse(
+            anexo.arquivo.open("rb"),
+            as_attachment=True,
+            filename=anexo.nome_original or anexo.arquivo.name,
+        )
     except FileNotFoundError:
         raise Http404("Arquivo nao encontrado no armazenamento.")
 

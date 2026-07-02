@@ -2,6 +2,13 @@
 
 ## 2026-07-02
 
+- Adicionada a area de conversa no detalhe do chamado, permitindo troca de mensagens entre solicitante e Atendente TI/Admin, com anexos opcionais por mensagem (multiplos arquivos, sem limite de tamanho/extensao).
+- Criados os models `ChamadoMensagem` (texto da conversa) e `ChamadoMensagemAnexo` (anexos da mensagem) e a migration `0005_chamadomensagem_chamadomensagemanexo`.
+- Criadas as rotas `POST /meus-chamados/<numero>/mensagens/` (envio, com permissao validada no backend) e `GET /meus-chamados/<numero>/mensagens/anexo/<id>/` (download protegido de anexo de mensagem).
+- Cada mensagem gera um evento resumido no historico tecnico (`ChamadoEvento` tipo `comentario`), sem duplicar o texto; a conversa guarda o conteudo e o historico guarda so o resumo.
+- O historico tecnico do chamado passou a aparecer recolhido por padrao (elemento `details/summary`), expandindo e recolhendo ao clique, sem trocar de tela nem remover registros.
+- Mensagens do solicitante e da equipe de TI sao diferenciadas visualmente; apos enviar, o usuario permanece no detalhe com notificacao de sucesso ou erro.
+- Adicionados testes automatizados (`core/tests.py`) para envio de mensagem, anexos, resumo no historico e permissoes de acesso.
 - Sincronizada a documentacao com o estado real do projeto: `01_arquitetura.md` (Kanban com dados reais, movimentacao persistida, `ti_required`, `static/js` e `sidebar.css`), `03_modelos.md` (quatro modelos: `Chamado`, `ChamadoEvento`, `ChamadoAnexo` e `AtendimentoHistorico`; `AnexoChamado` deixou de ser "previsto") e `00_visao_geral.md` (escopo atual e fora de escopo atualizados).
 - Corrigido o texto de coluna vazia no Kanban apos movimentacao de cards: a mensagem de vazio (ex.: "Sem chamados em atendimento.") deixou de aparecer junto com os cards. O estado de vazio agora e recalculado na hora, no drag-and-drop, removendo a mensagem quando a coluna recebe um card e recriando-a (via `data-empty-text`) quando a coluna fica sem cards; em caso de falha no POST o card volta e a mensagem e recalculada.
 - Corrigida a instabilidade vertical do menu lateral: os botoes mudavam de posicao ao trocar de tela (ex.: entre "Chamados" e "Permissoes") porque a `.tickets-sidebar` esticava ate a altura do conteudo e o `space-between` distribuia os blocos de forma diferente em cada pagina. A sidebar passou a ter altura fixa (`100vh`) e `position: sticky`, mantendo o menu sempre na mesma posicao.

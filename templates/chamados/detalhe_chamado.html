@@ -47,23 +47,77 @@
                     </ul>
                 {% endif %}
 
-                <h3 class="portal-detail__section-title">Historico do chamado</h3>
-                {% if eventos %}
-                    <ul class="portal-timeline">
-                        {% for evento in eventos %}
-                            <li class="portal-timeline__item">
-                                <div class="portal-timeline__head">
-                                    <strong>{{ evento.author }}</strong>
-                                    <span>{{ evento.tipo_label }}</span>
-                                    <time>{{ evento.timestamp }}</time>
-                                </div>
-                                <p class="portal-timeline__message">{{ evento.descricao }}</p>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="portal-detail__empty">Nenhum evento registrado para este chamado ainda.</p>
-                {% endif %}
+                <h3 class="portal-detail__section-title">Conversa</h3>
+                <div class="ticket-chat">
+                    {% if mensagens %}
+                        <ul class="chat-thread">
+                            {% for mensagem in mensagens %}
+                                <li class="chat-message{% if mensagem.from_requester %} chat-message--requester{% else %} chat-message--ti{% endif %}">
+                                    <div class="chat-message__head">
+                                        <strong>{{ mensagem.author }}</strong>
+                                        <span class="chat-message__origin">{{ mensagem.origin_label }}</span>
+                                        <time>{{ mensagem.timestamp }}</time>
+                                    </div>
+                                    {% if mensagem.texto %}
+                                        <p class="chat-message__text">{{ mensagem.texto|linebreaksbr }}</p>
+                                    {% endif %}
+                                    {% if mensagem.anexos %}
+                                        <ul class="chat-message__attachments">
+                                            {% for anexo in mensagem.anexos %}
+                                                <li>
+                                                    <a href="{% url 'download_message_anexo' numero=chamado.numero anexo_id=anexo.id %}">
+                                                        {{ anexo.nome_original|default:anexo.arquivo.name }}
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="portal-detail__empty">Nenhuma mensagem ainda. Envie a primeira mensagem abaixo.</p>
+                    {% endif %}
+
+                    <form class="chat-form" method="post" action="{% url 'ticket_message_create' numero=chamado.numero %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <div class="chat-form__field">
+                            {{ mensagem_form.texto }}
+                        </div>
+                        <div class="chat-form__row">
+                            <div class="chat-form__file">
+                                {{ mensagem_form.anexos }}
+                            </div>
+                            <button type="submit" class="btn btn-primary chat-form__submit">Enviar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <details class="ticket-history">
+                    <summary class="ticket-history__summary">
+                        <span class="ticket-history__title">Historico do chamado</span>
+                        <span class="ticket-history__count">{{ eventos_total }}</span>
+                        <span class="ticket-history__hint">ver</span>
+                    </summary>
+                    <div class="ticket-history__body">
+                        {% if eventos %}
+                            <ul class="portal-timeline">
+                                {% for evento in eventos %}
+                                    <li class="portal-timeline__item">
+                                        <div class="portal-timeline__head">
+                                            <strong>{{ evento.author }}</strong>
+                                            <span>{{ evento.tipo_label }}</span>
+                                            <time>{{ evento.timestamp }}</time>
+                                        </div>
+                                        <p class="portal-timeline__message">{{ evento.descricao }}</p>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="portal-detail__empty">Nenhum evento registrado para este chamado ainda.</p>
+                        {% endif %}
+                    </div>
+                </details>
 
                 <h3 class="portal-detail__section-title">Andamento do atendimento</h3>
                 {% if timeline %}

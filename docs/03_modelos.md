@@ -2,11 +2,13 @@
 
 ## Situacao atual
 
-O projeto possui quatro modelos persistidos para sustentar o fluxo de atendimento:
+O projeto possui seis modelos persistidos para sustentar o fluxo de atendimento:
 
 - `Chamado`
 - `ChamadoEvento`
 - `ChamadoAnexo`
+- `ChamadoMensagem`
+- `ChamadoMensagemAnexo`
 - `AtendimentoHistorico`
 
 ## Modelos implementados
@@ -91,6 +93,40 @@ Regras atuais:
 - Nao ha restricao de tamanho nem de extensao de arquivo neste momento.
 - Os arquivos ficam sob `MEDIA_ROOT` e sao servidos por `MEDIA_URL` (em desenvolvimento, servidos pelo proprio Django com `DEBUG=True`).
 
+### ChamadoMensagem
+
+Mensagem da conversa entre o solicitante e o Atendente TI dentro de um chamado. A conversa e separada do historico tecnico (`ChamadoEvento`): aqui fica o conteudo trocado; la fica apenas o resumo da acao.
+
+Campos atuais:
+
+- `chamado` (FK para `Chamado`, `on_delete=CASCADE`, related_name `mensagens`)
+- `autor` (FK opcional para quem escreveu, `on_delete=SET_NULL`)
+- `texto` (conteudo da mensagem)
+- `criado_em`
+
+Regras atuais:
+
+- Uma mensagem precisa ter texto OU pelo menos um anexo (nao pode ser totalmente vazia); a validacao ocorre no backend.
+- A origem da mensagem (solicitante x TI) e determinada comparando o `autor` com o `solicitante` do chamado.
+- Cada mensagem enviada gera um `ChamadoEvento` do tipo `comentario` com um resumo (sem repetir o texto da conversa).
+
+### ChamadoMensagemAnexo
+
+Arquivo opcional vinculado a uma mensagem da conversa.
+
+Campos atuais:
+
+- `mensagem` (FK para `ChamadoMensagem`, `on_delete=CASCADE`, related_name `anexos`)
+- `arquivo` (`FileField`, salvo em `MEDIA_ROOT/chamados/<numero>/mensagens/<arquivo>`)
+- `nome_original`
+- `enviado_em`
+
+Regras atuais:
+
+- Uma mensagem pode ter varios anexos, todos opcionais.
+- Nao ha restricao de tamanho nem de extensao neste momento.
+- O download usa rota dedicada e protegida (nao expoe a URL direta de `MEDIA`).
+
 ### AtendimentoHistorico
 
 Registra cada periodo individual de trabalho de um atendente em um chamado.
@@ -117,18 +153,7 @@ Regras atuais:
 
 ## Modelos previstos para proximas fases
 
-### ComentarioChamado
-
-Modelo futuro para comentarios/acoes manuais da equipe no chamado, separado do controle de tempo. Hoje comentarios podem ser registrados como evento do tipo `comentario` em `ChamadoEvento`; um modelo dedicado ainda pode ser criado quando o fluxo de interacao evoluir.
-
-Campos esperados:
-
-- chamado
-- autor
-- texto
-- data de criacao
-
-> O antigo item previsto "AnexoChamado" ja foi implementado como o modelo `ChamadoAnexo` (ver acima).
+> O antigo item previsto "ComentarioChamado" foi implementado como o modelo `ChamadoMensagem` (conversa do chamado, ver acima). O antigo item "AnexoChamado" foi implementado como `ChamadoAnexo`.
 
 ## Observacoes de modelagem
 

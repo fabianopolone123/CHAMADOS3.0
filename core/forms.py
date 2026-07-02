@@ -94,3 +94,37 @@ class AberturaChamadoForm(forms.ModelForm):
         if len(descricao) < 10:
             raise forms.ValidationError("Detalhe melhor o chamado com pelo menos 10 caracteres.")
         return descricao
+
+
+class MensagemChamadoForm(forms.Form):
+    """Mensagem da conversa do chamado, com anexos opcionais.
+
+    Regra: e obrigatorio informar um texto OU pelo menos um anexo (nao permite
+    mensagem completamente vazia).
+    """
+
+    texto = forms.CharField(
+        label="Mensagem",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Escreva uma mensagem para a equipe...",
+            }
+        ),
+    )
+    anexos = MultipleFileField(
+        label="Anexos",
+        required=False,
+        help_text="Voce pode anexar um ou mais arquivos (opcional).",
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        texto = (cleaned.get("texto") or "").strip()
+        anexos = cleaned.get("anexos") or []
+        if not texto and not anexos:
+            raise forms.ValidationError("Escreva uma mensagem ou anexe ao menos um arquivo.")
+        cleaned["texto"] = texto
+        return cleaned

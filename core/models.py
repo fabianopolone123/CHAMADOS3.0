@@ -127,6 +127,52 @@ class ChamadoAnexo(models.Model):
         return f"{self.chamado.numero} - {self.nome_original or self.arquivo.name}"
 
 
+def mensagem_anexo_upload_path(instance, filename):
+    """Organiza os anexos de mensagens por chamado dentro de MEDIA_ROOT."""
+    numero = instance.mensagem.chamado.numero or "sem-numero"
+    return f"chamados/{numero}/mensagens/{filename}"
+
+
+class ChamadoMensagem(models.Model):
+    """Mensagem da conversa entre solicitante e Atendente TI dentro de um chamado.
+
+    A conversa e separada do historico tecnico (`ChamadoEvento`): aqui fica o
+    conteudo trocado; la fica apenas o resumo da acao.
+    """
+
+    chamado = models.ForeignKey(Chamado, on_delete=models.CASCADE, related_name="mensagens")
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mensagens_chamado",
+    )
+    texto = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.chamado.numero} - mensagem #{self.pk}"
+
+
+class ChamadoMensagemAnexo(models.Model):
+    """Arquivo opcional vinculado a uma mensagem da conversa do chamado."""
+
+    mensagem = models.ForeignKey(ChamadoMensagem, on_delete=models.CASCADE, related_name="anexos")
+    arquivo = models.FileField(upload_to=mensagem_anexo_upload_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em"]
+
+    def __str__(self) -> str:
+        return f"{self.mensagem.chamado.numero} - {self.nome_original or self.arquivo.name}"
+
+
 class ChamadoEvento(models.Model):
     """Log de eventos/acoes de um chamado ao longo da sua vida."""
 

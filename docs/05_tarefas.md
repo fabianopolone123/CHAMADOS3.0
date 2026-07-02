@@ -2,11 +2,11 @@
 
 ## Em andamento
 
-- Permitir que a TI registre comentarios/acoes manuais no historico do chamado
 - Evoluir a atribuicao para um fluxo formal de responsavel, se necessario
 
 ## Concluidas
 
+- Adicionada area de conversa no detalhe do chamado (solicitante x TI) com anexos opcionais por mensagem, resumo no historico tecnico e historico recolhido por padrao (models `ChamadoMensagem` e `ChamadoMensagemAnexo`)
 - Corrigida a instabilidade vertical do menu lateral e padronizado seu visual; CSS do menu centralizado em `static/css/sidebar.css`
 - Adicionado botao "Criar chamado" no Kanban com modal para o atendente abrir chamado em nome proprio (entra em "Chamados abertos", sem atendente atual)
 - Padronizado o menu lateral da area de TI em um include reutilizavel (Chamados + Permissoes)
@@ -44,5 +44,5 @@
 1. Persistir chamados reais no Kanban e substituir os dados mockados
 2. Persistir a atribuicao dos cards no backend
 3. Refletir no portal os status atualizados pelos atendentes durante o atendimento
-4. Permitir que o solicitante complemente/comente o proprio chamado
-5. Definir as transicoes formais de status do chamado
+4. Definir as transicoes formais de status do chamado
+5. Atualizar a conversa sem recarregar a pagina (envio assincrono/AJAX)

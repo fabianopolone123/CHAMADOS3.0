@@ -441,6 +441,186 @@
     color: #0f172a;
 }
 
+/* Conversa do chamado (solicitante x TI). */
+.ticket-chat {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.chat-thread {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.chat-message {
+    padding: 0.85rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+/* Diferenciacao visual: solicitante x equipe de TI. */
+.chat-message--requester {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+
+.chat-message--ti {
+    background: #eff5ff;
+    border-color: #cfe0ff;
+    border-left: 3px solid #2563eb;
+}
+
+.chat-message__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.chat-message__head strong {
+    color: #0f172a;
+}
+
+.chat-message__origin {
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.chat-message--ti .chat-message__origin {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.chat-message__head time {
+    margin-left: auto;
+}
+
+.chat-message__text {
+    margin: 0;
+    color: #1f2937;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.chat-message__attachments {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.chat-message__attachments a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #1d4ed8;
+    font-weight: 600;
+    font-size: 0.88rem;
+    text-decoration: none;
+}
+
+.chat-message__attachments a:hover {
+    text-decoration: underline;
+}
+
+.chat-form {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.9rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.chat-form__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.chat-form__file {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.chat-form__submit {
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.55rem 1.4rem;
+    white-space: nowrap;
+}
+
+/* Historico tecnico recolhivel (recolhido por padrao). */
+.ticket-history {
+    margin: 1.4rem 0 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.ticket-history__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    font-weight: 700;
+    color: #0f172a;
+    list-style: none;
+    user-select: none;
+}
+
+.ticket-history__summary::-webkit-details-marker {
+    display: none;
+}
+
+.ticket-history__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.8rem;
+}
+
+.ticket-history__hint {
+    margin-left: auto;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1d4ed8;
+}
+
+.ticket-history[open] .ticket-history__hint::after {
+    content: " menos";
+}
+
+.ticket-history__hint::after {
+    content: " histórico";
+}
+
+.ticket-history__body {
+    padding: 0 1rem 1rem;
+}
+
 @media (max-width: 900px) {
     .portal-stats {
         grid-template-columns: 1fr;

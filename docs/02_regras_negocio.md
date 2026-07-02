@@ -71,6 +71,20 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 9. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
 10. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
 
+## Regras atuais da conversa do chamado
+
+1. O detalhe do chamado possui uma area de conversa entre o solicitante e o Atendente TI/Admin, separada do historico tecnico.
+2. O solicitante pode ver e enviar mensagens apenas nos proprios chamados.
+3. Atendente TI e Admin podem ver e responder mensagens em qualquer chamado da visao de atendimento.
+4. Usuario comum nao acessa nem envia mensagem em chamado de outro usuario; a permissao e validada no backend.
+5. Cada mensagem fica vinculada ao chamado e pode ter zero ou mais anexos opcionais (sem limite de tamanho ou extensao neste momento).
+6. Uma mensagem precisa ter texto ou pelo menos um anexo; mensagens totalmente vazias sao rejeitadas.
+7. A conversa guarda o conteudo trocado; o historico tecnico guarda apenas o resumo da acao, sem duplicar o texto.
+8. Ao enviar uma mensagem, o sistema registra um evento resumido em `ChamadoEvento` (ex.: "Mensagem enviada pelo solicitante Joao." ou "Mensagem enviada com 2 anexo(s) por fabiano.polone.").
+9. As mensagens diferenciam visualmente autor solicitante e autor da equipe de TI.
+10. Apos enviar, o usuario permanece no detalhe do chamado e ve uma notificacao de sucesso ou erro.
+11. O historico tecnico aparece recolhido por padrao no detalhe e expande/recolhe ao ser clicado, sem trocar de tela e sem remover registros.
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.
