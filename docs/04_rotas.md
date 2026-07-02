@@ -11,6 +11,8 @@
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza (Stop) o atendimento; o Stop encerra o chamado e o move para "Chamados fechados" (apenas TI/admin) | Implementada |
 | `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
 | `/chamados/criar/` | POST | Cria um chamado pelo Kanban (botao "+" no topo da coluna "Chamados abertos"), com o atendente logado como solicitante; apenas TI/admin | Implementada |
+| `/chamados/fechados/buscar/` | GET | Lista/pesquisa (JSON) os chamados encerrados para o modal do Kanban; sem `q` retorna os mais recentes, com `q` filtra por ID, titulo, descricao, solicitante, atendente, mensagens e historico (apenas TI/admin) | Implementada |
+| `/chamados/fechados/<numero>/` | GET | Detalhe completo (JSON) de um chamado encerrado para o modal: dados, descricao, conversa, anexos e historico tecnico (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/criar/` | POST | Cria uma pendencia na coluna "Pendencias" (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/` | GET | Detalhe (JSON) da pendencia para o modal: titulo, descricao, data e autor (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/converter/` | POST | Converte a pendencia em chamado ao ser arrastada para um atendente (apenas TI/admin) | Implementada |
@@ -69,6 +71,14 @@
 - Uma mensagem precisa ter texto ou pelo menos um anexo; caso contrario retorna ao detalhe com mensagem de erro.
 - Cada envio cria a mensagem (e seus anexos) e registra um evento resumido em `ChamadoEvento` (tipo `comentario`), sem duplicar o texto da conversa.
 - Apos o envio, o usuario e redirecionado de volta ao detalhe do chamado com notificacao de sucesso.
+
+## Regras do modal de chamados fechados
+
+- O titulo "Chamados fechados" da coluna e clicavel e abre um modal com pesquisa e a lista dos chamados encerrados.
+- `/chamados/fechados/buscar/` e `/chamados/fechados/<numero>/` exigem `login_required` e permissao de Atendente TI/Admin; usuario comum recebe `403` (validado no backend). O usuario comum continua acessando apenas os proprios chamados pelo fluxo do portal (`/meus-chamados/`).
+- A busca (`buscar/`) aceita o parametro `q` e filtra chamados com status encerrado (`resolvido`/`fechado`) por: numero (ID), titulo, descricao, solicitante (nome/username/first/last), atendente atual (username/first/last), texto das mensagens e descricao dos eventos do historico. Sem `q` retorna os encerrados mais recentes. A busca e case-insensitive, aceita partes do texto, usa `distinct()` e limita o resultado a 100 registros; retorna apenas `number` e `title` por item.
+- O detalhe (`<numero>/`) so expoe chamados encerrados (senao `404`) e retorna dados completos: numero, titulo, descricao, solicitante, atendente atual, status, data de criacao, data de fechamento (quando existir), anexos, conversa (mensagens com anexos) e historico tecnico (eventos). Os links de download reutilizam as rotas protegidas de anexo.
+- No frontend o modal alterna entre lista e detalhe (botao "Voltar") e fecha pelo botao "Fechar"; a pesquisa e dinamica com debounce de ~300ms e requisicoes concorrentes anteriores sao canceladas. O historico tecnico aparece recolhido por padrao.
 
 ## Regras das rotas de pendencias
 

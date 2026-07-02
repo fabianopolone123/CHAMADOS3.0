@@ -1,0 +1,87 @@
+<div class="modal fade" id="closedTicketsModal" tabindex="-1" aria-labelledby="closedTicketsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal closed-tickets-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Encerrados</span>
+                    <h5 class="modal-title" id="closedTicketsModalLabel">
+                        <span data-closed-title="list">Chamados fechados</span>
+                        <span data-closed-title="detail" class="is-hidden">Detalhe do chamado</span>
+                    </h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body closed-tickets-modal__body">
+                {# Estado 1: lista + pesquisa #}
+                <div class="closed-tickets-list-view" data-closed-view="list">
+                    <div class="closed-tickets-search">
+                        <span class="closed-tickets-search__icon" aria-hidden="true">&#128269;</span>
+                        <input
+                            type="search"
+                            class="closed-tickets-search__input"
+                            id="closedTicketsSearchInput"
+                            placeholder="Pesquisar por ID, titulo, descricao, solicitante, atendente, mensagem..."
+                            autocomplete="off"
+                        >
+                    </div>
+                    <p class="closed-tickets-status" data-closed-status></p>
+                    <ul class="closed-tickets-list" data-closed-list></ul>
+                </div>
+
+                {# Estado 2: detalhe completo do chamado #}
+                <div class="closed-ticket-detail-view is-hidden" data-closed-view="detail">
+                    <div class="closed-detail__head">
+                        <span class="ticket-number" data-closed-detail="number"></span>
+                        <span class="status-badge status-neutral" data-closed-detail="status"></span>
+                    </div>
+                    <h4 class="closed-detail__title" data-closed-detail="title"></h4>
+
+                    <dl class="closed-detail__meta">
+                        <div>
+                            <dt>Solicitante</dt>
+                            <dd data-closed-detail="requester">-</dd>
+                        </div>
+                        <div>
+                            <dt>Atendente</dt>
+                            <dd data-closed-detail="attendant">-</dd>
+                        </div>
+                        <div>
+                            <dt>Criado em</dt>
+                            <dd data-closed-detail="created">-</dd>
+                        </div>
+                        <div data-closed-detail-row="closed">
+                            <dt>Fechado em</dt>
+                            <dd data-closed-detail="closed">-</dd>
+                        </div>
+                    </dl>
+
+                    <section class="closed-detail__section">
+                        <h6 class="closed-detail__section-title">Descricao</h6>
+                        <p class="closed-detail__descricao" data-closed-detail="description"></p>
+                    </section>
+
+                    <section class="closed-detail__section" data-closed-section="attachments">
+                        <h6 class="closed-detail__section-title">Anexos</h6>
+                        <ul class="closed-detail__attachments" data-closed-attachments></ul>
+                    </section>
+
+                    <section class="closed-detail__section" data-closed-section="messages">
+                        <h6 class="closed-detail__section-title">Conversa</h6>
+                        <div class="closed-detail__messages" data-closed-messages></div>
+                    </section>
+
+                    <details class="closed-detail__events" data-closed-section="events">
+                        <summary class="closed-detail__events-summary">Historico tecnico</summary>
+                        <ul class="closed-detail__events-list" data-closed-events></ul>
+                    </details>
+                </div>
+            </div>
+
+            <div class="modal-footer closed-tickets-modal__footer">
+                <button type="button" class="btn btn-light is-hidden" data-closed-back>Voltar</button>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>

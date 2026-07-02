@@ -38,6 +38,9 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 22. Chamado criado pelo Kanban entra com status "Aberto", solicitante = atendente logado e sem atendente atual (aparece na coluna "Chamados abertos").
 23. O atendente atual do chamado criado so e definido quando o card e arrastado para a coluna de um atendente.
 24. A criacao pelo Kanban registra em `ChamadoEvento`: "Chamado criado manualmente pelo atendente X."
+25. O titulo "Chamados fechados" e clicavel e abre um modal de consulta dos chamados encerrados (lista + pesquisa e detalhe completo), acessivel apenas para Atendente TI/Admin (validado no backend); usuario comum nao acessa a lista geral de fechados e continua vendo apenas os proprios chamados pelo portal.
+26. O modal comeca na lista compacta (ID e titulo) dos encerrados mais recentes e possui uma pesquisa inteligente, dinamica (debounce de ~300ms), case-insensitive e por partes do texto, que filtra por ID/numero, titulo, descricao, solicitante, atendente atual, mensagens da conversa e historico; sem resultados exibe "Nenhum chamado fechado encontrado.".
+27. Clicar em um item abre o detalhe completo do chamado no proprio modal (numero, titulo, descricao, solicitante, atendente, status, data de criacao, data de fechamento, anexos, conversa e historico tecnico recolhido por padrao); o botao "Voltar" retorna a lista e "Fechar" encerra o modal.
 
 ## Regras atuais de controle de tempo
 

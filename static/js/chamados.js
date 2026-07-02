@@ -753,6 +753,294 @@
         });
     }
 
+    // ----- Modal de chamados fechados (lista + pesquisa inteligente + detalhe) -----
+    const closedModalElement = document.getElementById("closedTicketsModal");
+    const closedSearchUrl = appElement.dataset.closedSearchUrl;
+    const closedDetailUrlTemplate = appElement.dataset.closedDetailUrl;
+
+    function initializeClosedTicketsModal() {
+        const triggers = document.querySelectorAll(".js-open-closed-modal");
+        if (!closedModalElement || !closedSearchUrl || !triggers.length) {
+            return;
+        }
+
+        const closedModal = bootstrap.Modal.getOrCreateInstance(closedModalElement);
+        const searchInput = closedModalElement.querySelector("#closedTicketsSearchInput");
+        const listEl = closedModalElement.querySelector("[data-closed-list]");
+        const statusEl = closedModalElement.querySelector("[data-closed-status]");
+        const backButton = closedModalElement.querySelector("[data-closed-back]");
+        const listViews = closedModalElement.querySelectorAll('[data-closed-view="list"]');
+        const detailViews = closedModalElement.querySelectorAll('[data-closed-view="detail"]');
+        const titleList = closedModalElement.querySelector('[data-closed-title="list"]');
+        const titleDetail = closedModalElement.querySelector('[data-closed-title="detail"]');
+
+        let debounceTimer = null;
+        let searchController = null;
+        let detailController = null;
+
+        function toggleGroup(nodes, hidden) {
+            nodes.forEach((node) => node.classList.toggle("is-hidden", hidden));
+        }
+
+        function setView(view) {
+            const isDetail = view === "detail";
+            toggleGroup(listViews, isDetail);
+            toggleGroup(detailViews, !isDetail);
+            if (titleList) {
+                titleList.classList.toggle("is-hidden", isDetail);
+            }
+            if (titleDetail) {
+                titleDetail.classList.toggle("is-hidden", !isDetail);
+            }
+            if (backButton) {
+                backButton.classList.toggle("is-hidden", !isDetail);
+            }
+        }
+
+        function setDetailField(key, value) {
+            const el = closedModalElement.querySelector(`[data-closed-detail="${key}"]`);
+            if (el) {
+                el.textContent = value || "-";
+            }
+        }
+
+        function renderList(results) {
+            listEl.innerHTML = "";
+            if (!results.length) {
+                statusEl.textContent = "Nenhum chamado fechado encontrado.";
+                return;
+            }
+            statusEl.textContent = `${results.length} chamado(s) encontrado(s).`;
+            const fragment = document.createDocumentFragment();
+            results.forEach((item) => {
+                const li = document.createElement("li");
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "closed-tickets-item";
+                button.dataset.number = item.number;
+
+                const number = document.createElement("span");
+                number.className = "closed-tickets-item__number";
+                number.textContent = item.number;
+
+                const title = document.createElement("span");
+                title.className = "closed-tickets-item__title";
+                title.textContent = item.title;
+
+                button.appendChild(number);
+                button.appendChild(title);
+                button.addEventListener("click", () => openDetail(item.number));
+                li.appendChild(button);
+                fragment.appendChild(li);
+            });
+            listEl.appendChild(fragment);
+        }
+
+        async function loadList(query) {
+            if (searchController) {
+                searchController.abort();
+            }
+            searchController = new AbortController();
+            statusEl.textContent = "Carregando...";
+            try {
+                const url = `${closedSearchUrl}?q=${encodeURIComponent(query || "")}`;
+                const response = await fetch(url, {
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    signal: searchController.signal,
+                });
+                const data = await response.json();
+                if (!response.ok || data.ok === false) {
+                    throw data;
+                }
+                renderList(data.results || []);
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    return;
+                }
+                statusEl.textContent = "Nao foi possivel carregar os chamados fechados.";
+                showToast(error.message || "Nao foi possivel carregar os chamados fechados.", "error");
+            }
+        }
+
+        function renderAttachments(attachments) {
+            const section = closedModalElement.querySelector('[data-closed-section="attachments"]');
+            const container = closedModalElement.querySelector("[data-closed-attachments]");
+            container.innerHTML = "";
+            if (!attachments || !attachments.length) {
+                section.classList.add("is-hidden");
+                return;
+            }
+            section.classList.remove("is-hidden");
+            attachments.forEach((anexo) => {
+                const li = document.createElement("li");
+                const link = document.createElement("a");
+                link.href = anexo.url;
+                link.textContent = anexo.nome;
+                link.className = "closed-detail__attachment-link";
+                li.appendChild(link);
+                container.appendChild(li);
+            });
+        }
+
+        function renderMessages(messages) {
+            const section = closedModalElement.querySelector('[data-closed-section="messages"]');
+            const container = closedModalElement.querySelector("[data-closed-messages]");
+            container.innerHTML = "";
+            if (!messages || !messages.length) {
+                section.classList.add("is-hidden");
+                return;
+            }
+            section.classList.remove("is-hidden");
+            messages.forEach((msg) => {
+                const bubble = document.createElement("div");
+                bubble.className = "closed-message" + (msg.from_requester ? " closed-message--requester" : " closed-message--ti");
+
+                const head = document.createElement("div");
+                head.className = "closed-message__head";
+                const author = document.createElement("strong");
+                author.textContent = `${msg.author} - ${msg.origin_label}`;
+                const time = document.createElement("span");
+                time.textContent = msg.timestamp;
+                head.appendChild(author);
+                head.appendChild(time);
+
+                const body = document.createElement("p");
+                body.className = "closed-message__body";
+                body.textContent = msg.texto;
+
+                bubble.appendChild(head);
+                bubble.appendChild(body);
+
+                if (msg.anexos && msg.anexos.length) {
+                    const anexList = document.createElement("ul");
+                    anexList.className = "closed-message__anexos";
+                    msg.anexos.forEach((anexo) => {
+                        const li = document.createElement("li");
+                        const link = document.createElement("a");
+                        link.href = anexo.url;
+                        link.textContent = anexo.nome;
+                        li.appendChild(link);
+                        anexList.appendChild(li);
+                    });
+                    bubble.appendChild(anexList);
+                }
+                container.appendChild(bubble);
+            });
+        }
+
+        function renderEvents(events) {
+            const section = closedModalElement.querySelector('[data-closed-section="events"]');
+            const container = closedModalElement.querySelector("[data-closed-events]");
+            container.innerHTML = "";
+            if (!events || !events.length) {
+                section.classList.add("is-hidden");
+                return;
+            }
+            section.classList.remove("is-hidden");
+            section.open = false;
+            events.forEach((evento) => {
+                const li = document.createElement("li");
+                const meta = document.createElement("div");
+                meta.className = "closed-event__meta";
+                const author = document.createElement("strong");
+                author.textContent = `${evento.author} - ${evento.tipo_label}`;
+                const time = document.createElement("span");
+                time.textContent = evento.timestamp;
+                meta.appendChild(author);
+                meta.appendChild(time);
+                const desc = document.createElement("p");
+                desc.className = "closed-event__desc";
+                desc.textContent = evento.descricao;
+                li.appendChild(meta);
+                li.appendChild(desc);
+                container.appendChild(li);
+            });
+        }
+
+        async function openDetail(ticketNumber) {
+            if (!closedDetailUrlTemplate) {
+                return;
+            }
+            if (detailController) {
+                detailController.abort();
+            }
+            detailController = new AbortController();
+            const url = closedDetailUrlTemplate.replace("__NUM__", encodeURIComponent(ticketNumber));
+            try {
+                const response = await fetch(url, {
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                    signal: detailController.signal,
+                });
+                const data = await response.json();
+                if (!response.ok || data.ok === false) {
+                    throw data;
+                }
+
+                setDetailField("number", data.number);
+                setDetailField("title", data.title);
+                setDetailField("requester", data.requester);
+                setDetailField("attendant", data.current_attendant);
+                setDetailField("created", data.created_at);
+                setDetailField("description", data.description || "Sem descricao.");
+
+                const statusBadge = closedModalElement.querySelector('[data-closed-detail="status"]');
+                if (statusBadge) {
+                    statusBadge.textContent = data.status_label || "-";
+                    statusBadge.classList.remove(...STATUS_BADGE_CLASSES);
+                    statusBadge.classList.add(data.status_class || "status-neutral");
+                }
+
+                const closedRow = closedModalElement.querySelector('[data-closed-detail-row="closed"]');
+                if (closedRow) {
+                    if (data.closed_at) {
+                        closedRow.classList.remove("is-hidden");
+                        setDetailField("closed", data.closed_at);
+                    } else {
+                        closedRow.classList.add("is-hidden");
+                    }
+                }
+
+                renderAttachments(data.attachments);
+                renderMessages(data.messages);
+                renderEvents(data.events);
+                setView("detail");
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    return;
+                }
+                showToast(error.message || "Nao foi possivel abrir o chamado.", "error");
+            }
+        }
+
+        function openModal() {
+            setView("list");
+            if (searchInput) {
+                searchInput.value = "";
+            }
+            loadList("");
+            closedModal.show();
+            window.setTimeout(() => searchInput && searchInput.focus(), 200);
+        }
+
+        triggers.forEach((trigger) => {
+            trigger.addEventListener("click", openModal);
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener("input", () => {
+                if (debounceTimer) {
+                    window.clearTimeout(debounceTimer);
+                }
+                const value = searchInput.value.trim();
+                debounceTimer = window.setTimeout(() => loadList(value), 300);
+            });
+        }
+
+        if (backButton) {
+            backButton.addEventListener("click", () => setView("list"));
+        }
+    }
+
     function initialize() {
         attendanceForm.addEventListener("submit", handleAttendanceSubmit);
         initializeDragAndDrop();
@@ -760,6 +1048,7 @@
         initializePendenciaCards();
         initializeCreateTicket();
         initializeCreatePendencia();
+        initializeClosedTicketsModal();
         syncInitialActiveState();
     }
 

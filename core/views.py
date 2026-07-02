@@ -13,6 +13,7 @@ from django.db.models import Q
 from django.http import FileResponse, Http404, JsonResponse
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -1014,6 +1015,129 @@ def ticket_detail_view(request, numero: str):
         "can_view_history": pode_ver_todos,
     }
     return render(request, "chamados/detalhe_chamado.html", context)
+
+
+_CLOSED_TICKETS_LIMIT = 100
+
+
+def _serialize_closed_ticket_messages(chamado: Chamado):
+    """Serializa a conversa de um chamado fechado para JSON (modal do Kanban)."""
+    mensagens = []
+    for mensagem in chamado.mensagens.select_related("autor").prefetch_related("anexos"):
+        from_requester = (
+            mensagem.autor_id is not None and mensagem.autor_id == chamado.solicitante_id
+        )
+        anexos = [
+            {
+                "nome": anexo.nome_original or anexo.arquivo.name,
+                "url": reverse("download_message_anexo", args=[chamado.numero, anexo.id]),
+            }
+            for anexo in mensagem.anexos.all()
+        ]
+        mensagens.append(
+            {
+                "author": _attendant_display(mensagem.autor) or "Usuario removido",
+                "from_requester": from_requester,
+                "origin_label": "Solicitante" if from_requester else "Equipe de TI",
+                "texto": mensagem.texto,
+                "timestamp": timezone.localtime(mensagem.criado_em).strftime("%d/%m/%Y %H:%M"),
+                "anexos": anexos,
+            }
+        )
+    return mensagens
+
+
+@login_required
+def closed_tickets_search_view(request):
+    """Lista/pesquisa chamados encerrados (resolvido/fechado) para o modal do Kanban.
+
+    Sem `q` retorna os encerrados mais recentes (limitados). Com `q` filtra por
+    numero, titulo, descricao, solicitante, atendente atual, mensagens e historico.
+    Restrito a Atendente TI/Admin; usuario comum recebe 403.
+    """
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para acessar chamados fechados.", status=403)
+
+    query = (request.GET.get("q") or "").strip()
+    queryset = (
+        Chamado.objects.filter(status__in=Chamado.STATUS_ENCERRADOS)
+        .order_by("-fechado_em", "-criado_em")
+    )
+
+    if query:
+        filters = (
+            Q(numero__icontains=query)
+            | Q(titulo__icontains=query)
+            | Q(descricao__icontains=query)
+            | Q(solicitante_nome__icontains=query)
+            | Q(solicitante__username__icontains=query)
+            | Q(solicitante__first_name__icontains=query)
+            | Q(solicitante__last_name__icontains=query)
+            | Q(atendente_atual__username__icontains=query)
+            | Q(atendente_atual__first_name__icontains=query)
+            | Q(atendente_atual__last_name__icontains=query)
+            | Q(mensagens__texto__icontains=query)
+            | Q(eventos__descricao__icontains=query)
+        )
+        queryset = queryset.filter(filters).distinct()
+
+    items = list(queryset[:_CLOSED_TICKETS_LIMIT])
+    return JsonResponse(
+        {
+            "ok": True,
+            "count": len(items),
+            "results": [{"number": chamado.numero, "title": chamado.titulo} for chamado in items],
+        }
+    )
+
+
+@login_required
+def closed_ticket_detail_view(request, numero: str):
+    """Detalhe completo de um chamado encerrado para o modal do Kanban.
+
+    Restrito a Atendente TI/Admin; usuario comum recebe 403. Apenas chamados
+    encerrados (resolvido/fechado) sao expostos por este endpoint.
+    """
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para acessar chamados fechados.", status=403)
+
+    chamado = (
+        Chamado.objects.select_related("solicitante", "atendente_atual")
+        .filter(numero=numero)
+        .first()
+    )
+    if not chamado or chamado.status not in Chamado.STATUS_ENCERRADOS:
+        return _json_error("Chamado fechado nao encontrado.", status=404)
+
+    attachments = [
+        {
+            "nome": anexo.nome_original or anexo.arquivo.name,
+            "url": reverse("download_anexo", args=[chamado.numero, anexo.id]),
+        }
+        for anexo in chamado.anexos.select_related("enviado_por").all()
+    ]
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "number": chamado.numero,
+            "title": chamado.titulo,
+            "description": chamado.descricao or "",
+            "requester": _requester_display(chamado),
+            "current_attendant": _attendant_display(chamado.atendente_atual) or "-",
+            "status_label": chamado.status_label,
+            "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+            "created_at": timezone.localtime(chamado.criado_em).strftime("%d/%m/%Y %H:%M"),
+            "closed_at": (
+                timezone.localtime(chamado.fechado_em).strftime("%d/%m/%Y %H:%M")
+                if chamado.fechado_em
+                else ""
+            ),
+            "attachments": attachments,
+            "messages": _serialize_closed_ticket_messages(chamado),
+            "events": _serialize_ticket_events(chamado),
+        }
+    )
 
 
 @login_required

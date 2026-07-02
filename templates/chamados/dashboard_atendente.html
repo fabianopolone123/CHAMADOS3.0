@@ -16,6 +16,8 @@
     data-move-ticket-url="{% url 'move_ticket' %}"
     data-create-ticket-url="{% url 'create_ticket_kanban' %}"
     data-create-pendencia-url="{% url 'pendencia_create' %}"
+    data-closed-search-url="{% url 'closed_tickets_search' %}"
+    data-closed-detail-url="{% url 'closed_ticket_detail' numero='__NUM__' %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="chamados" %}
@@ -87,7 +89,10 @@
                     <div class="column-header">
                         <div>
                             <span class="column-kicker">Encerrados</span>
-                            <h3 class="column-title">Chamados fechados</h3>
+                            <button type="button" class="column-title column-title--action js-open-closed-modal" aria-haspopup="dialog" title="Pesquisar chamados fechados">
+                                <span>Chamados fechados</span>
+                                <span class="column-title__hint" aria-hidden="true">&#128269;</span>
+                            </button>
                         </div>
                         <span class="column-count">{{ closed_column.count }}</span>
                     </div>
@@ -108,6 +113,7 @@
 {% include "partials/criar_chamado_modal.html" %}
 {% include "partials/pendencia_create_modal.html" %}
 {% include "partials/pendencia_detail_modal.html" %}
+{% include "partials/closed_tickets_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

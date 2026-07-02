@@ -1134,3 +1134,315 @@
         flex-wrap: wrap;
     }
 }
+
+/* ===== Titulo clicavel da coluna "Chamados fechados" ===== */
+.column-title--action {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    border-radius: 0.5rem;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.column-title--action:hover {
+    color: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.column-title--action:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.28);
+    outline-offset: 3px;
+}
+
+.column-title__hint {
+    font-size: 0.85rem;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.column-title--action:hover .column-title__hint,
+.column-title--action:focus-visible .column-title__hint {
+    opacity: 0.85;
+}
+
+/* ===== Modal de chamados fechados ===== */
+.closed-tickets-modal__body {
+    max-height: min(72vh, 640px);
+    overflow-y: auto;
+}
+
+.closed-tickets-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.9rem;
+}
+
+.closed-tickets-search__icon {
+    position: absolute;
+    left: 0.9rem;
+    font-size: 0.95rem;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.closed-tickets-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.closed-tickets-search__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.closed-tickets-status {
+    margin: 0 0 0.6rem;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.closed-tickets-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.closed-tickets-item {
+    appearance: none;
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: #fff;
+    border-radius: 0.85rem;
+    padding: 0.65rem 0.85rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.closed-tickets-item:hover {
+    transform: translateY(-1px);
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+    background: #f8fbff;
+}
+
+.closed-tickets-item__number {
+    font-weight: 800;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+    flex: 0 0 auto;
+}
+
+.closed-tickets-item__title {
+    color: #0f172a;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== Detalhe do chamado fechado dentro do modal ===== */
+.closed-detail__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.closed-detail__title {
+    margin: 0 0 1rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+}
+
+.closed-detail__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.65rem 1rem;
+    margin: 0 0 1.1rem;
+    padding: 0.9rem 1rem;
+    background: #f8fafc;
+    border-radius: 0.9rem;
+}
+
+.closed-detail__meta dt {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.15rem;
+}
+
+.closed-detail__meta dd {
+    margin: 0;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.closed-detail__section {
+    margin-bottom: 1.1rem;
+}
+
+.closed-detail__section-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1d4ed8;
+    margin: 0 0 0.5rem;
+}
+
+.closed-detail__descricao {
+    margin: 0;
+    color: #1f2937;
+    line-height: 1.6;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.closed-detail__attachments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.closed-detail__attachment-link,
+.closed-message__anexos a {
+    color: #1d4ed8;
+    text-decoration: none;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.closed-detail__attachment-link:hover,
+.closed-message__anexos a:hover {
+    text-decoration: underline;
+}
+
+.closed-detail__messages {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.closed-message {
+    border-radius: 0.9rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    background: #fff;
+}
+
+.closed-message--requester {
+    background: #f8fafc;
+}
+
+.closed-message--ti {
+    background: #eff6ff;
+    border-color: rgba(37, 99, 235, 0.22);
+}
+
+.closed-message__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-bottom: 0.3rem;
+}
+
+.closed-message__head strong {
+    color: #0f172a;
+}
+
+.closed-message__body {
+    margin: 0;
+    color: #1f2937;
+    line-height: 1.5;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.closed-message__anexos {
+    list-style: none;
+    margin: 0.4rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+}
+
+.closed-detail__events {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.75rem;
+}
+
+.closed-detail__events-summary {
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.closed-detail__events-list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.closed-detail__events-list li {
+    padding: 0.5rem 0.7rem;
+    background: #f8fafc;
+    border-radius: 0.7rem;
+}
+
+.closed-event__meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.76rem;
+    color: #64748b;
+    margin-bottom: 0.2rem;
+}
+
+.closed-event__meta strong {
+    color: #0f172a;
+}
+
+.closed-event__desc {
+    margin: 0;
+    color: #1f2937;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
