@@ -195,8 +195,11 @@
         }
     }
 
+    // Recalcula o estado de vazio de todas as colunas, inclusive a de Pendencias.
     function refreshEmptyStates() {
-        document.querySelectorAll(LIST_SELECTOR).forEach(syncListEmptyState);
+        document
+            .querySelectorAll(`${LIST_SELECTOR}, ${PENDENCIA_LIST_SELECTOR}`)
+            .forEach(syncListEmptyState);
     }
 
     async function sendJson(url, payload) {

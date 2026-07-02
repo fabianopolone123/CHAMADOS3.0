@@ -2,6 +2,7 @@
 
 ## 2026-07-02
 
+- Corrigido o texto de coluna vazia da coluna "Pendencias": a mensagem "Nenhuma pendencia cadastrada." deixava de sumir ao criar uma pendencia porque a funcao de recalculo do estado vazio so varria as colunas de chamados (`.js-ticket-list`), ignorando a coluna de pendencias (`.js-pendencia-list`). A funcao passou a cobrir tambem a coluna de pendencias, entao o texto some ao criar e reaparece apenas quando a ultima pendencia sai da coluna (ex.: convertida em chamado), sem refresh.
 - Adicionada a coluna "Pendencias" no Kanban (entre "Chamados abertos" e as colunas dos atendentes) com botao "+" para cadastro em modal, card compacto exibindo so o titulo e modal de detalhe (titulo, descricao, data e autor). Criado o model `PendenciaTI` e a migration `0006_pendenciati`.
 - Arrastar uma pendencia para a coluna de um atendente a converte em chamado (titulo/descricao da pendencia, solicitante = criador, atendente atual = atendente destino, status "Em atendimento"); a pendencia sai da coluna, o novo card aparece sem refresh e o historico registra a criacao a partir da pendencia e a atribuicao ao atendente. Conversao idempotente (sem chamado duplicado) e restrita a TI/admin; usuario comum recebe 403.
 - Criadas as rotas `POST /chamados/pendencias/criar/`, `GET /chamados/pendencias/<id>/` e `POST /chamados/pendencias/<id>/converter/`. Regras de drag: pendencia so vai para colunas de atendente; chamado normal nao entra na coluna de pendencias; destino invalido devolve o card.
