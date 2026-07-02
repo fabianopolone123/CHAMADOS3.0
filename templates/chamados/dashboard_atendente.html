@@ -40,7 +40,7 @@
                         </div>
                         <span class="column-count">{{ open_column.count }}</span>
                     </div>
-                    <div class="ticket-list js-ticket-list" data-column-type="aberto">
+                    <div class="ticket-list js-ticket-list" data-column-type="aberto" data-empty-text="Nenhum chamado aberto na fila.">
                         {% for ticket in open_column.tickets %}
                             {% include "partials/kanban_card.html" %}
                         {% empty %}
@@ -59,7 +59,7 @@
                             </div>
                             <span class="column-count">{{ attendant.count }}</span>
                         </div>
-                        <div class="ticket-list js-ticket-list" data-column-type="atendente" data-attendant-id="{{ attendant.attendant_id }}">
+                        <div class="ticket-list js-ticket-list" data-column-type="atendente" data-attendant-id="{{ attendant.attendant_id }}" data-empty-text="Sem chamados em atendimento.">
                             {% for ticket in attendant.tickets %}
                                 {% include "partials/kanban_card.html" %}
                             {% empty %}
@@ -78,7 +78,7 @@
                         </div>
                         <span class="column-count">{{ closed_column.count }}</span>
                     </div>
-                    <div class="ticket-list js-ticket-list" data-column-type="fechado">
+                    <div class="ticket-list js-ticket-list" data-column-type="fechado" data-empty-text="Nenhum chamado fechado.">
                         {% for ticket in closed_column.tickets %}
                             {% include "partials/kanban_card.html" %}
                         {% empty %}

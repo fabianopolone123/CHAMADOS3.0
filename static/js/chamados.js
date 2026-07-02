@@ -169,6 +169,34 @@
         });
     }
 
+    // Mantem a mensagem de coluna vazia coerente: remove quando ha cards e
+    // recria (a partir de data-empty-text) quando a coluna fica sem cards.
+    function syncListEmptyState(list) {
+        if (!list) {
+            return;
+        }
+        const hasCards = list.querySelector(".ticket-card") !== null;
+        let emptyEl = list.querySelector(".kanban-empty");
+
+        if (hasCards) {
+            if (emptyEl) {
+                emptyEl.remove();
+            }
+            return;
+        }
+
+        if (!emptyEl) {
+            emptyEl = document.createElement("p");
+            emptyEl.className = "kanban-empty";
+            emptyEl.textContent = list.dataset.emptyText || "Nenhum chamado nesta coluna.";
+            list.appendChild(emptyEl);
+        }
+    }
+
+    function refreshEmptyStates() {
+        document.querySelectorAll(LIST_SELECTOR).forEach(syncListEmptyState);
+    }
+
     async function sendJson(url, payload) {
         const response = await fetch(url, {
             method: "POST",
@@ -313,6 +341,7 @@
             applyBadgeState(card, result.status_label, result.status_class);
             applyAttendantState(card, result.atendente_atual);
             updateColumnCounts();
+            refreshEmptyStates();
             showToast(result.message || "Chamado movido.", "success");
         } catch (error) {
             // reverte a movimentacao visual em caso de falha
@@ -320,6 +349,7 @@
             const reference = origin.children[event.oldIndex] || null;
             origin.insertBefore(card, reference);
             updateColumnCounts();
+            refreshEmptyStates();
             showToast(error.message || "Nao foi possivel movimentar o chamado.", "error");
         }
     }
@@ -369,6 +399,8 @@
                         payload.attendant_id = attendantId;
                     }
 
+                    // Atualiza o estado de vazio na hora (otimista); o POST confirma ou reverte.
+                    refreshEmptyStates();
                     persistMove(payload, event);
                 },
             });
