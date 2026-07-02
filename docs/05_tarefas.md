@@ -6,6 +6,7 @@
 
 ## Concluidas
 
+- Bloqueado o fechamento de chamado por drag: a coluna "Chamados fechados" nao aceita mais drop (card volta com mensagem no frontend; `move_ticket` recusa `target=fechado` com `409` no backend) e passou a ser so lista/consulta. O fechamento acontece somente via Stop, que exige Play ativo, "O que foi feito" preenchido e permissao TI/admin; o encerramento registra no historico tecnico quem finalizou e o texto digitado
 - Corrigida a regra do "Play" no Kanban: iniciar atendimento passou a valer somente para chamados em coluna de Atendente TI (oculto em abertos/fechados via CSS por `data-column-type`), com validacao no backend (`403` para usuario comum; `409` para chamado aberto sem atendente ou encerrado) e historico registrado apenas quando o Play e valido
 - Adicionado modal de "Chamados fechados" (aberto pelo titulo clicavel da coluna) com pesquisa inteligente dinamica (debounce ~300ms; filtra por ID, titulo, descricao, solicitante, atendente, mensagens e historico), lista compacta e detalhe completo do chamado; endpoints `GET /chamados/fechados/buscar/` e `GET /chamados/fechados/<numero>/` restritos a TI/admin
 - Removido o header superior da tela "Chamados" e movida a criacao de chamado para um botao "+" no topo da coluna "Chamados abertos", liberando mais altura para o Kanban

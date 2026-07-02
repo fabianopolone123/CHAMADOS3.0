@@ -9,7 +9,7 @@
 | `/chamados/` | GET | Kanban por atendente: coluna de abertos, colunas por Atendente TI e coluna de fechados (apenas TI/admin) | Implementada |
 | `/chamados/atendimento/iniciar/` | POST | Inicia (Play) um periodo de atendimento; apenas TI/admin e apenas para chamado em coluna de atendente (bloqueia aberto/encerrado) | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza (Stop) o atendimento; o Stop encerra o chamado e o move para "Chamados fechados" (apenas TI/admin) | Implementada |
-| `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
+| `/chamados/mover/` | POST | Movimenta um chamado no Kanban entre "abertos" e colunas de atendente; o destino "fechado" e recusado (fechamento so via Stop); apenas TI/admin | Implementada |
 | `/chamados/criar/` | POST | Cria um chamado pelo Kanban (botao "+" no topo da coluna "Chamados abertos"), com o atendente logado como solicitante; apenas TI/admin | Implementada |
 | `/chamados/fechados/buscar/` | GET | Lista/pesquisa (JSON) os chamados encerrados para o modal do Kanban; sem `q` retorna os mais recentes, com `q` filtra por ID, titulo, descricao, solicitante, atendente, mensagens e historico (apenas TI/admin) | Implementada |
 | `/chamados/fechados/<numero>/` | GET | Detalhe completo (JSON) de um chamado encerrado para o modal: dados, descricao, conversa, anexos e historico tecnico (apenas TI/admin) | Implementada |
@@ -34,10 +34,10 @@
 
 - As rotas de atendimento exigem `login_required`.
 - O inicio (`/chamados/atendimento/iniciar/`, o "Play") exige permissao de Atendente TI/Admin (usuario comum recebe `403`) e so vale para chamados em uma coluna de atendente: bloqueia com `409` chamado em "Chamados abertos" (sem `atendente_atual`) e chamado encerrado (resolvido/fechado). A regra "coluna de atendente" espelha o quadro: nao encerrado e `atendente_atual` pertencente ao grupo `Atendente TI`. O historico de tempo (`AtendimentoHistorico`) so e criado quando o Play passa em todas as validacoes; acoes bloqueadas nao geram registro. No frontend, o painel Play/Pause/Stop so aparece em cards dentro das colunas de atendente (regra em CSS reagindo ao `data-column-type`), some ao mover o card para abertos/fechados e ha uma checagem extra no clique antes de chamar o endpoint.
-- O encerramento (`/chamados/atendimento/encerrar/`) exige tambem permissao de Atendente TI/Admin; usuario comum recebe `403`.
+- O encerramento (`/chamados/atendimento/encerrar/`, a acao "Stop") exige permissao de Atendente TI/Admin (usuario comum recebe `403`) e e o unico caminho de fechamento de chamado. O backend so encerra quando existe atendimento ativo/Play em andamento do proprio usuario (`409` caso contrario) e com o campo "O que foi feito" preenchido; um chamado ja encerrado nao gera eventos repetidos (idempotente).
 - O backend valida que o usuario nao pode iniciar dois atendimentos ativos ao mesmo tempo.
 - O backend valida que `pause` e `stop` exigem descricao obrigatoria.
-- O `stop` encerra o chamado na mesma transacao: status "Fechado", `fechado_em` preenchido, atendente atual = quem encerrou e registro no historico (`ChamadoEvento`: mudanca de status + "Chamado encerrado por X."), sem duplicar eventos.
+- O `stop` encerra o chamado na mesma transacao: status "Fechado", `fechado_em` preenchido, atendente atual = quem finalizou e registro no historico tecnico (`ChamadoEvento`: mudanca de status + evento de finalizacao com quem finalizou e o texto de "O que foi feito", ex.: "Chamado finalizado por X. O que foi feito: ..."), sem duplicar eventos. Esse texto e registro tecnico, separado da conversa do usuario.
 - A resposta do `stop` inclui `ticket_closed`, `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban mover o card para "Chamados fechados" e atualizar o badge sem refresh.
 - As respostas dessas rotas sao em `JsonResponse` para consumo do JavaScript do Kanban.
 
@@ -47,9 +47,10 @@
 - O Kanban lista chamados reais do banco (model `Chamado`), sem dados mockados.
 - Colunas: "Chamados abertos" (fixa) + uma coluna por usuario do grupo `Atendente TI` + "Chamados fechados" (fixa).
 - `/chamados/mover/` exige `login_required` e permissao de administrador ou Atendente TI (usuario comum recebe `403` em JSON) e aceita apenas `POST` (GET retorna `405`).
-- Recebe em JSON: `ticket_number`, `target` (`aberto`, `atendente` ou `fechado`) e, quando `target=atendente`, `attendant_id`.
+- Recebe em JSON: `ticket_number`, `target` (`aberto` ou `atendente`) e, quando `target=atendente`, `attendant_id`.
+- O destino `fechado` e recusado com `409` e a mensagem "Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.": a coluna "Chamados fechados" so recebe chamados via acao Stop. No frontend o drop nessa coluna e cancelado (o card volta para a origem) com a mesma mensagem.
 - Valida que o `attendant_id` pertence ao grupo `Atendente TI` (caso contrario retorna `400`).
-- `target=atendente`: define `atendente_atual` e status "Em atendimento". `target=aberto`: status "Aberto" e limpa `atendente_atual`. `target=fechado`: status "Fechado", preenche `fechado_em` e registra quem fechou.
+- `target=atendente`: define `atendente_atual` e status "Em atendimento". `target=aberto`: status "Aberto" e limpa `atendente_atual`.
 - O `atendente_atual` e apenas o atendente que agiu por ultimo; nao e dono do chamado.
 - Toda movimentacao registra eventos em `ChamadoEvento` (mudanca de status e/ou troca de atendente).
 - A resposta JSON retorna `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban atualizar texto e cor do badge e o atendente do card sem recarregar a pagina.

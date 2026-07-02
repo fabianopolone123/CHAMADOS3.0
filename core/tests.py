@@ -161,8 +161,18 @@ class EncerramentoChamadoTests(TestCase):
         self.assertTrue(
             ChamadoEvento.objects.filter(chamado=self.chamado, tipo=ChamadoEvento.TIPO_STATUS).exists()
         )
+        # O historico tecnico registra a finalizacao com quem finalizou e o texto
+        # de "O que foi feito" (registro tecnico, separado da conversa do usuario).
         self.assertTrue(
-            ChamadoEvento.objects.filter(chamado=self.chamado, descricao__icontains="encerrado").exists()
+            ChamadoEvento.objects.filter(
+                chamado=self.chamado, descricao__icontains="finalizado"
+            ).exists()
+        )
+        self.assertTrue(
+            ChamadoEvento.objects.filter(
+                chamado=self.chamado,
+                descricao__icontains="O que foi feito: Resolvido e testado com o usuario",
+            ).exists()
         )
 
     def test_pause_does_not_close_ticket(self):
@@ -179,6 +189,30 @@ class EncerramentoChamadoTests(TestCase):
         self.client.force_login(self.owner)
         resp = self._finish("stop", "tentando encerrar")
         self.assertEqual(resp.status_code, 403)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+
+    def test_drag_to_fechado_is_blocked(self):
+        # O fechamento so acontece via Stop: o endpoint de movimentacao recusa o
+        # destino "fechado" e nao altera o chamado.
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps({"ticket_number": self.chamado.numero, "target": "fechado"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 409)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+        self.assertIsNone(self.chamado.fechado_em)
+
+    def test_stop_requires_active_attendance(self):
+        # Sem Play ativo, o Stop e recusado e o chamado nao e fechado.
+        self.client.force_login(self.attendant)
+        resp = self._finish("stop", "sem play ativo")
+        self.assertEqual(resp.status_code, 409)
 
         self.chamado.refresh_from_db()
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)

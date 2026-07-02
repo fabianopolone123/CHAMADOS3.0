@@ -237,7 +237,7 @@
         attendanceFields.ticketLabel.textContent = `${ticketNumber} | ${title}`;
         attendanceFields.actionLabel.textContent = actionLabel;
         attendanceFields.description.value = "";
-        attendanceFields.submit.textContent = action === "pause" ? "Enviar pausa" : "Enviar encerramento";
+        attendanceFields.submit.textContent = action === "pause" ? "Enviar pausa" : "Finalizar chamado";
 
         attendanceModal.show();
         window.setTimeout(() => attendanceFields.description.focus(), 180);
@@ -401,6 +401,20 @@
         if (event.from === event.to) {
             return;
         }
+
+        // O fechamento so acontece via Stop: bloqueia o drop direto em "Chamados
+        // fechados", devolvendo o card para a coluna de origem com uma mensagem.
+        if (target === "fechado") {
+            const card = event.item;
+            const origin = event.from;
+            const reference = origin.children[event.oldIndex] || null;
+            origin.insertBefore(card, reference);
+            updateColumnCounts();
+            refreshEmptyStates();
+            showToast("Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.", "warning");
+            return;
+        }
+
         if (target === "atendente" && attendantId === fromAttendantId) {
             return;
         }

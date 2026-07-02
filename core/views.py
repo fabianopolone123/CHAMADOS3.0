@@ -310,7 +310,14 @@ def move_ticket_view(request):
 
     if not ticket_number:
         return _json_error("Informe o chamado a movimentar.")
-    if target not in {"aberto", "atendente", "fechado"}:
+    # O fechamento nao acontece mais por drag: a coluna "Chamados fechados" so
+    # recebe chamados via acao Stop (encerramento de atendimento).
+    if target == "fechado":
+        return _json_error(
+            "Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.",
+            status=409,
+        )
+    if target not in {"aberto", "atendente"}:
         return _json_error("Coluna de destino invalida.")
 
     chamado = Chamado.objects.select_related("atendente_atual").filter(numero=ticket_number).first()
@@ -321,7 +328,6 @@ def move_ticket_view(request):
     previous_status_label = chamado.status_label
     previous_attendant = chamado.atendente_atual
     previous_attendant_id = chamado.atendente_atual_id
-    previous_closed = chamado.status in Chamado.STATUS_ENCERRADOS
 
     novo_atendente = None
     if target == "atendente":
@@ -337,11 +343,8 @@ def move_ticket_view(request):
         if not novo_atendente:
             return _json_error("O atendente de destino nao pertence ao perfil Atendente TI.", status=400)
         new_status = Chamado.STATUS_EM_ATENDIMENTO
-    elif target == "aberto":
+    else:  # aberto (unico destino restante; fechado ja foi barrado acima)
         new_status = Chamado.STATUS_ABERTO
-    else:  # fechado
-        new_status = Chamado.STATUS_FECHADO
-        novo_atendente = request.user  # registra quem fechou como atendente atual
 
     status_changed = chamado.status != new_status
     attendant_changed = previous_attendant_id != (novo_atendente.id if novo_atendente else None)
@@ -391,13 +394,6 @@ def move_ticket_view(request):
                 usuario=request.user,
                 tipo=ChamadoEvento.TIPO_ATENDENTE,
                 descricao=f"Atendente atual removido por {autor}; chamado devolvido para a fila de abertos.",
-            )
-        elif target == "fechado" and not previous_closed:
-            ChamadoEvento.registrar(
-                chamado=chamado,
-                usuario=request.user,
-                tipo=ChamadoEvento.TIPO_ATENDENTE,
-                descricao=f"Chamado fechado por {autor}.",
             )
 
     return JsonResponse(
@@ -722,12 +718,15 @@ def start_attendance_view(request):
     )
 
 
-def _close_chamado_on_stop(chamado: Chamado, user) -> bool:
+def _close_chamado_on_stop(chamado: Chamado, user, descricao_atividade: str = "") -> bool:
     """Fecha o chamado ao finalizar o atendimento (Stop) e registra o historico.
 
     Idempotente: se o chamado ja estiver encerrado, nao duplica eventos.
-    Reaproveita as mesmas regras do fechamento manual pelo Kanban (status
-    Fechado, `fechado_em` e atendente atual = quem executou a acao).
+    O fechamento define status Fechado, `fechado_em` e atendente atual = quem
+    executou a acao (Stop e o unico caminho de fechamento). O registro tecnico
+    guarda a mudanca de status e um evento de encerramento com quem finalizou e o
+    texto de "O que foi feito"; esse texto e historico tecnico, separado da
+    conversa do usuario (`ChamadoMensagem`).
     """
     autor = _attendant_display(user)
     previous_status_label = chamado.status_label
@@ -750,11 +749,14 @@ def _close_chamado_on_stop(chamado: Chamado, user) -> bool:
             descricao=f"Status alterado de {previous_status_label} para {chamado.status_label} por {autor}.",
         )
     if not previous_closed:
+        texto = f"Chamado finalizado por {autor}."
+        if descricao_atividade:
+            texto += f" O que foi feito: {descricao_atividade}"
         ChamadoEvento.registrar(
             chamado=chamado,
             usuario=user,
             tipo=ChamadoEvento.TIPO_ATENDENTE,
-            descricao=f"Chamado encerrado por {autor}.",
+            descricao=texto,
         )
     return True
 
@@ -803,7 +805,7 @@ def finish_attendance_view(request):
             attendance.finalizar(tipo_encerramento=action, descricao_atividade=description)
             attendance.save()
             if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
-                ticket_closed = _close_chamado_on_stop(attendance.chamado, request.user)
+                ticket_closed = _close_chamado_on_stop(attendance.chamado, request.user, description)
     except ValidationError as exc:
         message = exc.messages[0] if exc.messages else "Nao foi possivel encerrar o atendimento."
         return _json_error(message)

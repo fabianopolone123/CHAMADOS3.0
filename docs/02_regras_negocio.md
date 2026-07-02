@@ -23,7 +23,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 7. Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir).
 8. Arrastar para a coluna de um atendente define o `atendente_atual` como aquele usuario e o status como "Em atendimento".
 9. Arrastar entre atendentes atualiza o `atendente_atual`.
-10. Arrastar para "Chamados fechados" marca o status como "Fechado", registra quem fechou e preenche `fechado_em`.
+10. Nao e possivel arrastar um chamado para "Chamados fechados": o drop e recusado (o card volta para a coluna de origem) e o usuario recebe a mensagem "Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.". A coluna "Chamados fechados" so recebe chamados via acao Stop e serve apenas como lista/consulta. O bloqueio tambem e validado no backend (o endpoint de movimentacao recusa o destino `fechado` com `409`).
 11. Arrastar para "Chamados abertos" volta o status para "Aberto" e limpa o `atendente_atual`.
 12. O `atendente_atual` NAO torna o usuario dono do chamado; o dono e sempre o solicitante que abriu.
 13. Toda movimentacao e salva no banco e gera registro em `ChamadoEvento`.
@@ -56,9 +56,11 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 7. Administrador pode consultar todos os historicos de atendimento.
 8. Atendente TI pode consultar apenas o proprio historico na tela dedicada.
 9. Apenas Atendente TI/Admin podem encerrar chamados; o endpoint de encerramento nega usuario comum no backend.
-10. Ao finalizar o atendimento com "Stop", alem de encerrar o periodo, o chamado e encerrado: status vai para "Fechado", `fechado_em` e preenchido, o atendente atual passa a ser quem encerrou e o card e movido automaticamente para a coluna "Chamados fechados" no Kanban, sem refresh.
-11. "Pause" apenas encerra o periodo de atendimento e nao altera o status do chamado.
-12. O encerramento pelo "Stop" registra no historico tecnico a mudanca de status e um evento "Chamado encerrado por X.", sem duplicar registros; se o chamado ja estiver fechado, nao gera eventos repetidos.
+10. O fechamento de chamado acontece exclusivamente pela acao "Stop" (nao por drag). O Stop exige, validado no backend: usuario Atendente TI/Admin (`403` caso contrario), atendimento ativo/Play em andamento (`409` se nao houver), campo "O que foi feito" preenchido e chamado ainda nao encerrado.
+11. Ao clicar em "Stop", abre-se o modal de encerramento com o titulo do chamado, o campo obrigatorio "O que foi feito", o botao "Finalizar chamado" e o botao "Cancelar". O campo nao pode ser vazio (validado no frontend e no backend).
+12. Ao finalizar com "Stop": salva-se o texto informado, o status vai para "Fechado", `fechado_em` e preenchido, o atendente atual passa a ser quem finalizou, o card e movido automaticamente para "Chamados fechados" e o badge (texto e cor) e atualizado sem refresh. Se o Stop falhar, o card permanece na coluna atual.
+13. "Pause" apenas encerra o periodo de atendimento e nao altera o status do chamado.
+14. O encerramento pelo "Stop" registra no historico tecnico a mudanca de status e um evento de finalizacao com quem finalizou e o texto de "O que foi feito" (ex.: "Chamado finalizado por fabiano.polone. O que foi feito: atualizacao do driver e validacao com o usuario."), sem duplicar registros se o chamado ja estiver fechado. Esse texto e registro tecnico de encerramento, separado da conversa do usuario (`ChamadoMensagem`).
 
 ## Regras atuais de permissao
 
