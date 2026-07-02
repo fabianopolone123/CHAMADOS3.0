@@ -1,0 +1,67 @@
+<div class="modal fade" id="emprestimoDetailModal" tabindex="-1" aria-labelledby="emprestimoDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal emprestimo-detail-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Emprestimo</span>
+                    <h5 class="modal-title" id="emprestimoDetailModalLabel" data-emp-detail="colaborador_nome">Emprestimo</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body emprestimo-detail__body">
+                <div class="emprestimo-detail__statusbar">
+                    <span class="status-badge emp-status" data-emp-detail-status>-</span>
+                </div>
+
+                <dl class="requisicao-detail__meta">
+                    <div><dt>Empresa</dt><dd data-emp-detail="empresa">-</dd></div>
+                    <div><dt>CPF</dt><dd data-emp-detail="cpf">-</dd></div>
+                    <div><dt>E-mail</dt><dd data-emp-detail="email">-</dd></div>
+                    <div><dt>Telefone</dt><dd data-emp-detail="telefone">-</dd></div>
+                    <div><dt>Data do emprestimo</dt><dd data-emp-detail="data_emprestimo">-</dd></div>
+                    <div><dt>Devolucao</dt><dd data-emp-detail="devolucao">-</dd></div>
+                    <div><dt>Assinatura</dt><dd data-emp-detail="assinatura_responsavel">-</dd></div>
+                    <div><dt>Cadastrado por</dt><dd data-emp-detail="criado_por">-</dd></div>
+                </dl>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Observacoes internas</h6>
+                    <p class="requisicao-detail__texto" data-emp-detail="observacoes_internas"></p>
+                </section>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Equipamentos</h6>
+                    <div class="emprestimo-equipamentos" data-emp-equipamentos></div>
+                </section>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Termo</h6>
+                    <div class="emprestimo-termo">
+                        <a class="btn btn-sm btn-primary" data-emp-baixar-termo target="_blank" rel="noopener">Baixar termo gerado</a>
+                    </div>
+                </section>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Termo assinado</h6>
+                    <div class="emprestimo-assinado" data-emp-assinado-info>
+                        <p class="documentos-empty" data-emp-sem-assinado>Nenhum termo assinado anexado ainda.</p>
+                        <p class="emprestimo-assinado__meta is-hidden" data-emp-assinado-meta>
+                            <a data-emp-assinado-link target="_blank" rel="noopener">Abrir termo assinado</a>
+                            <span data-emp-assinado-quando></span>
+                        </p>
+                    </div>
+                    <form id="anexarTermoForm" class="emprestimo-assinado__form" enctype="multipart/form-data">
+                        <input type="file" class="form-control form-control-sm" name="termo_assinado" required>
+                        <button type="submit" class="btn btn-sm btn-light" data-anexar-submit>Anexar termo assinado</button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-success" data-marcar-ok>Marcar documentacao OK</button>
+                </section>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>

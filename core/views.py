@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.http import FileResponse, Http404, JsonResponse
@@ -21,6 +22,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import AberturaChamadoForm, LoginForm, MensagemChamadoForm
 from .models import (
+    AssinaturaResponsavelTI,
     AtendimentoHistorico,
     Chamado,
     ChamadoAnexo,
@@ -29,7 +31,11 @@ from .models import (
     ChamadoMensagemAnexo,
     DocumentoTI,
     DocumentoTIAnexo,
+    EmprestimoTI,
+    EquipamentoEmprestimoTI,
+    FotoEquipamentoEmprestimoTI,
     InsumoTI,
+    LogUsoAssinaturaTI,
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
@@ -38,6 +44,7 @@ from .models import (
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
+from .termo_pdf import gerar_termo_pdf_bytes
 from .permissions import (
     ATTENDANT_GROUP_NAME,
     PRIMARY_ADMIN_USERNAME,
@@ -1717,6 +1724,323 @@ def contrato_suborcamento_documento_view(request, documento_id: int):
         raise Http404("Nao encontrado.")
     doc = get_object_or_404(SuborcamentoDocumento, pk=documento_id)
     return _serve_file(doc.arquivo, as_attachment=True, filename=doc.nome_original or doc.arquivo.name)
+
+
+# ==========================================================================
+# Modulo Emprestimos
+# ==========================================================================
+
+
+def _serialize_assinatura(assinatura: AssinaturaResponsavelTI):
+    return {"id": assinatura.id, "nome_responsavel": assinatura.nome_responsavel}
+
+
+def _serialize_emprestimo_row(emp: EmprestimoTI, equipamentos_count=None):
+    count = equipamentos_count if equipamentos_count is not None else emp.equipamentos.count()
+    primeiro = emp.equipamentos.first()
+    return {
+        "id": emp.id,
+        "colaborador_nome": emp.colaborador_nome,
+        "empresa": emp.empresa or "-",
+        "equipamento_principal": primeiro.descricao_completa if primeiro else "-",
+        "equipamentos_count": count,
+        "data_emprestimo": emp.data_emprestimo.strftime("%d/%m/%Y") if emp.data_emprestimo else "-",
+        "devolucao": emp.devolucao_display,
+        "status": emp.status,
+        "status_label": emp.status_label,
+    }
+
+
+@ti_required
+def emprestimos_dashboard_view(request):
+    emprestimos = (
+        EmprestimoTI.objects.prefetch_related("equipamentos").select_related("assinatura_responsavel")
+    )
+    rows = [_serialize_emprestimo_row(emp) for emp in emprestimos]
+    assinaturas = AssinaturaResponsavelTI.objects.filter(ativo=True)
+    context = {
+        "page_title": "Emprestimos",
+        "emprestimos": rows,
+        "assinaturas": [_serialize_assinatura(a) for a in assinaturas],
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/emprestimos.html", context)
+
+
+@login_required
+@require_POST
+def assinatura_create_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para cadastrar assinaturas.", status=403)
+
+    nome = (request.POST.get("nome_responsavel") or "").strip()
+    senha = request.POST.get("senha") or ""
+    imagem = request.FILES.get("imagem_assinatura")
+    ativo = (request.POST.get("ativo") or "true").lower() not in {"false", "0", "nao", "no"}
+
+    if len(nome) < 2:
+        return _json_error("Informe o nome do responsavel.")
+    if len(senha) < 4:
+        return _json_error("Informe uma senha de autorizacao com pelo menos 4 caracteres.")
+
+    assinatura = AssinaturaResponsavelTI(nome_responsavel=nome, ativo=ativo, criado_por=request.user)
+    assinatura.set_senha(senha)
+    if imagem:
+        assinatura.imagem_assinatura = imagem
+    assinatura.save()
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Assinatura cadastrada com sucesso.",
+            "assinatura": _serialize_assinatura(assinatura),
+        }
+    )
+
+
+@login_required
+def assinaturas_list_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar assinaturas.", status=403)
+    assinaturas = AssinaturaResponsavelTI.objects.filter(ativo=True)
+    return JsonResponse({"ok": True, "assinaturas": [_serialize_assinatura(a) for a in assinaturas]})
+
+
+def _parse_equipamentos(request):
+    """Le os blocos de equipamento enviados no multipart (equip_<i>_*)."""
+    try:
+        total = int(request.POST.get("equipamentos_count") or "0")
+    except (TypeError, ValueError):
+        total = 0
+
+    equipamentos = []
+    for indice in range(total):
+        prefixo = f"equip_{indice}_"
+        tipo = (request.POST.get(prefixo + "tipo") or "").strip()
+        if not tipo:
+            continue  # ignora blocos vazios
+        equipamentos.append(
+            {
+                "tipo_equipamento": tipo,
+                "marca": (request.POST.get(prefixo + "marca") or "").strip(),
+                "modelo": (request.POST.get(prefixo + "modelo") or "").strip(),
+                "numero_serie": (request.POST.get(prefixo + "serie") or "").strip(),
+                "patrimonio_etiqueta": (request.POST.get(prefixo + "patrimonio") or "").strip(),
+                "acessorios_entregues": (request.POST.get(prefixo + "acessorios") or "").strip(),
+                "fotos": request.FILES.getlist(prefixo + "fotos"),
+            }
+        )
+    return equipamentos
+
+
+@login_required
+@require_POST
+def emprestimo_create_view(request):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para criar emprestimos.", status=403)
+
+    colaborador = (request.POST.get("colaborador_nome") or "").strip()
+    if len(colaborador) < 2:
+        return _json_error("Informe o nome do colaborador.")
+
+    data_emprestimo = parse_date((request.POST.get("data_emprestimo") or "").strip())
+    if not data_emprestimo:
+        return _json_error("Informe uma data de emprestimo valida.")
+
+    previsao = parse_date((request.POST.get("previsao_devolucao") or "").strip())
+    prazo_indeterminado = previsao is None
+
+    equipamentos = _parse_equipamentos(request)
+    if not equipamentos:
+        return _json_error("Adicione pelo menos um equipamento com o tipo preenchido.")
+
+    # Assinatura (opcional): se selecionada, a senha e obrigatoria e deve conferir.
+    assinatura = None
+    aplicar_assinatura = False
+    assinatura_id = (request.POST.get("assinatura_id") or "").strip()
+    if assinatura_id:
+        assinatura = AssinaturaResponsavelTI.objects.filter(pk=assinatura_id, ativo=True).first()
+        if not assinatura:
+            return _json_error("Assinatura selecionada invalida ou inativa.")
+        senha = request.POST.get("senha_assinatura") or ""
+        if not assinatura.conferir_senha(senha):
+            return _json_error("Senha de autorizacao da assinatura incorreta.", status=403)
+        aplicar_assinatura = True
+
+    with transaction.atomic():
+        emprestimo = EmprestimoTI.objects.create(
+            colaborador_nome=colaborador,
+            empresa=(request.POST.get("empresa") or "").strip(),
+            cpf=(request.POST.get("cpf") or "").strip(),
+            email=(request.POST.get("email") or "").strip(),
+            telefone=(request.POST.get("telefone") or "").strip(),
+            data_emprestimo=data_emprestimo,
+            previsao_devolucao=previsao,
+            prazo_indeterminado=prazo_indeterminado,
+            observacoes_internas=(request.POST.get("observacoes_internas") or "").strip(),
+            status=EmprestimoTI.STATUS_AGUARDANDO,
+            assinatura_responsavel=assinatura,
+            criado_por=request.user,
+        )
+        for dados in equipamentos:
+            fotos = dados.pop("fotos")
+            equip = EquipamentoEmprestimoTI.objects.create(emprestimo=emprestimo, **dados)
+            for foto in fotos:
+                FotoEquipamentoEmprestimoTI.objects.create(
+                    equipamento=equip, imagem=foto, nome_original=foto.name, enviado_por=request.user
+                )
+
+        # Gera o termo em PDF e vincula ao emprestimo.
+        pdf_bytes = gerar_termo_pdf_bytes(emprestimo, aplicar_assinatura=aplicar_assinatura)
+        emprestimo.termo_pdf.save(f"termo_emprestimo_{emprestimo.id}.pdf", ContentFile(pdf_bytes), save=True)
+
+        if aplicar_assinatura and assinatura:
+            LogUsoAssinaturaTI.objects.create(
+                assinatura=assinatura,
+                emprestimo=emprestimo,
+                usado_por=request.user,
+                observacao="Assinatura aplicada na geracao do termo.",
+            )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Emprestimo cadastrado e termo gerado com sucesso.",
+            "emprestimo": _serialize_emprestimo_row(emprestimo, len(equipamentos)),
+        }
+    )
+
+
+@login_required
+def emprestimo_detail_view(request, emprestimo_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver emprestimos.", status=403)
+
+    emp = (
+        EmprestimoTI.objects.select_related("assinatura_responsavel", "termo_assinado_por")
+        .prefetch_related("equipamentos__fotos")
+        .filter(pk=emprestimo_id)
+        .first()
+    )
+    if not emp:
+        return _json_error("Emprestimo nao encontrado.", status=404)
+
+    equipamentos = []
+    for equip in emp.equipamentos.all():
+        equipamentos.append(
+            {
+                "tipo_equipamento": equip.tipo_equipamento,
+                "marca": equip.marca,
+                "modelo": equip.modelo,
+                "numero_serie": equip.numero_serie or "-",
+                "patrimonio_etiqueta": equip.patrimonio_etiqueta or "-",
+                "acessorios_entregues": equip.acessorios_entregues or "-",
+                "fotos": [
+                    {"url": foto.imagem.url, "nome": foto.nome_original or foto.imagem.name}
+                    for foto in equip.fotos.all()
+                ],
+            }
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": emp.id,
+            "colaborador_nome": emp.colaborador_nome,
+            "empresa": emp.empresa or "-",
+            "cpf": emp.cpf or "-",
+            "email": emp.email or "-",
+            "telefone": emp.telefone or "-",
+            "data_emprestimo": emp.data_emprestimo.strftime("%d/%m/%Y") if emp.data_emprestimo else "-",
+            "devolucao": emp.devolucao_display,
+            "observacoes_internas": emp.observacoes_internas or "-",
+            "status": emp.status,
+            "status_label": emp.status_label,
+            "assinatura_responsavel": emp.assinatura_responsavel.nome_responsavel if emp.assinatura_responsavel else "-",
+            "termo_pdf_url": reverse("emprestimo_baixar_termo", args=[emp.id]) if emp.termo_pdf else "",
+            "termo_assinado_url": emp.termo_assinado.url if emp.termo_assinado else "",
+            "termo_assinado_ok": emp.termo_assinado_ok,
+            "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M") if emp.termo_assinado_em else "",
+            "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "",
+            "equipamentos": equipamentos,
+            "criado_por": _attendant_display(emp.criado_por) or "-",
+        }
+    )
+
+
+@login_required
+def emprestimo_baixar_termo_view(request, emprestimo_id: int):
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    emp = get_object_or_404(EmprestimoTI, pk=emprestimo_id)
+    if not emp.termo_pdf:
+        raise Http404("Termo ainda nao gerado.")
+    try:
+        return FileResponse(
+            emp.termo_pdf.open("rb"),
+            as_attachment=True,
+            filename=f"termo_emprestimo_{emp.id}.pdf",
+        )
+    except FileNotFoundError:
+        raise Http404("Arquivo do termo nao encontrado no armazenamento.")
+
+
+@login_required
+@require_POST
+def emprestimo_anexar_termo_assinado_view(request, emprestimo_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para anexar o termo assinado.", status=403)
+
+    emp = EmprestimoTI.objects.filter(pk=emprestimo_id).first()
+    if not emp:
+        return _json_error("Emprestimo nao encontrado.", status=404)
+
+    arquivo = request.FILES.get("termo_assinado")
+    if not arquivo:
+        return _json_error("Selecione o arquivo do termo assinado.")
+
+    emp.termo_assinado = arquivo
+    emp.termo_assinado_em = timezone.now()
+    emp.termo_assinado_por = request.user
+    emp.save(update_fields=["termo_assinado", "termo_assinado_em", "termo_assinado_por", "atualizado_em"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Termo assinado anexado com sucesso.",
+            "termo_assinado_url": emp.termo_assinado.url,
+            "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M"),
+            "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "-",
+        }
+    )
+
+
+@login_required
+@require_POST
+def emprestimo_marcar_ok_view(request, emprestimo_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para marcar a documentacao.", status=403)
+
+    emp = EmprestimoTI.objects.filter(pk=emprestimo_id).first()
+    if not emp:
+        return _json_error("Emprestimo nao encontrado.", status=404)
+    if not emp.termo_assinado:
+        return _json_error("Anexe o termo assinado antes de marcar como OK.", status=409)
+
+    emp.termo_assinado_ok = True
+    emp.status = EmprestimoTI.STATUS_ASSINADA_OK
+    emp.save(update_fields=["termo_assinado_ok", "status", "atualizado_em"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Documentacao marcada como assinada / OK.",
+            "status": emp.status,
+            "status_label": emp.status_label,
+        }
+    )
 
 
 # ==========================================================================

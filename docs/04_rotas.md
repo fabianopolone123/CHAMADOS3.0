@@ -32,6 +32,14 @@
 | `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
 | `/contratos/documentos/suborcamento/<id>/` | GET | Download protegido de documento de suborcamento (apenas TI/admin) | Implementada |
+| `/emprestimos/` | GET | Modulo Emprestimos: lista de emprestimos com botao "+ Adicionar" e acesso a assinaturas (apenas TI/admin) | Implementada |
+| `/emprestimos/criar/` | POST | Cria emprestimo com 1+ equipamentos e fotos, valida senha da assinatura e gera o termo PDF (multipart) (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/` | GET | Detalhe (JSON) do emprestimo: dados, equipamentos, fotos, termo e status (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/baixar-termo/` | GET | Download do termo PDF gerado pelo sistema (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/anexar-termo-assinado/` | POST | Anexa o termo assinado devolvido pelo colaborador (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/marcar-documentacao-ok/` | POST | Marca a documentacao como OK (status "Documentacao assinada / OK") (apenas TI/admin) | Implementada |
+| `/emprestimos/assinaturas/` | GET | Lista (JSON) as assinaturas ativas (apenas TI/admin) | Implementada |
+| `/emprestimos/assinaturas/criar/` | POST | Cadastra assinatura do responsavel (nome, imagem, senha com hash) (apenas TI/admin) | Implementada |
 | `/documentos/` | GET | Modulo Documentos: lista de documentos (nome, observacao, qtd anexos, data, autor) e botao "+ Adicionar" (apenas TI/admin) | Implementada |
 | `/documentos/criar/` | POST | Cadastra documento (nome, observacao, anexos multiplos, multipart) (apenas TI/admin) | Implementada |
 | `/documentos/<id>/` | GET | Detalhe (JSON) do documento com observacao completa e anexos (apenas TI/admin) | Implementada |
@@ -125,6 +133,16 @@
 - Foto do print: o botao "Tirar print" usa `navigator.mediaDevices.getDisplayMedia` no frontend, desenha o frame em canvas, permite recortar uma regiao e anexa o recorte como `foto_produto`. Se o navegador nao suportar, exibe mensagem e permite anexar imagem manualmente; cancelar a captura nao trava o formulario.
 - Fotos e documentos sao servidos por rotas dedicadas e protegidas (nao expoem a URL direta de `MEDIA`); acesso sem permissao retorna `404`.
 - A exclusao de requisicao (`requisicoes/<id>/excluir/`) exige `login_required` + permissao TI/admin (usuario comum recebe `403`), aceita apenas `POST` com CSRF (GET retorna `405`) e responde JSON. Remove a requisicao e, por cascata (`on_delete=CASCADE`), seus orcamentos, suborcamentos e os documentos vinculados. No frontend abre uma confirmacao obrigatoria antes de excluir; em caso de sucesso o item some da lista sem refresh. Observacao: os arquivos fisicos em `MEDIA_ROOT` nao sao apagados (pendencia registrada em `docs/05_tarefas.md`).
+
+## Regras do modulo Emprestimos
+
+- `/emprestimos/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Emprestimos" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend (usuario comum recebe `403` nos endpoints e `404` no download do termo).
+- Um emprestimo pode ter 1 ou varios equipamentos; os dados do colaborador, empresa, assinatura e senha sao preenchidos uma unica vez, e cada equipamento pode ter varias fotos. No formulario, "Adicionar mais um equipamento" gera novos blocos; no PDF os itens aparecem como Equipamento 1, 2, 3...
+- A criacao (`criar/`) usa `POST` multipart com CSRF (GET retorna `405`): valida nome do colaborador, data do emprestimo e pelo menos um equipamento. Se a previsao de devolucao ficar em branco, o emprestimo fica com prazo indeterminado (o termo mostra "Indeterminada").
+- Assinatura do responsavel: e cadastrada com nome, imagem e senha de autorizacao; a senha e guardada como hash Django (`make_password`), nunca em texto puro. Ao criar o emprestimo, se uma assinatura for selecionada, a senha e obrigatoria e conferida (`check_password`); se estiver correta, a assinatura e aplicada no PDF e o uso e registrado em `LogUsoAssinaturaTI`; se estiver errada, a geracao com assinatura e bloqueada (`403`).
+- O termo em PDF e gerado por ReportLab (sem servico externo) espelhando o modelo institucional (cabecalho Sidertec / Departamento de TI, titulo, dados do colaborador, equipamentos, condicoes, responsabilidades, assinaturas, rubrica e data de geracao), fica salvo em `termo_pdf` e pode ser baixado.
+- O termo assinado devolvido e anexado por `anexar-termo-assinado/` (registra data e usuario) e, por `marcar-documentacao-ok/`, o status muda para "Documentacao assinada / OK" (exige o termo assinado ja anexado, senao `409`). Status possiveis: Aguardando documentacao assinada (inicial), Documentacao assinada / OK, Em andamento, Devolvido, Cancelado.
+- O historico de uso de assinatura nao e apagado.
 
 ## Regras do modulo Documentos
 

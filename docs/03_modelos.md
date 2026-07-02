@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui dezesseis modelos persistidos:
+O projeto possui vinte e um modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -31,6 +31,14 @@ Modulo Documentos:
 
 - `DocumentoTI`
 - `DocumentoTIAnexo`
+
+Modulo Emprestimos:
+
+- `EmprestimoTI`
+- `EquipamentoEmprestimoTI`
+- `FotoEquipamentoEmprestimoTI`
+- `AssinaturaResponsavelTI`
+- `LogUsoAssinaturaTI`
 
 ## Modelos implementados
 
@@ -333,6 +341,56 @@ Regras atuais:
 
 - Multiplos anexos por documento; download por rota dedicada e protegida (nao expoe a URL direta de `MEDIA`), acesso sem permissao retorna `404`.
 - Documentos e anexos nao sao apagados automaticamente.
+
+### EmprestimoTI
+
+Emprestimo (comodato) de um ou mais equipamentos de TI a um colaborador.
+
+Campos atuais:
+
+- `colaborador_nome`, `empresa`, `cpf`, `email`, `telefone`
+- `data_emprestimo`, `previsao_devolucao` (opcional), `prazo_indeterminado`
+- `observacoes_internas`
+- `status` (choices: `aguardando`, `assinada_ok`, `em_andamento`, `devolvido`, `cancelado`; inicial `aguardando`)
+- `assinatura_responsavel` (FK opcional para `AssinaturaResponsavelTI`, `on_delete=SET_NULL`)
+- `termo_pdf` (termo gerado pelo sistema), `termo_assinado` (arquivo devolvido)
+- `termo_assinado_ok`, `termo_assinado_em`, `termo_assinado_por`
+- `criado_por`, `criado_em`, `atualizado_em`
+
+Regras/propriedades:
+
+- `devolucao_display`: retorna "Indeterminada" quando `prazo_indeterminado` ou sem `previsao_devolucao`.
+- Ao criar, o termo em PDF e gerado e vinculado; o status inicial e "Aguardando documentacao assinada".
+
+### EquipamentoEmprestimoTI
+
+Equipamento vinculado a um emprestimo (um emprestimo pode ter varios).
+
+- `emprestimo` (FK `on_delete=CASCADE`, related_name `equipamentos`)
+- `tipo_equipamento`, `marca`, `modelo`, `numero_serie`, `patrimonio_etiqueta`, `acessorios_entregues`, `criado_em`
+
+### FotoEquipamentoEmprestimoTI
+
+Foto de um equipamento (um equipamento pode ter varias).
+
+- `equipamento` (FK `on_delete=CASCADE`, related_name `fotos`)
+- `imagem` (`ImageField`), `nome_original`, `enviado_por`, `enviado_em`
+
+### AssinaturaResponsavelTI
+
+Assinatura cadastrada de um responsavel de TI, protegida por senha.
+
+- `nome_responsavel`, `imagem_assinatura` (`ImageField`)
+- `senha_hash` (hash Django via `make_password`; NUNCA em texto puro)
+- `ativo`, `criado_por`, `criado_em`, `atualizado_em`
+- Metodos `set_senha` / `conferir_senha` (usa `check_password`).
+
+### LogUsoAssinaturaTI
+
+Registro de cada uso autorizado de uma assinatura (rastreabilidade; nao e apagado).
+
+- `assinatura` (FK `on_delete=CASCADE`, related_name `usos`)
+- `emprestimo` (FK `on_delete=SET_NULL`), `usado_por`, `usado_em`, `observacao`
 
 ## Modelos previstos para proximas fases
 

@@ -1,9 +1,14 @@
 from django.contrib import admin
 
 from .models import (
+    AssinaturaResponsavelTI,
     DocumentoTI,
     DocumentoTIAnexo,
+    EmprestimoTI,
+    EquipamentoEmprestimoTI,
+    FotoEquipamentoEmprestimoTI,
     InsumoTI,
+    LogUsoAssinaturaTI,
     OrcamentoContrato,
     OrcamentoDocumento,
     RequisicaoContrato,
@@ -97,3 +102,46 @@ class DocumentoTIAnexoAdmin(admin.ModelAdmin):
     list_display = ("nome_original", "documento", "enviado_por", "enviado_em")
     search_fields = ("nome_original", "documento__nome")
     date_hierarchy = "enviado_em"
+
+
+class FotoEquipamentoInline(admin.TabularInline):
+    model = FotoEquipamentoEmprestimoTI
+    extra = 0
+    readonly_fields = ("enviado_em",)
+
+
+class EquipamentoEmprestimoInline(admin.TabularInline):
+    model = EquipamentoEmprestimoTI
+    extra = 0
+    fields = ("tipo_equipamento", "marca", "modelo", "numero_serie", "patrimonio_etiqueta")
+    show_change_link = True
+
+
+@admin.register(EmprestimoTI)
+class EmprestimoTIAdmin(admin.ModelAdmin):
+    list_display = ("id", "colaborador_nome", "empresa", "status", "data_emprestimo", "termo_assinado_ok", "criado_por")
+    list_filter = ("status", "termo_assinado_ok")
+    search_fields = ("colaborador_nome", "empresa", "cpf", "email")
+    date_hierarchy = "data_emprestimo"
+    inlines = [EquipamentoEmprestimoInline]
+
+
+@admin.register(EquipamentoEmprestimoTI)
+class EquipamentoEmprestimoTIAdmin(admin.ModelAdmin):
+    list_display = ("tipo_equipamento", "marca", "modelo", "numero_serie", "patrimonio_etiqueta", "emprestimo")
+    search_fields = ("tipo_equipamento", "marca", "modelo", "numero_serie", "patrimonio_etiqueta")
+    inlines = [FotoEquipamentoInline]
+
+
+@admin.register(AssinaturaResponsavelTI)
+class AssinaturaResponsavelTIAdmin(admin.ModelAdmin):
+    list_display = ("nome_responsavel", "ativo", "criado_por", "criado_em", "atualizado_em")
+    list_filter = ("ativo",)
+    search_fields = ("nome_responsavel",)
+    exclude = ("senha_hash",)
+
+
+@admin.register(LogUsoAssinaturaTI)
+class LogUsoAssinaturaTIAdmin(admin.ModelAdmin):
+    list_display = ("assinatura", "emprestimo", "usado_por", "usado_em")
+    date_hierarchy = "usado_em"

@@ -146,6 +146,17 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 4. Clicar em um documento abre um modal com nome, observacao completa, anexos vinculados (com link para abrir/baixar), data de cadastro e quem cadastrou.
 5. Os anexos sao servidos por rota protegida; apenas TI/admin conseguem abrir/baixar. Documentos e anexos nao sao apagados automaticamente (ha o campo `ativo` preparado para desativacao futura, ainda nao usado na interface).
 
+## Regras atuais do modulo Emprestimos
+
+1. O modulo Emprestimos e acessivel apenas para Administrador e Atendente TI; o botao no menu lateral so aparece para esses perfis e todas as rotas validam a permissao no backend (usuario comum nao ve o botao, recebe `403`/redirecionamento e `404` no download do termo).
+2. A tela lista os emprestimos (colaborador, empresa, equipamento principal, quantidade de equipamentos, data, previsao de devolucao e status). Clicar em um emprestimo abre um modal com todos os detalhes, equipamentos, fotos, termo e opcoes de documentacao.
+3. Um emprestimo pode ter 1 ou varios equipamentos. Os dados do colaborador, empresa, assinatura e senha de autorizacao sao preenchidos uma unica vez; cada equipamento tem tipo, marca, modelo, numero de serie, patrimonio, acessorios e pode ter varias fotos. No termo os itens aparecem como Equipamento 1, 2, 3...
+4. Se a previsao de devolucao ficar em branco, o emprestimo e tratado como prazo indeterminado e o termo exibe "Indeterminada".
+5. A assinatura do responsavel de TI e cadastrada com nome, imagem e senha de autorizacao. A senha e guardada com hash seguro (nunca em texto puro). Para aplicar a assinatura no termo, e preciso informar a senha correta na criacao do emprestimo; senha errada bloqueia a aplicacao. Cada uso autorizado da assinatura e registrado (quem usou e quando) e esse historico nao e apagado.
+6. Apos cadastrar o emprestimo, o sistema gera automaticamente o termo em PDF (modelo institucional da Sidertec), que fica vinculado ao emprestimo e pode ser baixado. O status inicial e "Aguardando documentacao assinada".
+7. O termo assinado devolvido pelo colaborador pode ser anexado no detalhe (registrando data e usuario). Ao marcar a documentacao como OK, o status muda para "Documentacao assinada / OK" (exige o termo assinado ja anexado). Status disponiveis: Aguardando documentacao assinada, Documentacao assinada / OK, Em andamento, Devolvido, Cancelado.
+8. Toda a validacao (permissao, senha da assinatura, obrigatoriedade de equipamento e datas) e feita no backend.
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.

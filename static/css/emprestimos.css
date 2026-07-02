@@ -1,0 +1,220 @@
+/* ==========================================================================
+   Modulo Emprestimos
+   ========================================================================== */
+
+.emprestimos-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 0 0 auto;
+}
+
+/* Tabela de emprestimos */
+.emprestimos-table-wrap {
+    overflow-x: auto;
+}
+
+.emprestimos-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+}
+
+.emprestimos-table thead th {
+    text-align: left;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.emprestimos-table tbody td {
+    padding: 0.6rem 0.7rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1f2937;
+}
+
+.emprestimo-row {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.emprestimo-row:hover td {
+    background: #f8fbff;
+}
+
+.emprestimo-row__nome {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.emprestimos-empty,
+.documentos-empty {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+/* Badges de status */
+.emp-status {
+    white-space: nowrap;
+}
+.emp-status--aguardando { color: #b45309; background: #ffedd5; }
+.emp-status--assinada_ok { color: #166534; background: #dcfce7; }
+.emp-status--em_andamento { color: #1d4ed8; background: #dbeafe; }
+.emp-status--devolvido { color: #334155; background: #cbd5e1; }
+.emp-status--cancelado { color: #b91c1c; background: #fee2e2; }
+
+/* Formulario */
+.emprestimo-form__body {
+    max-height: min(74vh, 700px);
+    overflow-y: auto;
+}
+
+.emprestimo-form__section {
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #1d4ed8;
+    margin: 0.4rem 0 0.6rem;
+}
+
+.emprestimo-form__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1rem;
+}
+
+.contrato-field--full {
+    grid-column: 1 / -1;
+}
+
+.contrato-field--check {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    display: flex;
+}
+
+.emprestimo-form__equip-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0.6rem 0 0.6rem;
+    flex-wrap: wrap;
+}
+
+.equipamento-bloco {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-left: 4px solid #2563eb;
+    border-radius: 0.8rem;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 0.7rem;
+    background: #f8fafc;
+    animation: emp-fade-in 0.18s ease;
+}
+
+@keyframes emp-fade-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.equipamento-bloco__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+}
+
+.equipamento-bloco__head strong {
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+/* Detalhe */
+.emprestimo-detail__body {
+    max-height: min(74vh, 700px);
+    overflow-y: auto;
+}
+
+.emprestimo-detail__statusbar {
+    margin-bottom: 0.75rem;
+}
+
+.emprestimo-equipamentos {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.emp-equip-card {
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 0.8rem;
+    padding: 0.7rem 0.85rem;
+    background: #fff;
+}
+
+.emp-equip-card__title {
+    margin: 0 0 0.3rem;
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.92rem;
+}
+
+.emp-equip-card__meta {
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.5;
+}
+
+.emp-equip-fotos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.emp-equip-fotos img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    cursor: pointer;
+}
+
+.emprestimo-termo a,
+.emprestimo-assinado a {
+    text-decoration: none;
+}
+
+.emprestimo-assinado__meta {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0.35rem 0;
+}
+
+.emprestimo-assinado__form {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0.5rem 0;
+}
+
+.emprestimo-assinado__form input[type="file"] {
+    max-width: 320px;
+}
+
+@media (max-width: 640px) {
+    .emprestimo-form__grid {
+        grid-template-columns: 1fr;
+    }
+}

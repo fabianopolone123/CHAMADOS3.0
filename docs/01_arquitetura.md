@@ -7,12 +7,12 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 ## Componentes atuais
 
 - `chamados_ti`: configuracao principal do projeto
-- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes, historico, modulo Requisicoes (nomes tecnicos internos com prefixo `Contrato`), modulo Insumos e modulo Documentos
+- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes, historico, modulo Requisicoes (nomes tecnicos internos com prefixo `Contrato`), modulo Insumos, modulo Documentos e modulo Emprestimos (termo em PDF via `core/termo_pdf.py`)
 - `templates/core`: templates da autenticacao e de permissoes
 - `templates/chamados`: templates do Kanban, do portal do solicitante e do historico
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
 - `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral)
-- `static/js`: scripts do front-end (`chamados.js` do Kanban, `contratos.js` do modulo Requisicoes, `insumos.js` do modulo Insumos, `documentos.js` do modulo Documentos e `notifications.js` dos toasts)
+- `static/js`: scripts do front-end (`chamados.js` do Kanban, `contratos.js` do modulo Requisicoes, `insumos.js` do modulo Insumos, `documentos.js` do modulo Documentos, `emprestimos.js` do modulo Emprestimos e `notifications.js` dos toasts)
 - `.env`: configuracao sensivel de ambiente, fora de versionamento
 
 ## Estrutura atual do fluxo autenticado
@@ -41,6 +41,8 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - ldap3 para autenticacao LDAP
 - Bootstrap via CDN
 - SortableJS via CDN
+- ReportLab para geracao do termo de emprestimo em PDF (sem dependencia nativa)
+- Pillow para campos de imagem (`ImageField`)
 - CSS proprio para refinamento visual
 
 ## Observacoes de infraestrutura

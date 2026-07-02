@@ -1,0 +1,39 @@
+<div class="modal fade" id="createAssinaturaModal" tabindex="-1" aria-labelledby="createAssinaturaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Assinatura TI</span>
+                    <h5 class="modal-title" id="createAssinaturaModalLabel">Cadastrar assinatura do responsavel</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="createAssinaturaForm" class="create-ticket-form" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Nome do responsavel</span>
+                        <input type="text" class="form-control" name="nome_responsavel" maxlength="255" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Imagem da assinatura</span>
+                        <input type="file" class="form-control" name="imagem_assinatura" accept="image/*">
+                    </label>
+                    <label class="contrato-field">
+                        <span>Senha de autorizacao</span>
+                        <input type="password" class="form-control" name="senha" autocomplete="new-password" required>
+                        <small class="contrato-field__help">Sera guardada com hash seguro; usada para aplicar a assinatura no termo.</small>
+                    </label>
+                    <label class="contrato-field contrato-field--check">
+                        <input type="checkbox" name="ativo" checked>
+                        <span>Ativa</span>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createAssinaturaSubmit">Cadastrar assinatura</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

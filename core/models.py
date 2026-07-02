@@ -630,3 +630,209 @@ class DocumentoTIAnexo(models.Model):
 
     def __str__(self) -> str:
         return self.nome_original or self.arquivo.name
+
+
+# ==========================================================================
+# Modulo Emprestimos: comodato de equipamentos de TI com termo em PDF
+# ==========================================================================
+
+
+def assinatura_upload_path(instance, filename):
+    return f"emprestimos/assinaturas/{instance.pk or 'nova'}/{filename}"
+
+
+class AssinaturaResponsavelTI(models.Model):
+    """Assinatura cadastrada de um responsavel de TI, protegida por senha.
+
+    A senha de autorizacao e guardada como hash (Django), nunca em texto puro.
+    """
+
+    nome_responsavel = models.CharField(max_length=255)
+    imagem_assinatura = models.ImageField(upload_to=assinatura_upload_path, null=True, blank=True)
+    senha_hash = models.CharField(max_length=255)
+    ativo = models.BooleanField(default=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assinaturas_ti_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome_responsavel", "id"]
+
+    def __str__(self) -> str:
+        return self.nome_responsavel
+
+    def set_senha(self, senha_plana: str) -> None:
+        from django.contrib.auth.hashers import make_password
+
+        self.senha_hash = make_password(senha_plana)
+
+    def conferir_senha(self, senha_plana: str) -> bool:
+        from django.contrib.auth.hashers import check_password
+
+        if not self.senha_hash:
+            return False
+        return check_password(senha_plana, self.senha_hash)
+
+
+def termo_pdf_upload_path(instance, filename):
+    return f"emprestimos/{instance.pk}/termo/{filename}"
+
+
+def termo_assinado_upload_path(instance, filename):
+    return f"emprestimos/{instance.pk}/assinado/{filename}"
+
+
+class EmprestimoTI(models.Model):
+    """Emprestimo (comodato) de um ou mais equipamentos de TI a um colaborador."""
+
+    STATUS_AGUARDANDO = "aguardando"
+    STATUS_ASSINADA_OK = "assinada_ok"
+    STATUS_EM_ANDAMENTO = "em_andamento"
+    STATUS_DEVOLVIDO = "devolvido"
+    STATUS_CANCELADO = "cancelado"
+    STATUS_CHOICES = [
+        (STATUS_AGUARDANDO, "Aguardando documentacao assinada"),
+        (STATUS_ASSINADA_OK, "Documentacao assinada / OK"),
+        (STATUS_EM_ANDAMENTO, "Em andamento"),
+        (STATUS_DEVOLVIDO, "Devolvido"),
+        (STATUS_CANCELADO, "Cancelado"),
+    ]
+
+    colaborador_nome = models.CharField(max_length=255)
+    empresa = models.CharField(max_length=255, blank=True)
+    cpf = models.CharField(max_length=40, blank=True)
+    email = models.EmailField(blank=True)
+    telefone = models.CharField(max_length=40, blank=True)
+    data_emprestimo = models.DateField()
+    previsao_devolucao = models.DateField(null=True, blank=True)
+    prazo_indeterminado = models.BooleanField(default=False)
+    observacoes_internas = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_AGUARDANDO)
+    assinatura_responsavel = models.ForeignKey(
+        AssinaturaResponsavelTI,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emprestimos",
+    )
+    termo_pdf = models.FileField(upload_to=termo_pdf_upload_path, null=True, blank=True)
+    termo_assinado = models.FileField(upload_to=termo_assinado_upload_path, null=True, blank=True)
+    termo_assinado_ok = models.BooleanField(default=False)
+    termo_assinado_em = models.DateTimeField(null=True, blank=True)
+    termo_assinado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emprestimos_termo_anexado",
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="emprestimos_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+
+    def __str__(self) -> str:
+        return f"Emprestimo #{self.pk} - {self.colaborador_nome}"
+
+    @property
+    def status_label(self) -> str:
+        return dict(self.STATUS_CHOICES).get(self.status, self.status or "-")
+
+    @property
+    def devolucao_display(self) -> str:
+        if self.prazo_indeterminado or not self.previsao_devolucao:
+            return "Indeterminada"
+        return self.previsao_devolucao.strftime("%d/%m/%Y")
+
+
+class EquipamentoEmprestimoTI(models.Model):
+    emprestimo = models.ForeignKey(
+        EmprestimoTI, on_delete=models.CASCADE, related_name="equipamentos"
+    )
+    tipo_equipamento = models.CharField(max_length=255)
+    marca = models.CharField(max_length=255, blank=True)
+    modelo = models.CharField(max_length=255, blank=True)
+    numero_serie = models.CharField(max_length=255, blank=True)
+    patrimonio_etiqueta = models.CharField(max_length=255, blank=True)
+    acessorios_entregues = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self) -> str:
+        return f"{self.tipo_equipamento} ({self.marca} {self.modelo})".strip()
+
+    @property
+    def descricao_completa(self) -> str:
+        partes = [p for p in [self.marca, self.modelo] if p]
+        titulo = self.tipo_equipamento
+        if partes:
+            titulo = f"{titulo} {' '.join(partes)}".strip()
+        return titulo
+
+
+def foto_equipamento_upload_path(instance, filename):
+    return f"emprestimos/{instance.equipamento.emprestimo_id}/equipamentos/{instance.equipamento_id}/{filename}"
+
+
+class FotoEquipamentoEmprestimoTI(models.Model):
+    equipamento = models.ForeignKey(
+        EquipamentoEmprestimoTI, on_delete=models.CASCADE, related_name="fotos"
+    )
+    imagem = models.ImageField(upload_to=foto_equipamento_upload_path)
+    nome_original = models.CharField(max_length=255, blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fotos_equipamento_enviadas",
+    )
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["enviado_em", "id"]
+
+    def __str__(self) -> str:
+        return self.nome_original or self.imagem.name
+
+
+class LogUsoAssinaturaTI(models.Model):
+    """Registro de cada uso autorizado de uma assinatura (rastreabilidade)."""
+
+    assinatura = models.ForeignKey(
+        AssinaturaResponsavelTI, on_delete=models.CASCADE, related_name="usos"
+    )
+    emprestimo = models.ForeignKey(
+        EmprestimoTI, on_delete=models.SET_NULL, null=True, blank=True, related_name="usos_assinatura"
+    )
+    usado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usos_assinatura_ti",
+    )
+    usado_em = models.DateTimeField(auto_now_add=True)
+    observacao = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-usado_em", "-id"]
+
+    def __str__(self) -> str:
+        return f"Uso da assinatura {self.assinatura_id} em {self.usado_em:%d/%m/%Y %H:%M}"

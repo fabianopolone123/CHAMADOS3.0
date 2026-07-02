@@ -1,7 +1,7 @@
 {% comment %}
 Menu lateral padrao da area de TI (Atendente TI / Admin).
 Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
-Valores de active: "chamados", "contratos", "insumos", "documentos", "permissoes".
+Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "permissoes".
 {% endcomment %}
 <aside class="tickets-sidebar">
     <div>
@@ -27,6 +27,13 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "permissoes
                 <path d="M9 17h4"></path>
             </svg>
             <span>Requisicoes</span>
+        </a>
+        <a href="{% url 'emprestimos_dashboard' %}" class="menu-link{% if active == 'emprestimos' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="7" width="20" height="14" rx="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+            <span>Emprestimos</span>
         </a>
         <a href="{% url 'documentos_dashboard' %}" class="menu-link{% if active == 'documentos' %} active{% endif %}">
             <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/emprestimos.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app emprestimos-app"
+    data-emprestimo-create-url="{% url 'emprestimo_create' %}"
+    data-emprestimo-detail-url="{% url 'emprestimo_detail' emprestimo_id=0 %}"
+    data-emprestimo-termo-url="{% url 'emprestimo_baixar_termo' emprestimo_id=0 %}"
+    data-emprestimo-anexar-url="{% url 'emprestimo_anexar_termo_assinado' emprestimo_id=0 %}"
+    data-emprestimo-marcar-ok-url="{% url 'emprestimo_marcar_ok' emprestimo_id=0 %}"
+    data-assinatura-create-url="{% url 'assinatura_create' %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="emprestimos" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Emprestimos</h2>
+                <p class="contratos-topbar__subtitle">Comodato de equipamentos de TI</p>
+                <p class="topbar-subtitle">Cadastre emprestimos, gere o termo em PDF e controle a documentacao assinada.</p>
+            </div>
+            <div class="emprestimos-topbar-actions">
+                <button type="button" class="btn btn-light btn-sm" id="openAssinaturaButton">Assinaturas</button>
+                <button type="button" class="contratos-add-btn" id="createEmprestimoButton" aria-label="Adicionar emprestimo" title="Adicionar emprestimo">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                    <span class="contratos-add-btn__label">Adicionar</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="contratos-panel">
+            <div class="emprestimos-table-wrap">
+                <table class="emprestimos-table" id="emprestimosTable" data-empty-text="Nenhum emprestimo cadastrado ainda.">
+                    <thead>
+                        <tr>
+                            <th>Colaborador</th>
+                            <th>Empresa</th>
+                            <th>Equipamento principal</th>
+                            <th>Qtd</th>
+                            <th>Emprestimo</th>
+                            <th>Devolucao</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emprestimosBody">
+                        {% for emp in emprestimos %}
+                            <tr class="emprestimo-row" data-emprestimo-id="{{ emp.id }}">
+                                <td class="emprestimo-row__nome">{{ emp.colaborador_nome }}</td>
+                                <td>{{ emp.empresa }}</td>
+                                <td>{{ emp.equipamento_principal }}</td>
+                                <td>{{ emp.equipamentos_count }}</td>
+                                <td>{{ emp.data_emprestimo }}</td>
+                                <td>{{ emp.devolucao }}</td>
+                                <td><span class="status-badge emp-status emp-status--{{ emp.status }}">{{ emp.status_label }}</span></td>
+                            </tr>
+                        {% empty %}
+                            <tr data-emprestimos-empty>
+                                <td colspan="7" class="emprestimos-empty">Nenhum emprestimo cadastrado ainda.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+</main>
+
+{% include "partials/emprestimo_create_modal.html" %}
+{% include "partials/emprestimo_detail_modal.html" %}
+{% include "partials/assinatura_create_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/emprestimos.js' %}"></script>
+{% endblock %}
