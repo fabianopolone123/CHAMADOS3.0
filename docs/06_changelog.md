@@ -2,6 +2,7 @@
 
 ## 2026-07-02
 
+- Reduzida a altura do header da tela "Chamados" (Quadro de Atendimento) para melhorar o espaco util do Kanban: header compacto (menos padding e margem), titulo "Quadro de Atendimento" menor, descricao em linha unica e botao "Criar chamado" alinhado a direita no mesmo card. Aplicado via modificador `tickets-topbar--compact`, sem afetar os headers das outras telas.
 - Ajustado o encerramento pelo botao "Stop": alem de finalizar o periodo de atendimento, o chamado agora e encerrado (status "Fechado", `fechado_em` preenchido, atendente atual = quem encerrou) e o card e movido automaticamente para a coluna "Chamados fechados" no Kanban, com badge atualizado sem refresh. Em caso de falha, o card permanece na coluna original.
 - O encerramento passou a exigir permissao de Atendente TI/Admin (`/chamados/atendimento/encerrar/` retorna `403` para usuario comum) e registra no historico tecnico a mudanca de status e o evento "Chamado encerrado por X.", sem duplicar registros. O "Pause" continua apenas encerrando o periodo, sem mudar o status.
 - Adicionada a area de conversa no detalhe do chamado, permitindo troca de mensagens entre solicitante e Atendente TI/Admin, com anexos opcionais por mensagem (multiplos arquivos, sem limite de tamanho/extensao).

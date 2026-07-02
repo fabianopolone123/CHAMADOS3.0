@@ -54,6 +54,26 @@
     line-height: 1.6;
 }
 
+/* Header compacto da tela "Chamados" (Kanban): libera espaco vertical para as colunas. */
+.tickets-topbar--compact {
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 0.9rem 1.35rem;
+    border-radius: 1.1rem;
+}
+
+.tickets-topbar--compact .topbar-title {
+    margin-bottom: 0.15rem;
+    font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+    letter-spacing: -0.02em;
+}
+
+.tickets-topbar--compact .topbar-subtitle {
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
 .topbar-meta {
     display: flex;
     flex-wrap: wrap;

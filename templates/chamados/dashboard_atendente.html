@@ -20,11 +20,10 @@
     {% include "partials/ti_sidebar.html" with active="chamados" %}
 
     <section class="tickets-main">
-        <header class="tickets-topbar">
+        <header class="tickets-topbar tickets-topbar--compact">
             <div>
-                <span class="topbar-kicker">Quadro de Atendimento</span>
-                <h2 class="topbar-title">Fila de chamados por atendente</h2>
-                <p class="topbar-subtitle">Chamados abertos a esquerda, colunas por atendente no meio e chamados fechados a direita.</p>
+                <h2 class="topbar-title">Quadro de Atendimento</h2>
+                <p class="topbar-subtitle">Fila de chamados por atendente: abertos a esquerda, atendentes no centro e fechados a direita.</p>
             </div>
             <button type="button" class="btn btn-primary portal-cta" id="createTicketButton" data-bs-toggle="modal" data-bs-target="#createTicketModal">+ Criar chamado</button>
         </header>
