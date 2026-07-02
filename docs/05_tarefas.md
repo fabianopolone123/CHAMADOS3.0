@@ -6,6 +6,7 @@
 
 ## Concluidas
 
+- Ajustado o "Stop" para encerrar o chamado (status Fechado), registrar quem encerrou no historico e mover o card automaticamente para "Chamados fechados" no Kanban sem refresh; encerramento restrito a TI/admin
 - Adicionada area de conversa no detalhe do chamado (solicitante x TI) com anexos opcionais por mensagem, resumo no historico tecnico e historico recolhido por padrao (models `ChamadoMensagem` e `ChamadoMensagemAnexo`)
 - Corrigida a instabilidade vertical do menu lateral e padronizado seu visual; CSS do menu centralizado em `static/css/sidebar.css`
 - Adicionado botao "Criar chamado" no Kanban com modal para o atendente abrir chamado em nome proprio (entra em "Chamados abertos", sem atendente atual)

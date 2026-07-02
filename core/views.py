@@ -527,9 +527,49 @@ def start_attendance_view(request):
     )
 
 
+def _close_chamado_on_stop(chamado: Chamado, user) -> bool:
+    """Fecha o chamado ao finalizar o atendimento (Stop) e registra o historico.
+
+    Idempotente: se o chamado ja estiver encerrado, nao duplica eventos.
+    Reaproveita as mesmas regras do fechamento manual pelo Kanban (status
+    Fechado, `fechado_em` e atendente atual = quem executou a acao).
+    """
+    autor = _attendant_display(user)
+    previous_status_label = chamado.status_label
+    previous_closed = chamado.status in Chamado.STATUS_ENCERRADOS
+    status_changed = chamado.status != Chamado.STATUS_FECHADO
+
+    chamado.status = Chamado.STATUS_FECHADO
+    chamado.atendente_atual = user
+    update_fields = ["status", "atendente_atual", "atualizado_em"]
+    if not chamado.fechado_em:
+        chamado.fechado_em = timezone.now()
+        update_fields.append("fechado_em")
+    chamado.save(update_fields=update_fields)
+
+    if status_changed:
+        ChamadoEvento.registrar(
+            chamado=chamado,
+            usuario=user,
+            tipo=ChamadoEvento.TIPO_STATUS,
+            descricao=f"Status alterado de {previous_status_label} para {chamado.status_label} por {autor}.",
+        )
+    if not previous_closed:
+        ChamadoEvento.registrar(
+            chamado=chamado,
+            usuario=user,
+            tipo=ChamadoEvento.TIPO_ATENDENTE,
+            descricao=f"Chamado encerrado por {autor}.",
+        )
+    return True
+
+
 @login_required
 @require_POST
 def finish_attendance_view(request):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para encerrar chamados.", status=403)
+
     payload = _load_request_payload(request)
     if payload is None:
         return _json_error("Nao foi possivel ler os dados enviados.")
@@ -562,32 +602,45 @@ def finish_attendance_view(request):
             active_ticket_number=attendance.chamado.numero,
         )
 
+    ticket_closed = False
     try:
         with transaction.atomic():
             attendance.finalizar(tipo_encerramento=action, descricao_atividade=description)
             attendance.save()
+            if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
+                ticket_closed = _close_chamado_on_stop(attendance.chamado, request.user)
     except ValidationError as exc:
         message = exc.messages[0] if exc.messages else "Nao foi possivel encerrar o atendimento."
         return _json_error(message)
 
+    chamado = attendance.chamado
     duration_display = _format_duration(attendance.duracao)
     action_label = "pausado" if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE else "finalizado"
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "message": f"Atendimento {action_label} no chamado {ticket_number}.",
-            "ticket_number": ticket_number,
-            "action": action,
-            "duration_display": duration_display,
-            "history_entry": {
-                "author": request.user.get_full_name() or request.user.username,
-                "timestamp": timezone.localtime(attendance.finalizado_em).strftime("%d/%m/%Y %H:%M"),
-                "message": description,
-                "kind": "comment",
-            },
-        }
-    )
+    response = {
+        "ok": True,
+        "message": f"Atendimento {action_label} no chamado {ticket_number}.",
+        "ticket_number": ticket_number,
+        "action": action,
+        "duration_display": duration_display,
+        "ticket_closed": ticket_closed,
+        "history_entry": {
+            "author": request.user.get_full_name() or request.user.username,
+            "timestamp": timezone.localtime(attendance.finalizado_em).strftime("%d/%m/%Y %H:%M"),
+            "message": description,
+            "kind": "comment",
+        },
+    }
+
+    if ticket_closed:
+        response["message"] = f"Chamado {ticket_number} encerrado e movido para {chamado.status_label}."
+        response["status"] = chamado.status
+        response["status_label"] = chamado.status_label
+        response["status_class"] = _STATUS_BADGE_CLASS.get(chamado.status, "status-muted")
+        response["atendente_atual"] = _attendant_display(chamado.atendente_atual)
+        response["atendente_atual_id"] = chamado.atendente_atual_id
+
+    return JsonResponse(response)
 
 
 _STATUS_BADGE_CLASS = {

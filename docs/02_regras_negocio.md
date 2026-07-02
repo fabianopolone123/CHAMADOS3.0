@@ -49,6 +49,10 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 6. O backend deve validar as regras criticas mesmo que o frontend tambem faca bloqueios visuais.
 7. Administrador pode consultar todos os historicos de atendimento.
 8. Atendente TI pode consultar apenas o proprio historico na tela dedicada.
+9. Apenas Atendente TI/Admin podem encerrar chamados; o endpoint de encerramento nega usuario comum no backend.
+10. Ao finalizar o atendimento com "Stop", alem de encerrar o periodo, o chamado e encerrado: status vai para "Fechado", `fechado_em` e preenchido, o atendente atual passa a ser quem encerrou e o card e movido automaticamente para a coluna "Chamados fechados" no Kanban, sem refresh.
+11. "Pause" apenas encerra o periodo de atendimento e nao altera o status do chamado.
+12. O encerramento pelo "Stop" registra no historico tecnico a mudanca de status e um evento "Chamado encerrado por X.", sem duplicar registros; se o chamado ja estiver fechado, nao gera eventos repetidos.
 
 ## Regras atuais de permissao
 

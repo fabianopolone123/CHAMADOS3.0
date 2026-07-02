@@ -288,6 +288,19 @@
             const card = getTicketCard(ticketNumber);
             activeTicketNumber = null;
             setCardInactiveState(card, action === "pause" ? "Pausado" : "Atendimento encerrado");
+
+            // Stop encerra o chamado: move o card para "Chamados fechados" e atualiza o badge.
+            if (action === "stop" && result.ticket_closed && card) {
+                applyBadgeState(card, result.status_label, result.status_class);
+                applyAttendantState(card, result.atendente_atual);
+                const closedList = document.querySelector('.js-ticket-list[data-column-type="fechado"]');
+                if (closedList) {
+                    closedList.appendChild(card);
+                }
+                updateColumnCounts();
+                refreshEmptyStates();
+            }
+
             attendanceModal.hide();
             showToast(result.message || "Atendimento registrado com sucesso.", "success");
         } catch (error) {

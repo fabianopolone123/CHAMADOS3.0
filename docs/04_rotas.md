@@ -8,7 +8,7 @@
 | `/login/` | GET, POST | Tela de login com autenticacao AD/LDAP; roteia por perfil apos autenticar | Implementada |
 | `/chamados/` | GET | Kanban por atendente: coluna de abertos, colunas por Atendente TI e coluna de fechados (apenas TI/admin) | Implementada |
 | `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
-| `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza o atendimento ativo com descricao obrigatoria | Implementada |
+| `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza (Stop) o atendimento; o Stop encerra o chamado e o move para "Chamados fechados" (apenas TI/admin) | Implementada |
 | `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
 | `/chamados/criar/` | POST | Cria um chamado pelo Kanban (modal), com o atendente logado como solicitante; apenas TI/admin | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
@@ -28,8 +28,11 @@
 ## Regras das rotas de atendimento
 
 - As rotas de atendimento exigem `login_required`.
+- O encerramento (`/chamados/atendimento/encerrar/`) exige tambem permissao de Atendente TI/Admin; usuario comum recebe `403`.
 - O backend valida que o usuario nao pode iniciar dois atendimentos ativos ao mesmo tempo.
 - O backend valida que `pause` e `stop` exigem descricao obrigatoria.
+- O `stop` encerra o chamado na mesma transacao: status "Fechado", `fechado_em` preenchido, atendente atual = quem encerrou e registro no historico (`ChamadoEvento`: mudanca de status + "Chamado encerrado por X."), sem duplicar eventos.
+- A resposta do `stop` inclui `ticket_closed`, `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban mover o card para "Chamados fechados" e atualizar o badge sem refresh.
 - As respostas dessas rotas sao em `JsonResponse` para consumo do JavaScript do Kanban.
 
 ## Regras do Kanban e da movimentacao de chamados
