@@ -633,9 +633,31 @@ def pendencia_convert_view(request, pendencia_id: int):
     )
 
 
+def _is_ticket_in_attendant_column(chamado: Chamado) -> bool:
+    """True quando o chamado esta em uma coluna de atendente no Kanban.
+
+    Espelha a regra de montagem do quadro (`tickets_dashboard_view`): o chamado
+    nao pode estar encerrado e o `atendente_atual` precisa pertencer ao grupo
+    `Atendente TI`. Chamados em "Chamados abertos" (sem atendente) e em
+    "Chamados fechados" (encerrados) ficam de fora.
+    """
+    if chamado.status in Chamado.STATUS_ENCERRADOS:
+        return False
+    if chamado.atendente_atual_id is None:
+        return False
+    return (
+        get_user_model()
+        .objects.filter(pk=chamado.atendente_atual_id, groups__name=ATTENDANT_GROUP_NAME)
+        .exists()
+    )
+
+
 @login_required
 @require_POST
 def start_attendance_view(request):
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para iniciar atendimentos.", status=403)
+
     payload = _load_request_payload(request)
     if payload is None:
         return _json_error("Nao foi possivel ler os dados enviados.")
@@ -644,9 +666,20 @@ def start_attendance_view(request):
     if not ticket_number:
         return _json_error("Informe o chamado que deve iniciar atendimento.")
 
-    chamado = Chamado.objects.filter(numero=ticket_number).first()
+    chamado = Chamado.objects.select_related("atendente_atual").filter(numero=ticket_number).first()
     if not chamado:
         return _json_error("Chamado nao encontrado para iniciar atendimento.", status=404)
+
+    # Play so vale para chamados em uma coluna de atendente: bloqueia chamados
+    # em "Chamados abertos" (sem atendente) e em "Chamados fechados" (encerrados),
+    # mesmo que a chamada venha direto pelo endpoint.
+    if chamado.status in Chamado.STATUS_ENCERRADOS:
+        return _json_error("Nao e possivel iniciar atendimento de um chamado encerrado.", status=409)
+    if not _is_ticket_in_attendant_column(chamado):
+        return _json_error(
+            "Arraste o chamado para uma coluna de atendente antes de iniciar o atendimento.",
+            status=409,
+        )
 
     existing_active = (
         AtendimentoHistorico.objects.select_related("chamado")

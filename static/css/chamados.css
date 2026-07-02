@@ -549,6 +549,13 @@
     border-top: 1px solid rgba(226, 232, 240, 0.9);
 }
 
+/* O controle de atendimento (Play/Pause/Stop) so aparece em colunas de atendente.
+   Em "Chamados abertos", "Pendencias" e "Chamados fechados" o painel fica oculto,
+   inclusive apos arrastar o card entre colunas (o CSS reage ao data-column-type). */
+.js-ticket-list:not([data-column-type="atendente"]) .ticket-attendance-panel {
+    display: none;
+}
+
 .ticket-attendance-state {
     display: flex;
     justify-content: space-between;

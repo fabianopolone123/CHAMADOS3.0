@@ -31,7 +31,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 15. O atendente de destino e validado no backend: precisa pertencer ao grupo `Atendente TI`.
 16. Ao arrastar, o badge de status do card atualiza texto e cor imediatamente, sem refresh.
 17. Clicar em um card abre a tela de detalhe do chamado.
-18. Cada card permite iniciar, pausar e finalizar um periodo de atendimento (controle de tempo).
+18. Somente os cards em uma coluna de Atendente TI exibem o controle de tempo (iniciar/Play, pausar e finalizar); cards em "Chamados abertos" e "Chamados fechados" nao mostram esses botoes.
 19. O detalhe do chamado exibe os anexos (nome, link de download, data e usuario que enviou) e o historico de eventos.
 20. Anexos so podem ser baixados pelo dono do chamado ou por TI/admin.
 21. A tela "Chamados" nao possui header superior; a criacao de chamado fica em um botao "+" no topo da coluna "Chamados abertos" (visivel apenas para TI/admin) que abre um modal para o atendente abrir um chamado em nome dele mesmo.
@@ -48,6 +48,9 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 2. O usuario logado e o atendente responsavel pelos registros de tempo.
 3. Um chamado pode acumular varios periodos de atendimento ao longo da sua vida.
 4. Pausar ou finalizar atendimento exige descricao obrigatoria do que foi feito.
+4a. O "Play" (iniciar/continuar atendimento) so existe e so funciona para chamados que estao em uma coluna de Atendente TI: chamados em "Chamados abertos", em "Pendencias" e em "Chamados fechados" nao exibem o botao. Um chamado so pode receber Play depois de ser arrastado para a coluna de um atendente.
+4b. Apenas Atendente TI/Admin executam o Play; usuario comum nunca ve nem executa. A regra e validada no frontend (o painel Play/Pause/Stop so aparece em coluna de atendente) e no backend (o endpoint nega usuario comum com `403` e bloqueia chamado aberto sem atendente ou encerrado com `409`).
+4c. O historico de atendimento (registro de tempo) so e criado quando o Play e executado validamente; acoes bloqueadas nao geram registro e a regra de um unico atendimento ativo por atendente evita duplicidade.
 5. Cada registro deve guardar inicio, fim, duracao, tipo de encerramento e descricao.
 6. O backend deve validar as regras criticas mesmo que o frontend tambem faca bloqueios visuais.
 7. Administrador pode consultar todos os historicos de atendimento.

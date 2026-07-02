@@ -7,7 +7,7 @@
 | `/` | GET | Redireciona para login ou landing conforme a sessao e o perfil | Implementada |
 | `/login/` | GET, POST | Tela de login com autenticacao AD/LDAP; roteia por perfil apos autenticar | Implementada |
 | `/chamados/` | GET | Kanban por atendente: coluna de abertos, colunas por Atendente TI e coluna de fechados (apenas TI/admin) | Implementada |
-| `/chamados/atendimento/iniciar/` | POST | Inicia um periodo de atendimento para o usuario logado | Implementada |
+| `/chamados/atendimento/iniciar/` | POST | Inicia (Play) um periodo de atendimento; apenas TI/admin e apenas para chamado em coluna de atendente (bloqueia aberto/encerrado) | Implementada |
 | `/chamados/atendimento/encerrar/` | POST | Pausa ou finaliza (Stop) o atendimento; o Stop encerra o chamado e o move para "Chamados fechados" (apenas TI/admin) | Implementada |
 | `/chamados/mover/` | POST | Movimenta um chamado no Kanban (aberto/atendente/fechado); apenas TI/admin | Implementada |
 | `/chamados/criar/` | POST | Cria um chamado pelo Kanban (botao "+" no topo da coluna "Chamados abertos"), com o atendente logado como solicitante; apenas TI/admin | Implementada |
@@ -33,6 +33,7 @@
 ## Regras das rotas de atendimento
 
 - As rotas de atendimento exigem `login_required`.
+- O inicio (`/chamados/atendimento/iniciar/`, o "Play") exige permissao de Atendente TI/Admin (usuario comum recebe `403`) e so vale para chamados em uma coluna de atendente: bloqueia com `409` chamado em "Chamados abertos" (sem `atendente_atual`) e chamado encerrado (resolvido/fechado). A regra "coluna de atendente" espelha o quadro: nao encerrado e `atendente_atual` pertencente ao grupo `Atendente TI`. O historico de tempo (`AtendimentoHistorico`) so e criado quando o Play passa em todas as validacoes; acoes bloqueadas nao geram registro. No frontend, o painel Play/Pause/Stop so aparece em cards dentro das colunas de atendente (regra em CSS reagindo ao `data-column-type`), some ao mover o card para abertos/fechados e ha uma checagem extra no clique antes de chamar o endpoint.
 - O encerramento (`/chamados/atendimento/encerrar/`) exige tambem permissao de Atendente TI/Admin; usuario comum recebe `403`.
 - O backend valida que o usuario nao pode iniciar dois atendimentos ativos ao mesmo tempo.
 - O backend valida que `pause` e `stop` exigem descricao obrigatoria.

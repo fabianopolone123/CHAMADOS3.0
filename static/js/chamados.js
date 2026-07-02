@@ -512,6 +512,12 @@
             const action = button.dataset.ticketAction;
 
             if (action === "play") {
+                // Play so vale em coluna de atendente (regra tambem validada no backend).
+                const list = card.closest(LIST_SELECTOR);
+                if (!list || list.dataset.columnType !== "atendente") {
+                    showToast("Arraste o chamado para uma coluna de atendente antes de iniciar o atendimento.", "warning");
+                    return;
+                }
                 handlePlay(ticketNumber);
                 return;
             }
