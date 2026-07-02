@@ -1568,6 +1568,32 @@ def requisicao_detail_view(request, requisicao_id: int):
     )
 
 
+@login_required
+@require_POST
+def requisicao_delete_view(request, requisicao_id: int):
+    """Exclui uma requisicao e, por cascata, seus orcamentos, suborcamentos e
+    documentos (FKs `on_delete=CASCADE`). Apenas TI/admin; somente via POST/CSRF.
+
+    Observacao: os arquivos fisicos em MEDIA_ROOT nao sao removidos aqui (o
+    projeto ainda nao possui rotina de limpeza de arquivos orfaos).
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para excluir requisicoes.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+
+    requisicao.delete()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Requisicao excluida com sucesso.",
+            "requisicao_id": requisicao_id,
+        }
+    )
+
+
 def _salvar_documentos(model_cls, fk_name, item, arquivos):
     for arquivo in arquivos:
         model_cls.objects.create(

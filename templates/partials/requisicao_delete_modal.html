@@ -1,0 +1,23 @@
+<div class="modal fade" id="requisicaoDeleteModal" tabindex="-1" aria-labelledby="requisicaoDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker create-ticket-kicker--danger">Excluir requisicao</span>
+                    <h5 class="modal-title" id="requisicaoDeleteModalLabel">Confirmar exclusao</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="mb-0">Tem certeza que deseja excluir esta requisicao? Esta acao nao podera ser desfeita.</p>
+                <p class="requisicao-delete__hint">A exclusao remove tambem os orcamentos, suborcamentos e os documentos vinculados.</p>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" data-confirm-delete-requisicao>Excluir definitivamente</button>
+            </div>
+        </div>
+    </div>
+</div>

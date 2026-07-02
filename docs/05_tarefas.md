@@ -4,8 +4,13 @@
 
 - Evoluir a atribuicao para um fluxo formal de responsavel, se necessario
 
+## Pendencias conhecidas
+
+- Modulo Requisicoes: ao excluir uma requisicao (ou seus orcamentos/suborcamentos), os registros do banco sao removidos por cascata, mas os arquivos fisicos correspondentes em `MEDIA_ROOT/contratos/...` (fotos e documentos) NAO sao apagados do disco. Ainda nao existe rotina de limpeza de arquivos orfaos; avaliar um `post_delete` signal ou tarefa de manutencao no futuro.
+
 ## Concluidas
 
+- Adicionada a exclusao de requisicao no modulo Requisicoes: botao "Excluir" no rodape do modal de detalhe (apenas TI/admin) com confirmacao obrigatoria ("Excluir definitivamente"); exclusao via `POST /contratos/requisicoes/<id>/excluir/` com CSRF (GET retorna `405`), permissao validada no backend (`403` para comum), remocao em cascata de orcamentos/suborcamentos/documentos e remocao do item da lista sem refresh
 - Renomeado o modulo para "Requisicoes" na interface (menu, titulo, card e modal), removendo as referencias visuais a "Contratos"; botao "+ Adicionar" responsivo e card superior compactado. Nomes tecnicos internos (models/rotas/arquivos com prefixo `Contrato`) mantidos para evitar migration/quebra
 - Criado o modulo "Contratos" (apenas TI/admin): menu lateral, tela de requisicoes (lista + botao "+"), modal de detalhe com orcamentos e suborcamentos indentados e totais. Models `RequisicaoContrato`, `OrcamentoContrato`, `OrcamentoDocumento`, `SuborcamentoContrato`, `SuborcamentoDocumento` (migration `0007`), com foto do produto, documentos multiplos, botao "Tirar print" (`getDisplayMedia` + recorte), calculo de totais (orcamento + suborcamentos), validacoes no backend e arquivos servidos por rotas protegidas
 - Bloqueado o fechamento de chamado por drag: a coluna "Chamados fechados" nao aceita mais drop (card volta com mensagem no frontend; `move_ticket` recusa `target=fechado` com `409` no backend) e passou a ser so lista/consulta. O fechamento acontece somente via Stop, que exige Play ativo, "O que foi feito" preenchido e permissao TI/admin; o encerramento registra no historico tecnico quem finalizou e o texto digitado

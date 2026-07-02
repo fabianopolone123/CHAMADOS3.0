@@ -464,6 +464,21 @@
     flex-wrap: wrap;
 }
 
+/* Rodape do detalhe: "Excluir" discreto a esquerda, "Fechar" a direita. */
+.requisicao-detail__footer {
+    justify-content: space-between;
+}
+
+.create-ticket-kicker--danger {
+    color: #b91c1c;
+}
+
+.requisicao-delete__hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
 .is-hidden {
     display: none !important;
 }

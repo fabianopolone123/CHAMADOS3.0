@@ -25,6 +25,7 @@
 | `/contratos/` | GET | Modulo Requisicoes (exibido como "Requisicoes"; rota mantem o prefixo tecnico): lista de requisicoes (titulo + status) e botao "+ Adicionar" (apenas TI/admin) | Implementada |
 | `/contratos/requisicoes/criar/` | POST | Cria uma requisicao (titulo, tipo fisica/digital, texto); status inicial "Aberta" (apenas TI/admin) | Implementada |
 | `/contratos/requisicoes/<id>/` | GET | Detalhe (JSON) da requisicao com orcamentos, suborcamentos e totais (apenas TI/admin) | Implementada |
+| `/contratos/requisicoes/<id>/excluir/` | POST | Exclui a requisicao e, por cascata, orcamentos, suborcamentos e documentos vinculados (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/orcamentos/criar/` | POST | Cria orcamento na requisicao (multipart: campos + foto + documentos) (apenas TI/admin) | Implementada |
 | `/contratos/orcamentos/<id>/suborcamentos/criar/` | POST | Cria suborcamento vinculado ao orcamento (multipart) (apenas TI/admin) | Implementada |
 | `/contratos/orcamentos/<id>/foto/` | GET | Serve a foto do orcamento (inline, protegida) (apenas TI/admin) | Implementada |
@@ -116,6 +117,7 @@
 - Regra de calculo: `total do orcamento = valor*quantidade + frete - desconto`; `total com suborcamentos = total do orcamento + soma dos totais dos suborcamentos`.
 - Foto do print: o botao "Tirar print" usa `navigator.mediaDevices.getDisplayMedia` no frontend, desenha o frame em canvas, permite recortar uma regiao e anexa o recorte como `foto_produto`. Se o navegador nao suportar, exibe mensagem e permite anexar imagem manualmente; cancelar a captura nao trava o formulario.
 - Fotos e documentos sao servidos por rotas dedicadas e protegidas (nao expoem a URL direta de `MEDIA`); acesso sem permissao retorna `404`.
+- A exclusao de requisicao (`requisicoes/<id>/excluir/`) exige `login_required` + permissao TI/admin (usuario comum recebe `403`), aceita apenas `POST` com CSRF (GET retorna `405`) e responde JSON. Remove a requisicao e, por cascata (`on_delete=CASCADE`), seus orcamentos, suborcamentos e os documentos vinculados. No frontend abre uma confirmacao obrigatoria antes de excluir; em caso de sucesso o item some da lista sem refresh. Observacao: os arquivos fisicos em `MEDIA_ROOT` nao sao apagados (pendencia registrada em `docs/05_tarefas.md`).
 
 ## Regras das rotas de historico
 

@@ -342,6 +342,61 @@
     });
 
     // ------------------------------------------------------------------
+    // Exclusao de requisicao (com confirmacao)
+    // ------------------------------------------------------------------
+    const requisicaoDeleteTpl = appElement.dataset.requisicaoDeleteUrl;
+    const deleteModalEl = document.getElementById("requisicaoDeleteModal");
+    const deleteModal = deleteModalEl ? bootstrap.Modal.getOrCreateInstance(deleteModalEl) : null;
+    let returnToDetailFromDelete = false;
+
+    function removeRequisicaoFromList(id) {
+        const btn = requisicoesList?.querySelector(`.requisicao-item[data-requisicao-id="${id}"]`);
+        const li = btn ? btn.closest("li") : null;
+        if (li) li.remove();
+        if (requisicoesList && !requisicoesList.querySelector(".requisicao-item") && !requisicoesList.querySelector(".requisicoes-empty")) {
+            const p = document.createElement("p");
+            p.className = "requisicoes-empty";
+            p.textContent = requisicoesList.dataset.emptyText || "Nenhuma requisicao cadastrada ainda.";
+            requisicoesList.appendChild(p);
+        }
+    }
+
+    // abre a confirmacao (empilha sobre o detalhe: esconde e reabre ao cancelar)
+    detailModalEl?.querySelector("[data-delete-requisicao]")?.addEventListener("click", () => {
+        if (!currentRequisicaoId || !deleteModal) return;
+        returnToDetailFromDelete = true;
+        detailModal?.hide();
+        deleteModal.show();
+    });
+
+    deleteModalEl?.addEventListener("hidden.bs.modal", () => {
+        if (returnToDetailFromDelete && currentRequisicaoId) {
+            detailModal?.show();
+        }
+        returnToDetailFromDelete = false;
+    });
+
+    deleteModalEl?.querySelector("[data-confirm-delete-requisicao]")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        if (!currentRequisicaoId || !requisicaoDeleteTpl) return;
+        button.disabled = true;
+        try {
+            const data = await sendJson(buildUrl(requisicaoDeleteTpl, currentRequisicaoId), {});
+            returnToDetailFromDelete = false; // sucesso: nao reabre o detalhe
+            removeRequisicaoFromList(currentRequisicaoId);
+            currentRequisicaoId = null;
+            deleteModal?.hide();
+            showToast(data.message || "Requisicao excluida.", "success");
+        } catch (error) {
+            // erro: mantem a requisicao; o detalhe reabre ao fechar a confirmacao
+            deleteModal?.hide();
+            showToast(error.message || "Nao foi possivel excluir a requisicao.", "error");
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    // ------------------------------------------------------------------
     // Formulario de orcamento / suborcamento (+ captura de print)
     // ------------------------------------------------------------------
     const orcFormModalEl = document.getElementById("orcamentoFormModal");

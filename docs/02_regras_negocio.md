@@ -125,6 +125,8 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 8. O backend valida a moeda, exige quantidade minima 1 e bloqueia valores negativos em valor, frete e desconto, com mensagens amigaveis.
 9. O botao "Tirar print" captura a tela pelo navegador (`getDisplayMedia`), permite recortar uma regiao, pre-visualizar e refazer/remover; o recorte e salvo como foto do produto. Sem suporte do navegador, o sistema orienta a anexar imagem manualmente e nao trava o formulario se a captura for cancelada.
 10. Fotos e documentos ficam em `MEDIA_ROOT/contratos/...` e sao servidos por rotas protegidas; usuario sem permissao nao acessa os arquivos.
+11. Ao abrir o detalhe de uma requisicao, o Atendente TI/Admin ve a opcao "Excluir" (discreta, no rodape do modal). O clique abre uma confirmacao obrigatoria ("Tem certeza que deseja excluir esta requisicao? Esta acao nao podera ser desfeita.") com os botoes "Cancelar" e "Excluir definitivamente" (estilo perigoso); nada e excluido sem confirmacao.
+12. A exclusao e feita via `POST` com CSRF (nunca por GET) e validada no backend (usuario comum recebe `403`). Ela remove a requisicao e, por cascata, todos os orcamentos, suborcamentos e documentos vinculados. Apos excluir, a requisicao some da lista sem refresh; em caso de erro, ela permanece visivel e uma mensagem e exibida. Os arquivos fisicos anexados nao sao removidos do disco (pendencia conhecida).
 
 ## Regras previstas para o sistema de chamados
 
