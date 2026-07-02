@@ -7,105 +7,7 @@
         linear-gradient(135deg, #eff4ff 0%, #f8fbff 48%, #edf3fb 100%);
 }
 
-.tickets-sidebar {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 2rem;
-    padding: 2rem 1.5rem;
-    background: linear-gradient(180deg, #07111f 0%, #0d1a30 100%);
-    color: #f8fafc;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.system-mark {
-    width: 3.5rem;
-    height: 3.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 1.2rem;
-    background: linear-gradient(135deg, rgba(79, 140, 255, 0.38) 0%, rgba(15, 118, 110, 0.42) 100%);
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    margin-bottom: 1.1rem;
-}
-
-.sidebar-title {
-    margin-bottom: 0.65rem;
-    font-size: 1.55rem;
-    font-weight: 800;
-}
-
-.sidebar-copy {
-    margin-bottom: 0;
-    color: rgba(226, 232, 240, 0.72);
-    line-height: 1.6;
-}
-
-.sidebar-menu {
-    display: grid;
-    gap: 0.75rem;
-}
-
-.menu-link {
-    padding: 0.95rem 1rem;
-    border-radius: 1rem;
-    color: #e2e8f0;
-    text-decoration: none;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid transparent;
-    transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
-}
-
-.menu-link:hover {
-    transform: translateX(4px);
-    color: #fff;
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.menu-link.active {
-    background: linear-gradient(135deg, rgba(79, 140, 255, 0.26) 0%, rgba(37, 99, 235, 0.36) 100%);
-    border-color: rgba(147, 197, 253, 0.24);
-    color: #fff;
-}
-
-.menu-link.disabled-link {
-    opacity: 0.55;
-    pointer-events: none;
-}
-
-.sidebar-footer {
-    display: grid;
-    gap: 1rem;
-}
-
-.sidebar-user-card {
-    display: grid;
-    gap: 0.15rem;
-    padding: 1rem;
-    border-radius: 1.1rem;
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.sidebar-user-card strong {
-    font-size: 1rem;
-}
-
-.sidebar-user-card span {
-    color: rgba(226, 232, 240, 0.76);
-}
-
-.sidebar-user-label {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.sidebar-logout {
-    border-radius: 999px;
-    font-weight: 700;
-}
+/* Estilos do menu lateral foram movidos para static/css/sidebar.css. */
 
 .tickets-main {
     min-width: 0;
@@ -1047,11 +949,6 @@
 @media (max-width: 1199.98px) {
     .tickets-app {
         grid-template-columns: 1fr;
-    }
-
-    .tickets-sidebar {
-        border-right: 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 }
 

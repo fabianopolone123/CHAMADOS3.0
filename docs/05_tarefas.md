@@ -7,6 +7,7 @@
 
 ## Concluidas
 
+- Corrigida a instabilidade vertical do menu lateral e padronizado seu visual; CSS do menu centralizado em `static/css/sidebar.css`
 - Adicionado botao "Criar chamado" no Kanban com modal para o atendente abrir chamado em nome proprio (entra em "Chamados abertos", sem atendente atual)
 - Padronizado o menu lateral da area de TI em um include reutilizavel (Chamados + Permissoes)
 - Reorganizado o Kanban por fila: coluna de abertos, colunas por Atendente TI e coluna de fechados

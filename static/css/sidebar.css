@@ -1,0 +1,145 @@
+/*
+ * Menu lateral padrao das areas autenticadas (TI e Portal do Solicitante).
+ * Fonte unica de estilo do menu para evitar duplicacao entre telas.
+ * Usado por: partials/ti_sidebar.html e partials/portal_sidebar.html.
+ */
+
+.tickets-sidebar {
+    /* Altura fixa e sticky: a sidebar nao acompanha mais a altura do conteudo,
+       entao o menu fica sempre na mesma posicao vertical em todas as telas. */
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(180deg, #07111f 0%, #0d1a30 100%);
+    color: #f8fafc;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.system-mark {
+    width: 3.5rem;
+    height: 3.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.2rem;
+    background: linear-gradient(135deg, rgba(79, 140, 255, 0.38) 0%, rgba(15, 118, 110, 0.42) 100%);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin-bottom: 1.1rem;
+}
+
+.sidebar-title {
+    margin-bottom: 0.65rem;
+    font-size: 1.55rem;
+    font-weight: 800;
+}
+
+.sidebar-copy {
+    margin-bottom: 0;
+    color: rgba(226, 232, 240, 0.72);
+    line-height: 1.6;
+}
+
+.sidebar-menu {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.menu-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8rem 1rem;
+    border-radius: 0.85rem;
+    color: #cbd5e1;
+    font-weight: 600;
+    text-decoration: none;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: transform 0.18s ease, background-color 0.18s ease,
+        border-color 0.18s ease, color 0.18s ease;
+}
+
+.menu-link__icon {
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    opacity: 0.85;
+}
+
+.menu-link:hover {
+    transform: translateX(3px);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-link:focus-visible {
+    outline: 2px solid rgba(147, 197, 253, 0.7);
+    outline-offset: 2px;
+}
+
+.menu-link.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(79, 140, 255, 0.28) 0%, rgba(37, 99, 235, 0.4) 100%);
+    border-color: rgba(147, 197, 253, 0.28);
+    box-shadow: inset 3px 0 0 rgba(147, 197, 253, 0.9);
+}
+
+.menu-link.active .menu-link__icon {
+    opacity: 1;
+}
+
+.menu-link.disabled-link {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.sidebar-footer {
+    display: grid;
+    gap: 1rem;
+}
+
+.sidebar-user-card {
+    display: grid;
+    gap: 0.15rem;
+    padding: 1rem;
+    border-radius: 1.1rem;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-user-card strong {
+    font-size: 1rem;
+}
+
+.sidebar-user-card span {
+    color: rgba(226, 232, 240, 0.76);
+}
+
+.sidebar-user-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.sidebar-logout {
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+@media (max-width: 1199.98px) {
+    /* Em telas menores a sidebar volta ao fluxo normal (empilhada no topo). */
+    .tickets-sidebar {
+        position: static;
+        height: auto;
+        overflow-y: visible;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+}

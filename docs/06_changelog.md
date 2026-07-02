@@ -1,5 +1,12 @@
 # 06 - Changelog
 
+## 2026-07-02
+
+- Corrigida a instabilidade vertical do menu lateral: os botoes mudavam de posicao ao trocar de tela (ex.: entre "Chamados" e "Permissoes") porque a `.tickets-sidebar` esticava ate a altura do conteudo e o `space-between` distribuia os blocos de forma diferente em cada pagina. A sidebar passou a ter altura fixa (`100vh`) e `position: sticky`, mantendo o menu sempre na mesma posicao.
+- Centralizado o CSS do menu lateral em `static/css/sidebar.css` (fonte unica, carregada em `base.html`), removendo as regras duplicadas de `chamados.css` e a responsividade da sidebar do media query.
+- Padronizado o visual do menu: espacamento interno consistente, bordas arredondadas, hover suave, estado ativo com destaque (barra de acento) e transicoes leves.
+- Adicionados icones inline (SVG) aos itens do menu de TI e do portal, sem depender de biblioteca externa de icones.
+
 ## 2026-07-01
 
 - Adicionado o botao "Criar chamado" na tela "Chamados" (Kanban) com modal responsivo, visivel apenas para TI/admin.

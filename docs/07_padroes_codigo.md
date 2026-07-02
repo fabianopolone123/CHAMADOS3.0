@@ -32,6 +32,8 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 - Para telas interativas, preferir bibliotecas leves e carregadas por CDN quando o projeto ainda estiver em fase inicial.
 - Em interacoes temporarias sem persistencia, deixar `TODO` explicito no codigo.
 - Separar estilos da autenticacao e da area autenticada quando a interface crescer.
+- O estilo do menu lateral (sidebar) fica centralizado em `static/css/sidebar.css`, carregado uma unica vez em `base.html`; nao duplicar essas regras em outros CSS.
+- A sidebar deve ter altura fixa e `position: sticky` para manter o menu estavel na mesma posicao vertical entre as telas.
 - Toda mensagem visual do sistema deve usar o componente global de toast ligado ao `Django messages`, evitando blocos locais de alert repetidos.
 - Detalhes de chamados devem usar um modal global reutilizavel preenchido por dados seguros da view, evitando um modal por card.
 - Quando houver dados mockados para modais ou cards, preferir `json_script` ou outro carregamento seguro no template.

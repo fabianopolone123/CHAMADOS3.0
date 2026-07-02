@@ -11,13 +11,37 @@ Valores de active: "meus", "novo".
     </div>
 
     <nav class="sidebar-menu">
-        <a href="{% url 'my_tickets' %}" class="menu-link{% if active == 'meus' %} active{% endif %}">Meus Chamados</a>
-        <a href="{% url 'open_ticket' %}" class="menu-link{% if active == 'novo' %} active{% endif %}">Abrir Chamado</a>
+        <a href="{% url 'my_tickets' %}" class="menu-link{% if active == 'meus' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 6h11M8 12h11M8 18h11"></path>
+                <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"></path>
+            </svg>
+            <span>Meus Chamados</span>
+        </a>
+        <a href="{% url 'open_ticket' %}" class="menu-link{% if active == 'novo' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            <span>Abrir Chamado</span>
+        </a>
         {% if is_admin or is_attendant %}
-            <a href="{% url 'tickets_dashboard' %}" class="menu-link">Chamados</a>
+            <a href="{% url 'tickets_dashboard' %}" class="menu-link">
+                <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
+                    <rect x="10.5" y="4" width="6" height="10" rx="1.5"></rect>
+                    <rect x="18" y="4" width="3" height="16" rx="1.5"></rect>
+                </svg>
+                <span>Chamados</span>
+            </a>
         {% endif %}
         {% if is_admin %}
-            <a href="{% url 'permissions' %}" class="menu-link">Permissoes</a>
+            <a href="{% url 'permissions' %}" class="menu-link">
+                <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5l-8-3Z"></path>
+                    <path d="m9 12 2 2 4-4"></path>
+                </svg>
+                <span>Permissoes</span>
+            </a>
         {% endif %}
     </nav>
 
