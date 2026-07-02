@@ -7,10 +7,12 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 ## Componentes atuais
 
 - `chamados_ti`: configuracao principal do projeto
-- `core`: app responsavel pela autenticacao, rotas principais e quadro inicial
-- `templates/core`: templates da autenticacao
-- `templates/chamados`: templates da interface inicial de chamados
-- `static/css`: estilos visuais separados por contexto
+- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes e historico
+- `templates/core`: templates da autenticacao e de permissoes
+- `templates/chamados`: templates do Kanban, do portal do solicitante e do historico
+- `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
+- `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral)
+- `static/js`: scripts do front-end (`chamados.js` do Kanban e `notifications.js` dos toasts)
 - `.env`: configuracao sensivel de ambiente, fora de versionamento
 
 ## Estrutura atual do fluxo autenticado
@@ -24,10 +26,11 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 
 ## Estrutura atual do quadro Kanban
 
-- A rota `/chamados/` e protegida com `login_required`
-- A view monta dados mockados de atendentes e chamados
-- O template usa `SortableJS` via CDN para drag-and-drop visual
-- A movimentacao ainda nao persiste no backend
+- A rota `/chamados/` e protegida pelo decorator `ti_required` (administrador e Atendente TI; usuario comum e redirecionado ao portal)
+- A view monta o quadro a partir dos chamados reais do banco (model `Chamado`), agrupados em coluna de abertos, colunas por Atendente TI e coluna de fechados
+- O template usa `SortableJS` via CDN para o drag-and-drop, controlado por `static/js/chamados.js`
+- A movimentacao persiste no backend via `POST /chamados/mover/`, atualizando `status` e `atendente_atual` e registrando eventos em `ChamadoEvento`
+- O front-end atualiza badge de status, atendente do card, contadores e mensagens de coluna vazia na hora, sem refresh; falhas no POST revertem a movimentacao visual
 
 ## Tecnologias base
 

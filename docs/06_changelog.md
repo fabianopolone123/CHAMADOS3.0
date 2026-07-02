@@ -2,6 +2,7 @@
 
 ## 2026-07-02
 
+- Sincronizada a documentacao com o estado real do projeto: `01_arquitetura.md` (Kanban com dados reais, movimentacao persistida, `ti_required`, `static/js` e `sidebar.css`), `03_modelos.md` (quatro modelos: `Chamado`, `ChamadoEvento`, `ChamadoAnexo` e `AtendimentoHistorico`; `AnexoChamado` deixou de ser "previsto") e `00_visao_geral.md` (escopo atual e fora de escopo atualizados).
 - Corrigido o texto de coluna vazia no Kanban apos movimentacao de cards: a mensagem de vazio (ex.: "Sem chamados em atendimento.") deixou de aparecer junto com os cards. O estado de vazio agora e recalculado na hora, no drag-and-drop, removendo a mensagem quando a coluna recebe um card e recriando-a (via `data-empty-text`) quando a coluna fica sem cards; em caso de falha no POST o card volta e a mensagem e recalculada.
 - Corrigida a instabilidade vertical do menu lateral: os botoes mudavam de posicao ao trocar de tela (ex.: entre "Chamados" e "Permissoes") porque a `.tickets-sidebar` esticava ate a altura do conteudo e o `space-between` distribuia os blocos de forma diferente em cada pagina. A sidebar passou a ter altura fixa (`100vh`) e `position: sticky`, mantendo o menu sempre na mesma posicao.
 - Centralizado o CSS do menu lateral em `static/css/sidebar.css` (fonte unica, carregada em `base.html`), removendo as regras duplicadas de `chamados.css` e a responsividade da sidebar do media query.

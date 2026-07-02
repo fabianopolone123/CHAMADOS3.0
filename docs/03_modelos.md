@@ -2,9 +2,11 @@
 
 ## Situacao atual
 
-O projeto agora possui dois modelos iniciais persistidos para sustentar o fluxo de atendimento:
+O projeto possui quatro modelos persistidos para sustentar o fluxo de atendimento:
 
 - `Chamado`
+- `ChamadoEvento`
+- `ChamadoAnexo`
 - `AtendimentoHistorico`
 
 ## Modelos implementados
@@ -117,7 +119,7 @@ Regras atuais:
 
 ### ComentarioChamado
 
-Modelo futuro para historico definitivo do chamado, separado do controle de tempo.
+Modelo futuro para comentarios/acoes manuais da equipe no chamado, separado do controle de tempo. Hoje comentarios podem ser registrados como evento do tipo `comentario` em `ChamadoEvento`; um modelo dedicado ainda pode ser criado quando o fluxo de interacao evoluir.
 
 Campos esperados:
 
@@ -126,16 +128,7 @@ Campos esperados:
 - texto
 - data de criacao
 
-### AnexoChamado
-
-Modelo futuro para arquivos enviados no chamado.
-
-Campos esperados:
-
-- chamado
-- arquivo
-- nome original
-- data de envio
+> O antigo item previsto "AnexoChamado" ja foi implementado como o modelo `ChamadoAnexo` (ver acima).
 
 ## Observacoes de modelagem
 
