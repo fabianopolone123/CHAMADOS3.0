@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/emails.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app emails-app"
+    data-email-detail-url="{% url 'email_detail' conta_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="emails" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Emails</h2>
+                <p class="contratos-topbar__subtitle">Contas de e-mail corporativo</p>
+                <p class="topbar-subtitle">Importe a lista atualizada exportada do Google Workspace e consulte os dados de cada conta.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="importEmailButton" aria-label="Importar lista" title="Importar lista">
+                <span class="contratos-add-btn__icon" aria-hidden="true">&uarr;</span>
+                <span class="contratos-add-btn__label">Importar lista</span>
+            </button>
+        </header>
+
+        <section class="emails-stats">
+            <article class="emails-stat">
+                <span class="emails-stat__label">Total de contas</span>
+                <strong class="emails-stat__value">{{ total_contas }}</strong>
+            </article>
+            <article class="emails-stat emails-stat--ok">
+                <span class="emails-stat__label">Ativas</span>
+                <strong class="emails-stat__value">{{ total_ativos }}</strong>
+            </article>
+            <article class="emails-stat emails-stat--warn">
+                <span class="emails-stat__label">Suspensas</span>
+                <strong class="emails-stat__value">{{ total_suspensos }}</strong>
+            </article>
+        </section>
+
+        <section class="emails-panel">
+            <div class="emails-search">
+                <span class="emails-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="emailSearch"
+                    class="emails-search__input"
+                    placeholder="Pesquisar por nome, e-mail, departamento, cargo, telefone..."
+                    autocomplete="off"
+                >
+            </div>
+            <p class="emails-search__status" id="emailSearchStatus"></p>
+
+            {% if contas %}
+            <div class="emails-table-wrap">
+                <table class="emails-table" id="emailsTable">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>E-mail</th>
+                            <th>Status</th>
+                            <th class="emails-col--hide-md">Departamento</th>
+                            <th class="emails-col--hide-md">Cargo</th>
+                            <th class="emails-col--hide-sm">Ultimo acesso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emailsTableBody">
+                        {% for c in contas %}
+                        <tr
+                            class="emails-row"
+                            data-conta-id="{{ c.id }}"
+                            data-search="{{ c.nome_completo|lower }} {{ c.email|lower }} {{ c.departamento|lower }} {{ c.cargo|lower }} {{ c.telefone_celular|lower }} {{ c.telefone_trabalho|lower }} {{ c.status|lower }} {{ c.employee_id|lower }}"
+                            tabindex="0"
+                            role="button"
+                            aria-label="Ver detalhes de {{ c.nome_completo }}"
+                        >
+                            <td data-label="Nome" class="emails-cell--name">{{ c.nome_completo }}</td>
+                            <td data-label="E-mail" class="emails-cell--email">{{ c.email }}</td>
+                            <td data-label="Status">
+                                <span class="status-badge {% if c.is_ativo %}status-success{% else %}status-warning{% endif %}">{{ c.status }}</span>
+                            </td>
+                            <td data-label="Departamento" class="emails-col--hide-md">{{ c.departamento }}</td>
+                            <td data-label="Cargo" class="emails-col--hide-md">{{ c.cargo }}</td>
+                            <td data-label="Ultimo acesso" class="emails-col--hide-sm">{{ c.ultimo_acesso }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="emails-empty is-hidden" id="emailsNoResults">Nenhuma conta encontrada para a pesquisa.</p>
+            {% else %}
+            <div class="emails-empty-state">
+                <p class="emails-empty-state__title">Nenhuma conta importada ainda.</p>
+                <p class="emails-empty-state__hint">Clique em "Importar lista" e envie o arquivo CSV exportado do Google Workspace.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/email_import_modal.html" %}
+{% include "partials/email_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/emails.js' %}"></script>
+{% endblock %}

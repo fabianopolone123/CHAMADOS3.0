@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
+import csv
+import io
 import json
 
 from django.contrib import messages
@@ -25,6 +27,7 @@ from .models import (
     AssinaturaResponsavelTI,
     AtendimentoHistorico,
     Chamado,
+    ContaEmail,
     ChamadoAnexo,
     ChamadoEvento,
     ChamadoMensagem,
@@ -2344,3 +2347,173 @@ def logout_view(request):
     logout(request)
     messages.info(request, "Sessao encerrada com sucesso.")
     return redirect("login")
+
+
+# ==========================================================================
+# Modulo Emails: lista das contas de e-mail e importacao da lista CSV
+# ==========================================================================
+
+# Mapeamento coluna do CSV (Google Workspace) -> campo do model ContaEmail.
+_EMAIL_CSV_MAP = {
+    "First Name [Required]": "primeiro_nome",
+    "Last Name [Required]": "sobrenome",
+    "Status [READ ONLY]": "status",
+    "Org Unit Path [Required]": "org_unit_path",
+    "Last Sign In [READ ONLY]": "ultimo_acesso",
+    "Recovery Email": "email_recuperacao",
+    "Recovery Phone [MUST BE IN THE E.164 FORMAT]": "telefone_recuperacao",
+    "Work Phone": "telefone_trabalho",
+    "Home Phone": "telefone_residencial",
+    "Mobile Phone": "telefone_celular",
+    "Employee ID": "employee_id",
+    "Employee Type": "tipo_funcionario",
+    "Employee Title": "cargo",
+    "Manager Email": "email_gestor",
+    "Department": "departamento",
+    "Cost Center": "centro_custo",
+    "Email Usage [READ ONLY]": "uso_email",
+    "Drive Usage [READ ONLY]": "uso_drive",
+    "Photos Usage [READ ONLY]": "uso_fotos",
+    "Storage limit [READ ONLY]": "limite_armazenamento",
+    "Storage Used [READ ONLY]": "armazenamento_usado",
+    "Licenses [READ ONLY]": "licencas",
+    "Gemini Limit Status [READ ONLY]": "gemini_status",
+}
+_EMAIL_CSV_BOOL = {
+    "2sv Enrolled [READ ONLY]": "dois_fatores_inscrito",
+    "2sv Enforced [READ ONLY]": "dois_fatores_forcado",
+}
+
+
+def _serialize_conta_email(conta: ContaEmail):
+    """Todos os dados da conta, para lista e detalhe."""
+    return {
+        "id": conta.id,
+        "email": conta.email,
+        "nome_completo": conta.nome_completo,
+        "primeiro_nome": conta.primeiro_nome,
+        "sobrenome": conta.sobrenome,
+        "status": conta.status or "-",
+        "is_ativo": conta.is_ativo,
+        "org_unit_path": conta.org_unit_path or "-",
+        "ultimo_acesso": conta.ultimo_acesso or "-",
+        "email_recuperacao": conta.email_recuperacao or "-",
+        "telefone_recuperacao": conta.telefone_recuperacao or "-",
+        "telefone_trabalho": conta.telefone_trabalho or "-",
+        "telefone_residencial": conta.telefone_residencial or "-",
+        "telefone_celular": conta.telefone_celular or "-",
+        "employee_id": conta.employee_id or "-",
+        "tipo_funcionario": conta.tipo_funcionario or "-",
+        "cargo": conta.cargo or "-",
+        "email_gestor": conta.email_gestor or "-",
+        "departamento": conta.departamento or "-",
+        "centro_custo": conta.centro_custo or "-",
+        "dois_fatores_inscrito": conta.dois_fatores_inscrito,
+        "dois_fatores_forcado": conta.dois_fatores_forcado,
+        "uso_email": conta.uso_email or "-",
+        "uso_drive": conta.uso_drive or "-",
+        "uso_fotos": conta.uso_fotos or "-",
+        "limite_armazenamento": conta.limite_armazenamento or "-",
+        "armazenamento_usado": conta.armazenamento_usado or "-",
+        "licencas": conta.licencas or "-",
+        "gemini_status": conta.gemini_status or "-",
+        "atualizado_em": timezone.localtime(conta.atualizado_em).strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+@ti_required
+def emails_dashboard_view(request):
+    contas = list(ContaEmail.objects.all())
+    total = len(contas)
+    ativos = sum(1 for c in contas if c.is_ativo)
+    context = {
+        "page_title": "Emails",
+        "contas": [_serialize_conta_email(c) for c in contas],
+        "total_contas": total,
+        "total_ativos": ativos,
+        "total_suspensos": total - ativos,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/emails.html", context)
+
+
+@login_required
+@require_POST
+def email_import_view(request):
+    """Importa/atualiza a lista de contas a partir do CSV exportado do Google
+    Workspace (upsert por e-mail). Usa as notificacoes classicas (Django
+    messages) e redireciona de volta para a listagem."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para importar contas de e-mail.")
+        return redirect("emails_dashboard")
+
+    arquivo = request.FILES.get("arquivo")
+    if not arquivo:
+        messages.error(request, "Selecione o arquivo CSV da lista de e-mails.")
+        return redirect("emails_dashboard")
+
+    raw = arquivo.read()
+    texto = None
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            texto = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        messages.error(request, "Nao foi possivel ler o arquivo. Envie um CSV valido.")
+        return redirect("emails_dashboard")
+
+    leitor = csv.DictReader(io.StringIO(texto))
+    cabecalhos = leitor.fieldnames or []
+    if "Email Address [Required]" not in cabecalhos:
+        messages.error(
+            request,
+            "Arquivo invalido: nao encontrei a coluna 'Email Address'. Envie o CSV exportado do Google Workspace.",
+        )
+        return redirect("emails_dashboard")
+
+    criados = 0
+    atualizados = 0
+    ignorados = 0
+    try:
+        with transaction.atomic():
+            for linha in leitor:
+                email = (linha.get("Email Address [Required]") or "").strip().lower()
+                if not email:
+                    ignorados += 1
+                    continue
+                defaults = {}
+                for coluna, campo in _EMAIL_CSV_MAP.items():
+                    defaults[campo] = (linha.get(coluna) or "").strip()
+                for coluna, campo in _EMAIL_CSV_BOOL.items():
+                    defaults[campo] = (linha.get(coluna) or "").strip().lower() == "true"
+                defaults["importado_por"] = request.user
+                _, created = ContaEmail.objects.update_or_create(email=email, defaults=defaults)
+                if created:
+                    criados += 1
+                else:
+                    atualizados += 1
+    except Exception:
+        messages.error(request, "Ocorreu um erro ao processar o arquivo. Verifique o formato e tente novamente.")
+        return redirect("emails_dashboard")
+
+    partes = [f"{criados} nova(s)", f"{atualizados} atualizada(s)"]
+    if ignorados:
+        partes.append(f"{ignorados} ignorada(s) sem e-mail")
+    messages.success(request, "Lista importada: " + ", ".join(partes) + ".")
+    return redirect("emails_dashboard")
+
+
+@login_required
+def email_detail_view(request, conta_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver contas de e-mail.", status=403)
+    conta = ContaEmail.objects.filter(pk=conta_id).first()
+    if not conta:
+        return _json_error("Conta nao encontrada.", status=404)
+    data = _serialize_conta_email(conta)
+    data["ok"] = True
+    return JsonResponse(data)

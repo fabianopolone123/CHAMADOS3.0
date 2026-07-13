@@ -49,6 +49,9 @@
 | `/insumos/` | GET | Modulo Insumos: estoque (cards) e ultimas retiradas, com botao "+ Adicionar" (apenas TI/admin) | Implementada |
 | `/insumos/criar/` | POST | Cadastra um insumo (nome, descricao, quantidade inicial, observacao); quantidade obrigatoria e nao negativa (apenas TI/admin) | Implementada |
 | `/insumos/<id>/retirar/` | POST | Registra retirada (quantidade, para quem, motivo), valida estoque e abate a quantidade (apenas TI/admin) | Implementada |
+| `/emails/` | GET | Modulo Emails: lista das contas de e-mail (tabela responsiva + busca + cards de resumo) e botao "Importar lista" (apenas TI/admin) | Implementada |
+| `/emails/importar/` | POST | Importa/atualiza a lista a partir do CSV do Google Workspace (upsert por e-mail), notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/emails/<id>/` | GET | Detalhe (JSON) de uma conta com todos os dados, usado pelo modal (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |

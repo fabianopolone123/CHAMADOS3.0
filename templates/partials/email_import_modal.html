@@ -1,0 +1,32 @@
+{% load static %}
+<div class="modal fade" id="importEmailModal" tabindex="-1" aria-labelledby="importEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Emails</span>
+                    <h5 class="modal-title" id="importEmailModalLabel">Importar lista atualizada</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'email_import' %}" enctype="multipart/form-data" class="create-ticket-form">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Arquivo CSV</span>
+                        <input type="file" class="form-control" name="arquivo" accept=".csv,text/csv" required>
+                        <small class="contrato-field__help">
+                            Envie o CSV exportado do Google Workspace. As contas sao atualizadas pelo e-mail:
+                            os dados existentes sao atualizados e os novos e-mails sao adicionados.
+                        </small>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="importEmailSubmit">Importar e atualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

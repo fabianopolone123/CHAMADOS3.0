@@ -836,3 +836,75 @@ class LogUsoAssinaturaTI(models.Model):
 
     def __str__(self) -> str:
         return f"Uso da assinatura {self.assinatura_id} em {self.usado_em:%d/%m/%Y %H:%M}"
+
+
+# ==========================================================================
+# Modulo Emails: cadastro das contas de e-mail (importadas de uma lista CSV
+# exportada do Google Workspace). A importacao faz upsert por e-mail.
+# ==========================================================================
+
+
+class ContaEmail(models.Model):
+    """Conta de e-mail corporativo e seus dados, atualizada via importacao CSV.
+
+    A chave de identificacao/atualizacao e o proprio e-mail (unico). A senha
+    do export nunca e armazenada.
+    """
+
+    email = models.EmailField(unique=True)
+    primeiro_nome = models.CharField(max_length=255, blank=True)
+    sobrenome = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=40, blank=True)
+    org_unit_path = models.CharField(max_length=255, blank=True)
+    ultimo_acesso = models.CharField(max_length=40, blank=True)
+
+    email_recuperacao = models.CharField(max_length=255, blank=True)
+    telefone_recuperacao = models.CharField(max_length=40, blank=True)
+    telefone_trabalho = models.CharField(max_length=40, blank=True)
+    telefone_residencial = models.CharField(max_length=40, blank=True)
+    telefone_celular = models.CharField(max_length=40, blank=True)
+
+    employee_id = models.CharField(max_length=64, blank=True)
+    tipo_funcionario = models.CharField(max_length=120, blank=True)
+    cargo = models.CharField(max_length=255, blank=True)
+    email_gestor = models.CharField(max_length=255, blank=True)
+    departamento = models.CharField(max_length=255, blank=True)
+    centro_custo = models.CharField(max_length=120, blank=True)
+
+    dois_fatores_inscrito = models.BooleanField(default=False)
+    dois_fatores_forcado = models.BooleanField(default=False)
+
+    uso_email = models.CharField(max_length=40, blank=True)
+    uso_drive = models.CharField(max_length=40, blank=True)
+    uso_fotos = models.CharField(max_length=40, blank=True)
+    limite_armazenamento = models.CharField(max_length=40, blank=True)
+    armazenamento_usado = models.CharField(max_length=40, blank=True)
+
+    licencas = models.TextField(blank=True)
+    gemini_status = models.CharField(max_length=120, blank=True)
+
+    importado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contas_email_importadas",
+    )
+    importado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["primeiro_nome", "sobrenome", "email"]
+        verbose_name = "Conta de e-mail"
+        verbose_name_plural = "Contas de e-mail"
+
+    def __str__(self) -> str:
+        return self.email
+
+    @property
+    def nome_completo(self) -> str:
+        return f"{self.primeiro_nome} {self.sobrenome}".strip() or self.email
+
+    @property
+    def is_ativo(self) -> bool:
+        return (self.status or "").strip().lower() == "active"

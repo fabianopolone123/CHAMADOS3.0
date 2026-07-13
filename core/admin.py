@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     AssinaturaResponsavelTI,
+    ContaEmail,
     DocumentoTI,
     DocumentoTIAnexo,
     EmprestimoTI,
@@ -145,3 +146,11 @@ class AssinaturaResponsavelTIAdmin(admin.ModelAdmin):
 class LogUsoAssinaturaTIAdmin(admin.ModelAdmin):
     list_display = ("assinatura", "emprestimo", "usado_por", "usado_em")
     date_hierarchy = "usado_em"
+
+
+@admin.register(ContaEmail)
+class ContaEmailAdmin(admin.ModelAdmin):
+    list_display = ("email", "primeiro_nome", "sobrenome", "status", "departamento", "cargo", "atualizado_em")
+    list_filter = ("status", "departamento", "dois_fatores_inscrito")
+    search_fields = ("email", "primeiro_nome", "sobrenome", "departamento", "cargo", "employee_id")
+    date_hierarchy = "atualizado_em"

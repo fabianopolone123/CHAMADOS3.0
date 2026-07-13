@@ -1,0 +1,342 @@
+/* ==========================================================================
+   Modulo Emails: contas de e-mail corporativo (lista + importacao CSV)
+   ========================================================================== */
+
+/* ----- Cartoes de resumo ----- */
+.emails-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.emails-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.2rem;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-left: 4px solid #2563eb;
+    border-radius: 1.1rem;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.emails-stat--ok {
+    border-left-color: #22c55e;
+}
+
+.emails-stat--warn {
+    border-left-color: #f59e0b;
+}
+
+.emails-stat__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+}
+
+.emails-stat__value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+}
+
+/* ----- Painel principal ----- */
+.emails-panel {
+    min-width: 0;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    border-radius: 1.6rem;
+    box-shadow: 0 22px 45px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(14px);
+}
+
+/* ----- Busca ----- */
+.emails-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.emails-search__icon {
+    position: absolute;
+    left: 0.9rem;
+    font-size: 0.95rem;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.emails-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.emails-search__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.emails-search__status {
+    margin: 0.6rem 0 0.2rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    min-height: 1rem;
+}
+
+/* ----- Tabela ----- */
+.emails-table-wrap {
+    min-width: 0;
+    overflow-x: auto;
+    margin-top: 0.4rem;
+}
+
+.emails-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.emails-table thead th {
+    position: sticky;
+    top: 0;
+    text-align: left;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.emails-table tbody td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1f2937;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+
+.emails-row {
+    cursor: pointer;
+    transition: background 0.14s ease;
+}
+
+.emails-row:hover td,
+.emails-row:focus-visible td {
+    background: #eff5ff;
+}
+
+.emails-row:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.5);
+    outline-offset: -2px;
+}
+
+.emails-cell--name {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.emails-cell--email {
+    color: #2563eb;
+}
+
+/* Badges de status (auto-contido, pois esta pagina nao carrega portal.css) */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.status-badge.status-success {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.status-badge.status-warning {
+    color: #b45309;
+    background: #ffedd5;
+}
+
+.status-badge.status-muted {
+    color: #475569;
+    background: #e2e8f0;
+}
+
+/* ----- Estados vazios ----- */
+.emails-empty,
+.emails-empty-state__hint {
+    margin: 0.6rem 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.emails-empty-state {
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.emails-empty-state__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+/* ----- Modal de detalhe ----- */
+.email-detail__email {
+    margin: 0.2rem 0 0;
+    color: #2563eb;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.email-detail__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.email-detail__updated {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.email-detail__section {
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #eef2f7;
+}
+
+.email-detail__section:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.email-detail__section-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #1d4ed8;
+}
+
+.email-detail__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 0.7rem 1.1rem;
+    margin: 0;
+}
+
+.email-detail__grid dt {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin: 0 0 0.15rem;
+}
+
+.email-detail__grid dd {
+    margin: 0;
+    color: #0f172a;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* Esconde colunas menos importantes conforme a largura. */
+@media (max-width: 900px) {
+    .emails-col--hide-md {
+        display: none;
+    }
+}
+
+@media (max-width: 700px) {
+    .emails-col--hide-sm {
+        display: none;
+    }
+}
+
+/* Em telas de celular a tabela vira uma lista de cards (linha = cartao). */
+@media (max-width: 640px) {
+    .emails-table thead {
+        display: none;
+    }
+
+    .emails-table,
+    .emails-table tbody,
+    .emails-table tr,
+    .emails-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .emails-row {
+        margin-bottom: 0.7rem;
+        padding: 0.35rem 0.2rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.9rem;
+        background: #fff;
+    }
+
+    .emails-row:hover td,
+    .emails-row:focus-visible td {
+        background: transparent;
+    }
+
+    .emails-table tbody td {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.3rem 0.85rem;
+        border-bottom: 0;
+        text-align: right;
+    }
+
+    /* No modo cartao mostra todos os campos, inclusive os ocultos na tabela. */
+    .emails-col--hide-md,
+    .emails-col--hide-sm {
+        display: flex;
+    }
+
+    .emails-table tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94a3b8;
+        text-align: left;
+    }
+
+    .emails-cell--name {
+        font-size: 1rem;
+    }
+}

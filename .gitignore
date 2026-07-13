@@ -4,3 +4,5 @@ __pycache__/
 db.sqlite3
 staticfiles/
 media/
+# Listas de e-mail exportadas (contem dados pessoais; nao versionar)
+User_Download_*.csv

@@ -21,6 +21,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Modulo Insumos (apenas TI/admin): controle simples de estoque de materiais de TI com cadastro, retirada com baixa de estoque e historico de retiradas
 - Modulo Documentos (apenas TI/admin): cadastro e armazenamento de documentos internos com nome, observacao e anexos multiplos
 - Modulo Emprestimos (apenas TI/admin): comodato de equipamentos de TI com multiplos equipamentos e fotos, assinatura protegida por senha, geracao do termo em PDF, anexo do termo assinado e controle de status
+- Modulo Emails (apenas TI/admin): consulta das contas de e-mail corporativo com busca e detalhe, atualizadas pela importacao da lista CSV do Google Workspace (upsert por e-mail)
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional
 - Documentacao tecnica e funcional do projeto

@@ -15,6 +15,7 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    ContaEmail,
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
@@ -381,3 +382,56 @@ class RequisicaoDeleteFilesTests(TestCase):
         self.assertFalse(RequisicaoContrato.objects.filter(id=requisicao.id).exists())
         for caminho in caminhos:
             self.assertFalse(os.path.exists(caminho), f"arquivo orfao nao removido: {caminho}")
+
+
+class ContaEmailImportTests(TestCase):
+    """Importacao da lista de contas de e-mail (upsert por e-mail) e permissoes."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _csv(self, deptos):
+        header = (
+            "First Name [Required],Last Name [Required],Email Address [Required],"
+            "Status [READ ONLY],Department,2sv Enrolled [READ ONLY]\n"
+        )
+        linhas = [
+            f"Joao,Silva,joao.silva@x.com,Active,{deptos[0]},True",
+            f"Maria,Souza,maria.souza@x.com,Suspended,{deptos[1]},False",
+        ]
+        conteudo = (header + "\n".join(linhas)).encode("utf-8")
+        return SimpleUploadedFile("lista.csv", conteudo, content_type="text/csv")
+
+    def test_ti_import_creates_and_upserts(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("email_import"), {"arquivo": self._csv(["TI", "RH"])})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(ContaEmail.objects.count(), 2)
+
+        joao = ContaEmail.objects.get(email="joao.silva@x.com")
+        self.assertEqual(joao.primeiro_nome, "Joao")
+        self.assertEqual(joao.departamento, "TI")
+        self.assertTrue(joao.dois_fatores_inscrito)
+        self.assertTrue(joao.is_ativo)
+        self.assertFalse(ContaEmail.objects.get(email="maria.souza@x.com").is_ativo)
+
+        # Reimportar com o mesmo e-mail atualiza (nao duplica).
+        self.client.post(reverse("email_import"), {"arquivo": self._csv(["Infra", "RH"])})
+        self.assertEqual(ContaEmail.objects.count(), 2)
+        joao.refresh_from_db()
+        self.assertEqual(joao.departamento, "Infra")
+
+    def test_common_user_cannot_import(self):
+        self.client.force_login(self.common)
+        resp = self.client.post(reverse("email_import"), {"arquivo": self._csv(["TI", "RH"])})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(ContaEmail.objects.count(), 0)
+
+    def test_common_user_cannot_access_dashboard(self):
+        self.client.force_login(self.common)
+        resp = self.client.get(reverse("emails_dashboard"))
+        self.assertEqual(resp.status_code, 302)  # redirecionado (sem permissao TI)

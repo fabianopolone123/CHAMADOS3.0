@@ -1,0 +1,79 @@
+<div class="modal fade" id="emailDetailModal" tabindex="-1" aria-labelledby="emailDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Conta de e-mail</span>
+                    <h5 class="modal-title" id="emailDetailModalLabel" data-email-detail="nome_completo">Conta</h5>
+                    <p class="email-detail__email" data-email-detail="email">-</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="email-detail__status">
+                    <span class="status-badge" data-email-detail-status>-</span>
+                    <span class="email-detail__updated">Atualizado em <strong data-email-detail="atualizado_em">-</strong></span>
+                </div>
+
+                <section class="email-detail__section">
+                    <h6 class="email-detail__section-title">Identificacao</h6>
+                    <dl class="email-detail__grid">
+                        <div><dt>Primeiro nome</dt><dd data-email-detail="primeiro_nome">-</dd></div>
+                        <div><dt>Sobrenome</dt><dd data-email-detail="sobrenome">-</dd></div>
+                        <div><dt>Unidade organizacional</dt><dd data-email-detail="org_unit_path">-</dd></div>
+                        <div><dt>Employee ID</dt><dd data-email-detail="employee_id">-</dd></div>
+                        <div><dt>Tipo de funcionario</dt><dd data-email-detail="tipo_funcionario">-</dd></div>
+                    </dl>
+                </section>
+
+                <section class="email-detail__section">
+                    <h6 class="email-detail__section-title">Organizacao</h6>
+                    <dl class="email-detail__grid">
+                        <div><dt>Departamento</dt><dd data-email-detail="departamento">-</dd></div>
+                        <div><dt>Cargo</dt><dd data-email-detail="cargo">-</dd></div>
+                        <div><dt>Centro de custo</dt><dd data-email-detail="centro_custo">-</dd></div>
+                        <div><dt>E-mail do gestor</dt><dd data-email-detail="email_gestor">-</dd></div>
+                    </dl>
+                </section>
+
+                <section class="email-detail__section">
+                    <h6 class="email-detail__section-title">Contato</h6>
+                    <dl class="email-detail__grid">
+                        <div><dt>Celular</dt><dd data-email-detail="telefone_celular">-</dd></div>
+                        <div><dt>Telefone de trabalho</dt><dd data-email-detail="telefone_trabalho">-</dd></div>
+                        <div><dt>Telefone residencial</dt><dd data-email-detail="telefone_residencial">-</dd></div>
+                        <div><dt>Telefone de recuperacao</dt><dd data-email-detail="telefone_recuperacao">-</dd></div>
+                        <div><dt>E-mail de recuperacao</dt><dd data-email-detail="email_recuperacao">-</dd></div>
+                    </dl>
+                </section>
+
+                <section class="email-detail__section">
+                    <h6 class="email-detail__section-title">Seguranca e acesso</h6>
+                    <dl class="email-detail__grid">
+                        <div><dt>Ultimo acesso</dt><dd data-email-detail="ultimo_acesso">-</dd></div>
+                        <div><dt>Verificacao em 2 etapas (inscrito)</dt><dd data-email-detail="dois_fatores_inscrito">-</dd></div>
+                        <div><dt>Verificacao em 2 etapas (forcado)</dt><dd data-email-detail="dois_fatores_forcado">-</dd></div>
+                        <div><dt>Gemini</dt><dd data-email-detail="gemini_status">-</dd></div>
+                    </dl>
+                </section>
+
+                <section class="email-detail__section">
+                    <h6 class="email-detail__section-title">Armazenamento</h6>
+                    <dl class="email-detail__grid">
+                        <div><dt>Uso de e-mail</dt><dd data-email-detail="uso_email">-</dd></div>
+                        <div><dt>Uso do Drive</dt><dd data-email-detail="uso_drive">-</dd></div>
+                        <div><dt>Uso de fotos</dt><dd data-email-detail="uso_fotos">-</dd></div>
+                        <div><dt>Total usado</dt><dd data-email-detail="armazenamento_usado">-</dd></div>
+                        <div><dt>Limite</dt><dd data-email-detail="limite_armazenamento">-</dd></div>
+                        <div><dt>Licencas</dt><dd data-email-detail="licencas">-</dd></div>
+                    </dl>
+                </section>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>

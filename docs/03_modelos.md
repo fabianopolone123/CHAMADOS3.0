@@ -392,6 +392,18 @@ Registro de cada uso autorizado de uma assinatura (rastreabilidade; nao e apagad
 - `assinatura` (FK `on_delete=CASCADE`, related_name `usos`)
 - `emprestimo` (FK `on_delete=SET_NULL`), `usado_por`, `usado_em`, `observacao`
 
+### ContaEmail
+
+Conta de e-mail corporativo, atualizada via importacao do CSV exportado do Google Workspace (modulo Emails). A importacao faz upsert pela chave `email` (unica). A senha do export NUNCA e armazenada.
+
+- `email` (unico, chave de atualizacao), `primeiro_nome`, `sobrenome`, `status`, `org_unit_path`, `ultimo_acesso`
+- Contato: `email_recuperacao`, `telefone_recuperacao`, `telefone_trabalho`, `telefone_residencial`, `telefone_celular`
+- Organizacao: `employee_id`, `tipo_funcionario`, `cargo`, `email_gestor`, `departamento`, `centro_custo`
+- Seguranca: `dois_fatores_inscrito`, `dois_fatores_forcado`, `gemini_status`
+- Armazenamento: `uso_email`, `uso_drive`, `uso_fotos`, `limite_armazenamento`, `armazenamento_usado`, `licencas`
+- `importado_por` (FK `on_delete=SET_NULL`), `importado_em`, `atualizado_em`
+- Propriedades `nome_completo` e `is_ativo`. Migration `0011`.
+
 ## Modelos previstos para proximas fases
 
 > O antigo item previsto "ComentarioChamado" foi implementado como o modelo `ChamadoMensagem` (conversa do chamado, ver acima). O antigo item "AnexoChamado" foi implementado como `ChamadoAnexo`.
