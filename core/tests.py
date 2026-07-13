@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 
 from django.contrib.auth import get_user_model
@@ -14,7 +15,12 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    OrcamentoContrato,
+    OrcamentoDocumento,
     PendenciaTI,
+    RequisicaoContrato,
+    SuborcamentoContrato,
+    SuborcamentoDocumento,
 )
 from .permissions import ATTENDANT_GROUP_NAME
 
@@ -318,3 +324,60 @@ class PendenciaTITests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 403)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class RequisicaoDeleteFilesTests(TestCase):
+    """Ao excluir uma requisicao, os arquivos fisicos (fotos e documentos dos
+    orcamentos e suborcamentos) devem ser removidos do disco pelos signals."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _img(self, nome):
+        # PNG 1x1 minimo valido para o ImageField aceitar.
+        conteudo = (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+            b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        return SimpleUploadedFile(nome, conteudo, content_type="image/png")
+
+    def test_delete_removes_physical_files(self):
+        requisicao = RequisicaoContrato.objects.create(titulo="Notebooks", criado_por=self.ti)
+        orcamento = OrcamentoContrato.objects.create(
+            requisicao=requisicao, titulo="Loja A", foto_produto=self._img("orc.png")
+        )
+        orc_doc = OrcamentoDocumento.objects.create(
+            orcamento=orcamento,
+            arquivo=SimpleUploadedFile("orc.pdf", b"pdf", content_type="application/pdf"),
+            nome_original="orc.pdf",
+        )
+        suborcamento = SuborcamentoContrato.objects.create(
+            orcamento_pai=orcamento, titulo="Complemento", foto_produto=self._img("sub.png")
+        )
+        sub_doc = SuborcamentoDocumento.objects.create(
+            suborcamento=suborcamento,
+            arquivo=SimpleUploadedFile("sub.pdf", b"pdf", content_type="application/pdf"),
+            nome_original="sub.pdf",
+        )
+
+        caminhos = [
+            orcamento.foto_produto.path,
+            orc_doc.arquivo.path,
+            suborcamento.foto_produto.path,
+            sub_doc.arquivo.path,
+        ]
+        for caminho in caminhos:
+            self.assertTrue(os.path.exists(caminho), f"arquivo deveria existir: {caminho}")
+
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("requisicao_delete", args=[requisicao.id]))
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertFalse(RequisicaoContrato.objects.filter(id=requisicao.id).exists())
+        for caminho in caminhos:
+            self.assertFalse(os.path.exists(caminho), f"arquivo orfao nao removido: {caminho}")

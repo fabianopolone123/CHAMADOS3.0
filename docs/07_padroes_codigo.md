@@ -19,6 +19,7 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 - Arquivos estaticos devem ficar em `static/`.
 - Backends de autenticacao customizados devem ficar no app que os utiliza.
 - Controle de permissao inicial deve preferir `Group` do Django antes de introduzir estruturas mais complexas.
+- Signals ficam em `core/signals.py`, registrados no `CoreConfig.ready()` (`apps.py`). Usar `post_delete` para limpar arquivos fisicos (`FileField`/`ImageField`) do `MEDIA_ROOT` quando o registro e apagado, evitando arquivos orfaos; a limpeza deve remover tambem diretorios vazios sem nunca ultrapassar o `MEDIA_ROOT`.
 
 ## Configuracao e seguranca
 

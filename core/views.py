@@ -1585,8 +1585,9 @@ def requisicao_delete_view(request, requisicao_id: int):
     """Exclui uma requisicao e, por cascata, seus orcamentos, suborcamentos e
     documentos (FKs `on_delete=CASCADE`). Apenas TI/admin; somente via POST/CSRF.
 
-    Observacao: os arquivos fisicos em MEDIA_ROOT nao sao removidos aqui (o
-    projeto ainda nao possui rotina de limpeza de arquivos orfaos).
+    Os arquivos fisicos em MEDIA_ROOT (fotos de produto e documentos) sao
+    removidos do disco pelos signals `post_delete` de `core/signals.py`, que
+    disparam para cada registro apagado no cascade, evitando arquivos orfaos.
     """
     if not _is_ti(request.user):
         return _json_error("Voce nao tem permissao para excluir requisicoes.", status=403)
