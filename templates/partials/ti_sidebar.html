@@ -4,10 +4,17 @@ Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
 Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "permissoes".
 {% endcomment %}
 <aside class="tickets-sidebar">
-    <div>
+    <div class="sidebar-brand">
         <div class="system-mark">TI</div>
-        <h1 class="sidebar-title">Sistema de Chamados TI</h1>
-        <p class="sidebar-copy">Area de atendimento da equipe de TI para triagem, movimentacao e acompanhamento dos chamados.</p>
+        <div class="sidebar-brand__text">
+            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+            <p class="sidebar-copy">Area de atendimento da equipe de TI para triagem, movimentacao e acompanhamento dos chamados.</p>
+        </div>
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+        </button>
     </div>
 
     <nav class="sidebar-menu">

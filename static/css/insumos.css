@@ -10,6 +10,10 @@
 }
 
 .insumos-section {
+    /* min-width: 0 permite que a secao encolha abaixo do min-content da tabela
+       (cabecalhos nowrap), fazendo o `.insumos-table-wrap` rolar internamente
+       em vez de estourar a largura da pagina em telas estreitas. */
+    min-width: 0;
     background: #fff;
     border-radius: 1.1rem;
     border: 1px solid rgba(148, 163, 184, 0.18);
@@ -29,7 +33,7 @@
 /* Grid de cards de estoque */
 .insumos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
     gap: 0.75rem;
 }
 

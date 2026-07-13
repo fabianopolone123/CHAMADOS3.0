@@ -23,6 +23,7 @@ Construir um sistema de chamados de TI em Django com foco em simplicidade, organ
 - O projeto possui o modulo Insumos em `/insumos/` (apenas TI/admin): controle simples de estoque de materiais de TI (models `InsumoTI` e `RetiradaInsumoTI`) com cadastro, retirada com baixa de estoque validada no backend e historico de retiradas.
 - O projeto possui o modulo Documentos em `/documentos/` (apenas TI/admin): cadastro e armazenamento de documentos internos (models `DocumentoTI` e `DocumentoTIAnexo`) com nome, observacao e anexos multiplos servidos por rota protegida.
 - O projeto possui o modulo Emprestimos em `/emprestimos/` (apenas TI/admin): comodato de equipamentos de TI (models `EmprestimoTI`, `EquipamentoEmprestimoTI`, `FotoEquipamentoEmprestimoTI`, `AssinaturaResponsavelTI`, `LogUsoAssinaturaTI`). Gera o termo de responsabilidade em PDF com ReportLab (`core/termo_pdf.py`), com assinatura do responsavel protegida por senha (hash), anexo do termo assinado e controle de status.
+- O layout autenticado e responsivo: o shell `.tickets-app` (sidebar + conteudo) usa breakpoint em 992px. Acima disso a sidebar fica lateral (290px); abaixo vira uma barra superior fina com menu recolhido atras de um hamburger (`static/js/sidebar.js`). Regras globais de responsividade e barras de rolagem discretas ficam em `static/css/base.css`; a pagina nunca deve gerar rolagem horizontal (conteudo largo rola dentro do proprio container).
 - O arquivo `.env` na raiz concentra as configuracoes sensiveis de ambiente.
 - A base de documentacao do projeto fica em `docs/`.
 

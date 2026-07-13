@@ -243,8 +243,9 @@
  * colunas preenchem o espaco disponivel. A rolagem interna da lista de cards so
  * aparece quando os cards ultrapassam a altura da coluna. Sem numeros magicos:
  * a altura vem da cadeia flex (100vh -> main -> wrapper flex:1 -> coluna 100%).
+ * Vale a partir de 992px, mesmo ponto em que a sidebar fica lateral (>=992px).
  */
-@media (min-width: 1200px) {
+@media (min-width: 992px) {
     .kanban-page {
         height: 100vh;
     }
@@ -1088,9 +1089,14 @@
     color: #fff;
 }
 
-@media (max-width: 1199.98px) {
+@media (max-width: 991.98px) {
     .tickets-app {
+        /* Barra superior (altura natural) + conteudo ocupando o restante.
+           Sem isto, o `min-height: 100vh` distribuiria o espaco livre entre as
+           linhas (align-content stretch) e a barra escura esticaria em paginas
+           curtas. */
         grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
     }
 }
 
@@ -1287,7 +1293,7 @@
 
 .closed-detail__meta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
     gap: 0.65rem 1rem;
     margin: 0 0 1.1rem;
     padding: 0.9rem 1rem;

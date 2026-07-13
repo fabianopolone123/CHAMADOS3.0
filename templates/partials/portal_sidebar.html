@@ -4,10 +4,17 @@ Uso: {% include "partials/portal_sidebar.html" with active="meus" %}
 Valores de active: "meus", "novo".
 {% endcomment %}
 <aside class="tickets-sidebar">
-    <div>
+    <div class="sidebar-brand">
         <div class="system-mark">TI</div>
-        <h1 class="sidebar-title">Sistema de Chamados TI</h1>
-        <p class="sidebar-copy">Abra novos chamados para a equipe de TI e acompanhe o andamento das suas solicitacoes em um so lugar.</p>
+        <div class="sidebar-brand__text">
+            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
+            <p class="sidebar-copy">Abra novos chamados para a equipe de TI e acompanhe o andamento das suas solicitacoes em um so lugar.</p>
+        </div>
+        <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+            <span class="sidebar-toggle__bar"></span>
+        </button>
     </div>
 
     <nav class="sidebar-menu">

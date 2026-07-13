@@ -41,6 +41,41 @@
     font-weight: 800;
 }
 
+/* Botao hamburger: some no desktop, aparece no modo barra superior (mobile). */
+.sidebar-toggle {
+    display: none;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 2.7rem;
+    height: 2.7rem;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.7rem;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-toggle:focus-visible {
+    outline: 2px solid rgba(147, 197, 253, 0.7);
+    outline-offset: 2px;
+}
+
+.sidebar-toggle__bar {
+    display: block;
+    width: 1.15rem;
+    height: 2px;
+    border-radius: 2px;
+    background: #e2e8f0;
+}
+
 .sidebar-copy {
     margin-bottom: 0;
     color: rgba(226, 232, 240, 0.72);
@@ -133,13 +168,75 @@
     font-weight: 700;
 }
 
-@media (max-width: 1199.98px) {
-    /* Em telas menores a sidebar volta ao fluxo normal (empilhada no topo). */
+@media (max-width: 991.98px) {
+    /* Modo barra superior: a sidebar vira uma barra fina no topo com o menu
+       recolhido atras do hamburger, liberando a tela para o conteudo. */
     .tickets-sidebar {
-        position: static;
+        position: sticky;
+        top: 0;
+        z-index: 1030;
+        align-self: stretch;
         height: auto;
-        overflow-y: visible;
+        overflow: visible;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 0;
+        padding: 0.6rem 1rem;
         border-right: 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Marca + hamburger na mesma linha. */
+    .sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+    }
+
+    .system-mark {
+        width: 2.4rem;
+        height: 2.4rem;
+        margin-bottom: 0;
+        border-radius: 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    .sidebar-brand__text {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .sidebar-title {
+        margin-bottom: 0;
+        font-size: 1.05rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sidebar-copy {
+        display: none;
+    }
+
+    .sidebar-toggle {
+        display: inline-flex;
+    }
+
+    /* Menu e rodape recolhidos por padrao; abrem ao tocar no hamburger. */
+    .sidebar-menu,
+    .sidebar-footer {
+        display: none;
+        margin-top: 0.75rem;
+    }
+
+    .tickets-sidebar.is-open .sidebar-menu {
+        display: grid;
+    }
+
+    .tickets-sidebar.is-open .sidebar-footer {
+        display: grid;
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 }
