@@ -225,8 +225,8 @@
     flex-direction: column;
     /* Fluida: cresce para aproveitar a largura em telas grandes e encolhe ate
        um minimo legivel; o excesso de colunas rola horizontalmente. */
-    flex: 1 1 290px;
-    min-width: 250px;
+    flex: 1 1 320px;
+    min-width: 300px;
     max-width: 460px;
     /* No desktop a altura e preenchida pelo flex (ver @media min-width 1200px);
        aqui fica apenas um minimo confortavel para telas menores/empilhadas. */
@@ -515,6 +515,11 @@
 
 .ticket-meta {
     display: grid;
+    /* Coluna unica limitada a largura do card (minmax 0..1fr). Sem isto, a
+       coluna implicita do grid seria dimensionada pelo conteudo (max-content)
+       e as linhas rotulo/valor estouravam o card para a direita em colunas
+       estreitas, pois o valor (dd) nao encolhia. */
+    grid-template-columns: minmax(0, 1fr);
     gap: clamp(0.5rem, 0.6vw, 0.7rem);
     margin: 0;
 }
@@ -524,6 +529,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     align-items: baseline;
+    min-width: 0;
 }
 
 .ticket-meta dt {
