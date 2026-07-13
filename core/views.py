@@ -42,6 +42,7 @@ from .models import (
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
+    Ramal,
     RequisicaoContrato,
     RetiradaInsumoTI,
     SuborcamentoContrato,
@@ -2517,3 +2518,71 @@ def email_detail_view(request, conta_id: int):
     data = _serialize_conta_email(conta)
     data["ok"] = True
     return JsonResponse(data)
+
+
+# ==========================================================================
+# Modulo Ramais: lista telefonica interna (colaborador, setor, telefone,
+# ramal, e-mail). O e-mail e escolhido entre as contas ja cadastradas.
+# ==========================================================================
+
+
+@ti_required
+def ramais_dashboard_view(request):
+    ramais = list(Ramal.objects.all())
+    contas = ContaEmail.objects.all().order_by("primeiro_nome", "sobrenome", "email")
+    opcoes_email = [
+        {"id": c.id, "email": c.email, "nome": c.nome_completo}
+        for c in contas
+    ]
+    context = {
+        "page_title": "Ramais",
+        "ramais": ramais,
+        "total_ramais": len(ramais),
+        "opcoes_email": opcoes_email,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+        "can_view_history": True,
+    }
+    return render(request, "chamados/ramais.html", context)
+
+
+@login_required
+@require_POST
+def ramal_create_view(request):
+    """Cadastra um novo ramal. O e-mail e resolvido a partir da conta de e-mail
+    selecionada (quando informada). Notifica pelo toast classico (Django
+    messages) e redireciona para a listagem."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar ramais.")
+        return redirect("ramais_dashboard")
+
+    colaborador = (request.POST.get("colaborador") or "").strip()
+    setor = (request.POST.get("setor") or "").strip()
+    telefone = (request.POST.get("telefone") or "").strip()
+    ramal = (request.POST.get("ramal") or "").strip()
+
+    if len(colaborador) < 2:
+        messages.error(request, "Informe o nome do colaborador (minimo 2 caracteres).")
+        return redirect("ramais_dashboard")
+
+    conta = None
+    email = ""
+    conta_id = (request.POST.get("conta_email") or "").strip()
+    if conta_id:
+        conta = ContaEmail.objects.filter(pk=conta_id).first()
+        if not conta:
+            messages.error(request, "E-mail selecionado invalido.")
+            return redirect("ramais_dashboard")
+        email = conta.email
+
+    Ramal.objects.create(
+        colaborador=colaborador,
+        setor=setor,
+        telefone=telefone,
+        ramal=ramal,
+        email=email,
+        conta_email=conta,
+        criado_por=request.user,
+    )
+    messages.success(request, f"Ramal de {colaborador} cadastrado com sucesso.")
+    return redirect("ramais_dashboard")

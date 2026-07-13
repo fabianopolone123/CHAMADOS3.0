@@ -1,0 +1,254 @@
+/* ==========================================================================
+   Modulo Ramais: lista telefonica interna (lista + cadastro)
+   ========================================================================== */
+
+.ramais-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.ramais-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.2rem;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-left: 4px solid #2563eb;
+    border-radius: 1.1rem;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.ramais-stat__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+}
+
+.ramais-stat__value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+}
+
+.ramais-panel {
+    min-width: 0;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    border-radius: 1.6rem;
+    box-shadow: 0 22px 45px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(14px);
+}
+
+/* ----- Busca ----- */
+.ramais-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.ramais-search__icon {
+    position: absolute;
+    left: 0.9rem;
+    font-size: 0.95rem;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.ramais-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.ramais-search__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.ramais-search__status {
+    margin: 0.6rem 0 0.2rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    min-height: 1rem;
+}
+
+/* ----- Tabela ----- */
+.ramais-table-wrap {
+    min-width: 0;
+    overflow-x: auto;
+    margin-top: 0.4rem;
+}
+
+.ramais-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.ramais-table thead th {
+    position: sticky;
+    top: 0;
+    text-align: left;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.ramais-table tbody td {
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1f2937;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+
+.ramais-row:hover td {
+    background: #eff5ff;
+}
+
+.ramais-cell--name {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.ramais-cell--email a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.ramais-cell--email a:hover {
+    text-decoration: underline;
+}
+
+.ramais-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.2rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.6rem;
+    background: #e0e7ff;
+    color: #312e81;
+    font-weight: 800;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+}
+
+/* ----- Estados vazios ----- */
+.ramais-empty,
+.ramais-empty-state__hint {
+    margin: 0.6rem 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.ramais-empty-state {
+    padding: 2.5rem 1rem;
+    text-align: center;
+}
+
+.ramais-empty-state__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+/* Duas colunas no modal (telefone + ramal). */
+.ramais-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+/* Esconde colunas menos importantes conforme a largura. */
+@media (max-width: 900px) {
+    .ramais-col--hide-md {
+        display: none;
+    }
+}
+
+@media (max-width: 700px) {
+    .ramais-col--hide-sm {
+        display: none;
+    }
+}
+
+/* Em telas de celular a tabela vira lista de cards (linha = cartao). */
+@media (max-width: 640px) {
+    .ramais-table thead {
+        display: none;
+    }
+
+    .ramais-table,
+    .ramais-table tbody,
+    .ramais-table tr,
+    .ramais-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .ramais-row {
+        margin-bottom: 0.7rem;
+        padding: 0.35rem 0.2rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.9rem;
+        background: #fff;
+    }
+
+    .ramais-row:hover td {
+        background: transparent;
+    }
+
+    .ramais-table tbody td {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.3rem 0.85rem;
+        border-bottom: 0;
+        text-align: right;
+    }
+
+    .ramais-col--hide-md,
+    .ramais-col--hide-sm {
+        display: flex;
+    }
+
+    .ramais-table tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: 0.7rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94a3b8;
+        text-align: left;
+    }
+
+    .ramais-cell--name {
+        font-size: 1rem;
+    }
+}

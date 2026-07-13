@@ -5,6 +5,7 @@ from .models import (
     ContaEmail,
     DocumentoTI,
     DocumentoTIAnexo,
+    Ramal,
     EmprestimoTI,
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
@@ -154,3 +155,10 @@ class ContaEmailAdmin(admin.ModelAdmin):
     list_filter = ("status", "departamento", "dois_fatores_inscrito")
     search_fields = ("email", "primeiro_nome", "sobrenome", "departamento", "cargo", "employee_id")
     date_hierarchy = "atualizado_em"
+
+
+@admin.register(Ramal)
+class RamalAdmin(admin.ModelAdmin):
+    list_display = ("colaborador", "setor", "telefone", "ramal", "email", "atualizado_em")
+    list_filter = ("setor",)
+    search_fields = ("colaborador", "setor", "telefone", "ramal", "email")

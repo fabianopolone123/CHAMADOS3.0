@@ -404,6 +404,14 @@ Conta de e-mail corporativo, atualizada via importacao do CSV exportado do Googl
 - `importado_por` (FK `on_delete=SET_NULL`), `importado_em`, `atualizado_em`
 - Propriedades `nome_completo` e `is_ativo`. Migration `0011`.
 
+### Ramal
+
+Contato da lista telefonica interna (modulo Ramais). Seed inicial via migration de dados `0013`, que le um arquivo local ignorado pelo Git (`seed/ramais_seed.json`); os dados pessoais nao sao versionados.
+
+- `colaborador`, `setor`, `telefone`, `ramal`, `email`
+- `conta_email` (FK `ContaEmail` `on_delete=SET_NULL`, related_name `ramais`) — vinculo opcional com a conta de e-mail escolhida no cadastro
+- `criado_por` (FK `on_delete=SET_NULL`), `criado_em`, `atualizado_em`. Migration `0012`.
+
 ## Modelos previstos para proximas fases
 
 > O antigo item previsto "ComentarioChamado" foi implementado como o modelo `ChamadoMensagem` (conversa do chamado, ver acima). O antigo item "AnexoChamado" foi implementado como `ChamadoAnexo`.

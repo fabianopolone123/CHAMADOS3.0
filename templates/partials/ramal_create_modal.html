@@ -1,0 +1,52 @@
+{% load static %}
+<div class="modal fade" id="createRamalModal" tabindex="-1" aria-labelledby="createRamalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Ramais</span>
+                    <h5 class="modal-title" id="createRamalModalLabel">Cadastrar novo ramal</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'ramal_create' %}" class="create-ticket-form" id="createRamalForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>E-mail (selecione entre as contas cadastradas)</span>
+                        <select class="form-select" name="conta_email" id="ramalEmailSelect">
+                            <option value="" data-nome="">— Selecione um e-mail —</option>
+                            {% for op in opcoes_email %}
+                                <option value="{{ op.id }}" data-nome="{{ op.nome }}">{{ op.nome }} ({{ op.email }})</option>
+                            {% endfor %}
+                        </select>
+                        <small class="contrato-field__help">A lista vem dos e-mails ja cadastrados no modulo Emails.</small>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Colaborador</span>
+                        <input type="text" class="form-control" name="colaborador" id="ramalColaborador" maxlength="255" placeholder="Ex.: Fabiano Polone" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Setor</span>
+                        <input type="text" class="form-control" name="setor" maxlength="255" placeholder="Ex.: TI">
+                    </label>
+                    <div class="ramais-field-row">
+                        <label class="contrato-field">
+                            <span>Telefone</span>
+                            <input type="text" class="form-control" name="telefone" maxlength="60" placeholder="Ex.: (16) 3353-8390">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Ramal</span>
+                            <input type="text" class="form-control" name="ramal" maxlength="20" placeholder="Ex.: 8390">
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="createRamalSubmit">Cadastrar ramal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

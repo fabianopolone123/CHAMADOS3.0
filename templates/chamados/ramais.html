@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/ramais.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app ramais-app">
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="ramais" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Ramais</h2>
+                <p class="contratos-topbar__subtitle">Lista de contatos e ramais internos</p>
+                <p class="topbar-subtitle">Consulte colaborador, setor, telefone, ramal e e-mail. Pesquise digitando abaixo.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createRamalButton" aria-label="Cadastrar novo ramal" title="Cadastrar novo ramal">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Cadastrar novo</span>
+            </button>
+        </header>
+
+        <section class="ramais-stats">
+            <article class="ramais-stat">
+                <span class="ramais-stat__label">Total de ramais</span>
+                <strong class="ramais-stat__value">{{ total_ramais }}</strong>
+            </article>
+        </section>
+
+        <section class="ramais-panel">
+            <div class="ramais-search">
+                <span class="ramais-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="ramalSearch"
+                    class="ramais-search__input"
+                    placeholder="Pesquisar por colaborador, setor, telefone, ramal ou e-mail..."
+                    autocomplete="off"
+                >
+            </div>
+            <p class="ramais-search__status" id="ramalSearchStatus"></p>
+
+            {% if ramais %}
+            <div class="ramais-table-wrap">
+                <table class="ramais-table" id="ramaisTable">
+                    <thead>
+                        <tr>
+                            <th>Colaborador</th>
+                            <th class="ramais-col--hide-sm">Setor</th>
+                            <th class="ramais-col--hide-sm">Telefone</th>
+                            <th>Ramal</th>
+                            <th class="ramais-col--hide-md">E-mail</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ramaisTableBody">
+                        {% for r in ramais %}
+                        <tr
+                            class="ramais-row"
+                            data-search="{{ r.colaborador|lower }} {{ r.setor|lower }} {{ r.telefone|lower }} {{ r.ramal|lower }} {{ r.email|lower }}"
+                        >
+                            <td data-label="Colaborador" class="ramais-cell--name">{{ r.colaborador|default:"-" }}</td>
+                            <td data-label="Setor" class="ramais-col--hide-sm">{{ r.setor|default:"-" }}</td>
+                            <td data-label="Telefone" class="ramais-col--hide-sm">{{ r.telefone|default:"-" }}</td>
+                            <td data-label="Ramal"><span class="ramais-badge">{{ r.ramal|default:"-" }}</span></td>
+                            <td data-label="E-mail" class="ramais-col--hide-md ramais-cell--email">
+                                {% if r.email %}<a href="mailto:{{ r.email }}">{{ r.email }}</a>{% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="ramais-empty is-hidden" id="ramaisNoResults">Nenhum ramal encontrado para a pesquisa.</p>
+            {% else %}
+            <div class="ramais-empty-state">
+                <p class="ramais-empty-state__title">Nenhum ramal cadastrado ainda.</p>
+                <p class="ramais-empty-state__hint">Clique em "Cadastrar novo" para adicionar o primeiro contato.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/ramal_create_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/ramais.js' %}"></script>
+{% endblock %}

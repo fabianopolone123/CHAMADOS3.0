@@ -908,3 +908,43 @@ class ContaEmail(models.Model):
     @property
     def is_ativo(self) -> bool:
         return (self.status or "").strip().lower() == "active"
+
+
+# ==========================================================================
+# Modulo Ramais: lista telefonica interna (colaborador, setor, telefone,
+# ramal e e-mail). O e-mail pode ser vinculado a uma ContaEmail existente.
+# ==========================================================================
+
+
+class Ramal(models.Model):
+    """Contato da lista de ramais/telefones interna."""
+
+    colaborador = models.CharField(max_length=255, blank=True)
+    setor = models.CharField(max_length=255, blank=True)
+    telefone = models.CharField(max_length=60, blank=True)
+    ramal = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    conta_email = models.ForeignKey(
+        ContaEmail,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ramais",
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ramais_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["colaborador", "setor", "id"]
+        verbose_name = "Ramal"
+        verbose_name_plural = "Ramais"
+
+    def __str__(self) -> str:
+        return f"{self.colaborador or self.setor} ({self.ramal or '-'})"

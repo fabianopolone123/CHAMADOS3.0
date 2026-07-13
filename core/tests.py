@@ -19,6 +19,7 @@ from .models import (
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
+    Ramal,
     RequisicaoContrato,
     SuborcamentoContrato,
     SuborcamentoDocumento,
@@ -435,3 +436,57 @@ class ContaEmailImportTests(TestCase):
         self.client.force_login(self.common)
         resp = self.client.get(reverse("emails_dashboard"))
         self.assertEqual(resp.status_code, 302)  # redirecionado (sem permissao TI)
+
+
+class RamalCreateTests(TestCase):
+    """Cadastro de ramal (e-mail vindo de uma ContaEmail) e permissoes.
+
+    Obs.: o banco de teste ja vem com os ramais do seed (migration 0013), por
+    isso os testes comparam a contagem antes/depois em vez de assumir zero.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        self.conta = ContaEmail.objects.create(
+            email="novo.contato@x.com", primeiro_nome="Novo", sobrenome="Contato"
+        )
+
+    def test_ti_creates_ramal_with_selected_email(self):
+        self.client.force_login(self.ti)
+        antes = Ramal.objects.count()
+        resp = self.client.post(
+            reverse("ramal_create"),
+            {"colaborador": "Zzz Teste", "setor": "TI", "telefone": "123", "ramal": "9000", "conta_email": self.conta.id},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Ramal.objects.count(), antes + 1)
+
+        ramal = Ramal.objects.get(colaborador="Zzz Teste")
+        self.assertEqual(ramal.email, "novo.contato@x.com")  # puxado da conta selecionada
+        self.assertEqual(ramal.conta_email, self.conta)
+        self.assertEqual(ramal.ramal, "9000")
+
+    def test_create_requires_colaborador(self):
+        self.client.force_login(self.ti)
+        antes = Ramal.objects.count()
+        resp = self.client.post(reverse("ramal_create"), {"colaborador": "", "setor": "TI"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Ramal.objects.count(), antes)  # nada criado
+
+    def test_common_user_cannot_create(self):
+        self.client.force_login(self.common)
+        antes = Ramal.objects.count()
+        resp = self.client.post(
+            reverse("ramal_create"), {"colaborador": "Hacker", "setor": "X"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Ramal.objects.count(), antes)
+
+    def test_common_user_cannot_access_dashboard(self):
+        self.client.force_login(self.common)
+        resp = self.client.get(reverse("ramais_dashboard"))
+        self.assertEqual(resp.status_code, 302)
