@@ -225,8 +225,8 @@
     flex-direction: column;
     /* Fluida: cresce para aproveitar a largura em telas grandes e encolhe ate
        um minimo legivel; o excesso de colunas rola horizontalmente. */
-    flex: 1 1 320px;
-    min-width: 300px;
+    flex: 1 1 290px;
+    min-width: 250px;
     max-width: 460px;
     /* No desktop a altura e preenchida pelo flex (ver @media min-width 1200px);
        aqui fica apenas um minimo confortavel para telas menores/empilhadas. */
@@ -401,6 +401,11 @@
 .ticket-list {
     flex: 1 1 auto;
     display: grid;
+    /* Coluna unica que encolhe e preenche a largura disponivel (minmax 0..1fr).
+       Sem isto, a coluna implicita do grid seria dimensionada pelo conteudo do
+       card (max-content), fazendo o card estourar a largura da coluna e gerar
+       barra de rolagem horizontal dentro de cada coluna. */
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: clamp(0.6rem, 0.8vw, 0.95rem);
     padding: clamp(0.75rem, 1vw, 1.15rem);
@@ -409,6 +414,7 @@
 }
 
 .ticket-card {
+    min-width: 0;
     padding: clamp(0.75rem, 0.6rem + 0.6vw, 1.05rem);
     border-radius: 1.2rem;
     background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
