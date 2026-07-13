@@ -490,3 +490,46 @@ class RamalCreateTests(TestCase):
         self.client.force_login(self.common)
         resp = self.client.get(reverse("ramais_dashboard"))
         self.assertEqual(resp.status_code, 302)
+
+    def test_create_with_free_email(self):
+        """E-mail digitado livremente (sem conta selecionada) e aceito."""
+        self.client.force_login(self.ti)
+        self.client.post(
+            reverse("ramal_create"),
+            {"colaborador": "Sala Teste", "setor": "Reuniao", "email": "livre@x.com"},
+        )
+        ramal = Ramal.objects.get(colaborador="Sala Teste")
+        self.assertEqual(ramal.email, "livre@x.com")
+        self.assertIsNone(ramal.conta_email)
+
+    def test_ti_updates_ramal(self):
+        self.client.force_login(self.ti)
+        ramal = Ramal.objects.create(colaborador="Antigo", setor="X", ramal="1000")
+        resp = self.client.post(
+            reverse("ramal_update", args=[ramal.id]),
+            {"colaborador": "Novo Nome", "setor": "TI", "telefone": "9", "ramal": "1001", "conta_email": self.conta.id},
+        )
+        self.assertEqual(resp.status_code, 302)
+        ramal.refresh_from_db()
+        self.assertEqual(ramal.colaborador, "Novo Nome")
+        self.assertEqual(ramal.ramal, "1001")
+        self.assertEqual(ramal.email, self.conta.email)  # veio da conta selecionada
+        self.assertEqual(ramal.conta_email, self.conta)
+
+    def test_ti_deletes_ramal(self):
+        self.client.force_login(self.ti)
+        ramal = Ramal.objects.create(colaborador="Excluir", setor="X")
+        antes = Ramal.objects.count()
+        resp = self.client.post(reverse("ramal_delete", args=[ramal.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Ramal.objects.count(), antes - 1)
+        self.assertFalse(Ramal.objects.filter(id=ramal.id).exists())
+
+    def test_common_user_cannot_update_or_delete(self):
+        ramal = Ramal.objects.create(colaborador="Protegido", setor="X")
+        self.client.force_login(self.common)
+        self.client.post(reverse("ramal_update", args=[ramal.id]), {"colaborador": "Hack"})
+        self.client.post(reverse("ramal_delete", args=[ramal.id]))
+        ramal.refresh_from_db()
+        self.assertEqual(ramal.colaborador, "Protegido")  # inalterado
+        self.assertTrue(Ramal.objects.filter(id=ramal.id).exists())  # nao excluido

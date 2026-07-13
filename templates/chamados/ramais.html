@@ -10,7 +10,11 @@
 {% endblock %}
 
 {% block content %}
-<main class="tickets-app ramais-app">
+<main
+    class="tickets-app ramais-app"
+    data-ramal-update-url="{% url 'ramal_update' ramal_id=0 %}"
+    data-ramal-delete-url="{% url 'ramal_delete' ramal_id=0 %}"
+>
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="ramais" %}
 
@@ -52,25 +56,35 @@
                 <table class="ramais-table" id="ramaisTable">
                     <thead>
                         <tr>
-                            <th>Colaborador</th>
-                            <th class="ramais-col--hide-sm">Setor</th>
-                            <th class="ramais-col--hide-sm">Telefone</th>
-                            <th>Ramal</th>
-                            <th class="ramais-col--hide-md">E-mail</th>
+                            <th class="ramais-th" data-sort-index="0" aria-sort="none">Colaborador <span class="ramais-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ramais-th ramais-col--hide-sm" data-sort-index="1" aria-sort="none">Setor <span class="ramais-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ramais-th ramais-col--hide-sm" data-sort-index="2" aria-sort="none">Telefone <span class="ramais-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ramais-th" data-sort-index="3" data-sort-numeric="1" aria-sort="none">Ramal <span class="ramais-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ramais-th ramais-col--hide-md" data-sort-index="4" aria-sort="none">E-mail <span class="ramais-sort-ind" aria-hidden="true"></span></th>
                         </tr>
                     </thead>
                     <tbody id="ramaisTableBody">
                         {% for r in ramais %}
                         <tr
                             class="ramais-row"
+                            data-id="{{ r.id }}"
+                            data-colaborador="{{ r.colaborador }}"
+                            data-setor="{{ r.setor }}"
+                            data-telefone="{{ r.telefone }}"
+                            data-ramal="{{ r.ramal }}"
+                            data-email="{{ r.email }}"
+                            data-conta-id="{{ r.conta_email_id|default:'' }}"
                             data-search="{{ r.colaborador|lower }} {{ r.setor|lower }} {{ r.telefone|lower }} {{ r.ramal|lower }} {{ r.email|lower }}"
+                            tabindex="0"
+                            role="button"
+                            aria-label="Editar ramal de {{ r.colaborador|default:r.setor }}"
                         >
                             <td data-label="Colaborador" class="ramais-cell--name">{{ r.colaborador|default:"-" }}</td>
                             <td data-label="Setor" class="ramais-col--hide-sm">{{ r.setor|default:"-" }}</td>
                             <td data-label="Telefone" class="ramais-col--hide-sm">{{ r.telefone|default:"-" }}</td>
                             <td data-label="Ramal"><span class="ramais-badge">{{ r.ramal|default:"-" }}</span></td>
                             <td data-label="E-mail" class="ramais-col--hide-md ramais-cell--email">
-                                {% if r.email %}<a href="mailto:{{ r.email }}">{{ r.email }}</a>{% else %}-{% endif %}
+                                {% if r.email %}<a href="mailto:{{ r.email }}" class="ramais-mail-link">{{ r.email }}</a>{% else %}-{% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -89,6 +103,7 @@
 </main>
 
 {% include "partials/ramal_create_modal.html" %}
+{% include "partials/ramal_edit_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

@@ -1,56 +1,67 @@
 {% load static %}
-<div class="modal fade" id="createRamalModal" tabindex="-1" aria-labelledby="createRamalModalLabel" aria-hidden="true">
+<div class="modal fade" id="editRamalModal" tabindex="-1" aria-labelledby="editRamalModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content create-ticket-modal">
             <div class="modal-header">
                 <div>
                     <span class="create-ticket-kicker">Ramais</span>
-                    <h5 class="modal-title" id="createRamalModalLabel">Cadastrar novo ramal</h5>
+                    <h5 class="modal-title" id="editRamalModalLabel">Editar ramal</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
-            <form method="post" action="{% url 'ramal_create' %}" class="create-ticket-form" id="createRamalForm">
+            <form method="post" class="create-ticket-form" id="editRamalForm">
                 {% csrf_token %}
                 <div class="modal-body">
                     <label class="contrato-field">
                         <span>Puxar de um e-mail ja cadastrado</span>
-                        <select class="form-select" name="conta_email" id="ramalEmailSelect">
+                        <select class="form-select" name="conta_email" id="editRamalEmailSelect">
                             <option value="" data-nome="" data-email="">— Selecionar (opcional) —</option>
                             {% for op in opcoes_email %}
                                 <option value="{{ op.id }}" data-nome="{{ op.nome }}" data-email="{{ op.email }}">{{ op.nome }} ({{ op.email }})</option>
                             {% endfor %}
                         </select>
-                        <small class="contrato-field__help">A lista vem dos e-mails do modulo Emails. Ao escolher, o e-mail e o colaborador sao preenchidos.</small>
                     </label>
                     <label class="contrato-field">
                         <span>E-mail</span>
-                        <input type="email" class="form-control" name="email" id="ramalEmailInput" maxlength="254" placeholder="nome@sidertec.com.br">
+                        <input type="email" class="form-control" name="email" id="editRamalEmailInput" maxlength="254" placeholder="nome@sidertec.com.br">
                     </label>
                     <label class="contrato-field">
                         <span>Colaborador</span>
-                        <input type="text" class="form-control" name="colaborador" id="ramalColaborador" maxlength="255" placeholder="Ex.: Fabiano Polone" required>
+                        <input type="text" class="form-control" name="colaborador" id="editRamalColaborador" maxlength="255" required>
                     </label>
                     <label class="contrato-field">
                         <span>Setor</span>
-                        <input type="text" class="form-control" name="setor" maxlength="255" placeholder="Ex.: TI">
+                        <input type="text" class="form-control" name="setor" id="editRamalSetor" maxlength="255">
                     </label>
                     <div class="ramais-field-row">
                         <label class="contrato-field">
                             <span>Telefone</span>
-                            <input type="text" class="form-control" name="telefone" maxlength="60" placeholder="Ex.: (16) 3353-8390">
+                            <input type="text" class="form-control" name="telefone" id="editRamalTelefone" maxlength="60">
                         </label>
                         <label class="contrato-field">
                             <span>Ramal</span>
-                            <input type="text" class="form-control" name="ramal" maxlength="20" placeholder="Ex.: 8390">
+                            <input type="text" class="form-control" name="ramal" id="editRamalRamal" maxlength="20">
                         </label>
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" id="editRamalDeleteBtn">Excluir</button>
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" id="createRamalSubmit">Cadastrar ramal</button>
+                    <button type="submit" class="btn btn-primary">Salvar alteracoes</button>
                 </div>
             </form>
+
+            <div class="ramal-delete-confirm is-hidden" id="ramalDeleteConfirm">
+                <p class="ramal-delete-confirm__text">
+                    Tem certeza que deseja excluir este ramal? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="deleteRamalForm" class="ramal-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="ramalDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
         </div>
     </div>
 </div>

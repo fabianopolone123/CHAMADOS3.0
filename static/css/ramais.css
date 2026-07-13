@@ -120,8 +120,56 @@
     overflow-wrap: anywhere;
 }
 
-.ramais-row:hover td {
+.ramais-row {
+    cursor: pointer;
+    transition: background 0.14s ease;
+}
+
+.ramais-row:hover td,
+.ramais-row:focus-visible td {
     background: #eff5ff;
+}
+
+.ramais-row:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.5);
+    outline-offset: -2px;
+}
+
+/* Cabecalhos ordenaveis */
+.ramais-th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.ramais-th:hover {
+    color: #1d4ed8;
+}
+
+.ramais-sort-ind {
+    display: inline-block;
+    width: 0.8em;
+    color: #2563eb;
+    font-weight: 800;
+}
+
+/* Confirmacao de exclusao dentro do modal de edicao */
+.ramal-delete-confirm {
+    padding: 1.2rem 1.25rem 1.4rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.ramal-delete-confirm__text {
+    margin: 0 0 1rem;
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.ramal-delete-confirm__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin: 0;
 }
 
 .ramais-cell--name {

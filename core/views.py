@@ -2546,43 +2546,96 @@ def ramais_dashboard_view(request):
     return render(request, "chamados/ramais.html", context)
 
 
-@login_required
-@require_POST
-def ramal_create_view(request):
-    """Cadastra um novo ramal. O e-mail e resolvido a partir da conta de e-mail
-    selecionada (quando informada). Notifica pelo toast classico (Django
-    messages) e redireciona para a listagem."""
-    if not _is_ti(request.user):
-        messages.error(request, "Voce nao tem permissao para cadastrar ramais.")
-        return redirect("ramais_dashboard")
+def _ler_dados_ramal(request):
+    """Le e valida os campos do formulario de ramal (create/update).
 
+    Retorna (dados, erro). O e-mail pode ser digitado livremente e/ou vir de uma
+    ContaEmail selecionada; quando uma conta e escolhida e o campo de e-mail
+    esta vazio, usa-se o e-mail da conta.
+    """
     colaborador = (request.POST.get("colaborador") or "").strip()
-    setor = (request.POST.get("setor") or "").strip()
-    telefone = (request.POST.get("telefone") or "").strip()
-    ramal = (request.POST.get("ramal") or "").strip()
-
     if len(colaborador) < 2:
-        messages.error(request, "Informe o nome do colaborador (minimo 2 caracteres).")
-        return redirect("ramais_dashboard")
+        return None, "Informe o nome do colaborador (minimo 2 caracteres)."
 
+    email = (request.POST.get("email") or "").strip()
     conta = None
-    email = ""
     conta_id = (request.POST.get("conta_email") or "").strip()
     if conta_id:
         conta = ContaEmail.objects.filter(pk=conta_id).first()
         if not conta:
-            messages.error(request, "E-mail selecionado invalido.")
-            return redirect("ramais_dashboard")
-        email = conta.email
+            return None, "E-mail selecionado invalido."
+        if not email:
+            email = conta.email
 
-    Ramal.objects.create(
-        colaborador=colaborador,
-        setor=setor,
-        telefone=telefone,
-        ramal=ramal,
-        email=email,
-        conta_email=conta,
-        criado_por=request.user,
-    )
-    messages.success(request, f"Ramal de {colaborador} cadastrado com sucesso.")
+    dados = {
+        "colaborador": colaborador,
+        "setor": (request.POST.get("setor") or "").strip(),
+        "telefone": (request.POST.get("telefone") or "").strip(),
+        "ramal": (request.POST.get("ramal") or "").strip(),
+        "email": email,
+        "conta_email": conta,
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def ramal_create_view(request):
+    """Cadastra um novo ramal. O e-mail pode ser digitado ou escolhido entre as
+    contas ja cadastradas. Notifica pelo toast classico e redireciona."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar ramais.")
+        return redirect("ramais_dashboard")
+
+    dados, erro = _ler_dados_ramal(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("ramais_dashboard")
+
+    Ramal.objects.create(criado_por=request.user, **dados)
+    messages.success(request, f"Ramal de {dados['colaborador']} cadastrado com sucesso.")
+    return redirect("ramais_dashboard")
+
+
+@login_required
+@require_POST
+def ramal_update_view(request, ramal_id: int):
+    """Edita um ramal existente (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar ramais.")
+        return redirect("ramais_dashboard")
+
+    ramal = Ramal.objects.filter(pk=ramal_id).first()
+    if not ramal:
+        messages.error(request, "Ramal nao encontrado.")
+        return redirect("ramais_dashboard")
+
+    dados, erro = _ler_dados_ramal(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("ramais_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(ramal, campo, valor)
+    ramal.save()
+    messages.success(request, f"Ramal de {dados['colaborador']} atualizado com sucesso.")
+    return redirect("ramais_dashboard")
+
+
+@login_required
+@require_POST
+def ramal_delete_view(request, ramal_id: int):
+    """Exclui um ramal (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir ramais.")
+        return redirect("ramais_dashboard")
+
+    ramal = Ramal.objects.filter(pk=ramal_id).first()
+    if not ramal:
+        messages.error(request, "Ramal nao encontrado.")
+        return redirect("ramais_dashboard")
+
+    nome = ramal.colaborador or ramal.setor or "Ramal"
+    ramal.delete()
+    messages.success(request, f"Ramal de {nome} excluido com sucesso.")
     return redirect("ramais_dashboard")

@@ -53,7 +53,9 @@
 | `/emails/importar/` | POST | Importa/atualiza a lista a partir do CSV do Google Workspace (upsert por e-mail), notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/emails/<id>/` | GET | Detalhe (JSON) de uma conta com todos os dados, usado pelo modal (apenas TI/admin) | Implementada |
 | `/ramais/` | GET | Modulo Ramais: lista telefonica interna (colaborador, setor, telefone, ramal, e-mail) com busca dinamica e botao "Cadastrar novo" (apenas TI/admin) | Implementada |
-| `/ramais/criar/` | POST | Cadastra um ramal; o e-mail vem de uma `ContaEmail` selecionada; notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/ramais/criar/` | POST | Cadastra um ramal; o e-mail pode ser digitado ou vir de uma `ContaEmail` selecionada; notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/ramais/<id>/editar/` | POST | Edita um ramal existente (apenas TI/admin) | Implementada |
+| `/ramais/<id>/excluir/` | POST | Exclui um ramal (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
