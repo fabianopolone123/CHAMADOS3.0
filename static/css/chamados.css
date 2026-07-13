@@ -208,72 +208,35 @@
 }
 
 .kanban-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
+    /* Sem rolagem horizontal: as colunas quebram para a linha de baixo quando
+       nao cabem na largura (ver .kanban-columns) e a pagina rola na vertical. */
     padding-bottom: 0.5rem;
 }
 
 .kanban-columns {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 1.2rem;
-    align-items: stretch;
+    align-items: start;
 }
 
 .kanban-column {
     display: flex;
     flex-direction: column;
-    /* Fluida: cresce para aproveitar a largura em telas grandes e encolhe ate
-       um minimo legivel; o excesso de colunas rola horizontalmente. */
-    flex: 1 1 290px;
+    /* Fluida: cresce para aproveitar a largura e, quando nao ha espaco para
+       mais uma coluna na linha, quebra para a linha seguinte (flex-wrap),
+       eliminando a rolagem horizontal do quadro. Cada coluna tem altura
+       maxima e a lista de cards rola internamente quando ha muitos cards. */
+    flex: 1 1 280px;
     min-width: 250px;
     max-width: 460px;
-    /* No desktop a altura e preenchida pelo flex (ver @media min-width 1200px);
-       aqui fica apenas um minimo confortavel para telas menores/empilhadas. */
-    min-height: min(60vh, 420px);
+    min-height: 240px;
+    max-height: 82vh;
     border-radius: 1.6rem;
     background: rgba(255, 255, 255, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.92);
     box-shadow: 0 22px 45px rgba(15, 23, 42, 0.08);
     backdrop-filter: blur(14px);
-}
-
-/*
- * Desktop (sidebar ao lado): a tela do Kanban ocupa a altura da janela e as
- * colunas preenchem o espaco disponivel. A rolagem interna da lista de cards so
- * aparece quando os cards ultrapassam a altura da coluna. Sem numeros magicos:
- * a altura vem da cadeia flex (100vh -> main -> wrapper flex:1 -> coluna 100%).
- * Vale a partir de 992px, mesmo ponto em que a sidebar fica lateral (>=992px).
- */
-@media (min-width: 992px) {
-    .kanban-page {
-        height: 100vh;
-    }
-
-    .kanban-page .tickets-main {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        min-height: 0;
-    }
-
-    .kanban-page .kanban-wrapper {
-        flex: 1 1 auto;
-        min-height: 0;
-    }
-
-    .kanban-page .kanban-columns {
-        height: 100%;
-    }
-
-    .kanban-page .kanban-column {
-        min-height: 0;
-        max-height: 100%;
-    }
-
-    .kanban-page .ticket-list {
-        min-height: 0;
-    }
 }
 
 .column-header {
@@ -409,7 +372,9 @@
     align-content: start;
     gap: clamp(0.6rem, 0.8vw, 0.95rem);
     padding: clamp(0.75rem, 1vw, 1.15rem);
-    min-height: 100px;
+    /* min-height: 0 permite que a lista encolha e role dentro da coluna de
+       altura limitada (max-height), em vez de esticar a coluna. */
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -1116,8 +1081,10 @@
     }
 
     .kanban-column {
-        flex: 0 0 85vw;
-        min-width: 260px;
+        /* Em telas de celular cada coluna ocupa a largura toda e empilha; a
+           altura acompanha o conteudo e a pagina rola normalmente. */
+        flex: 1 1 100%;
+        min-width: 0;
         max-width: none;
         max-height: none;
     }
