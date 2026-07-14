@@ -118,6 +118,9 @@
 
 .servicos-th--num { text-align: right; }
 .servicos-th--actions { text-align: right; }
+/* Cabecalho numerico/acoes alinhado a direita (vence a regra generica de thead th). */
+.servicos-table thead th.servicos-th--num,
+.servicos-table thead th.servicos-th--actions { text-align: right; }
 
 .servicos-th {
     cursor: pointer;

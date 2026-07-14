@@ -169,6 +169,8 @@
 }
 
 .ips-th--actions { text-align: right; }
+/* Cabecalho de acoes alinhado a direita (vence a regra generica de thead th). */
+.ips-table thead th.ips-th--actions { text-align: right; }
 
 /* Cabecalhos ordenaveis */
 .ips-th {

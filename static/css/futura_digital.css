@@ -178,6 +178,8 @@
 /* ----- Tabela ----- */
 .fd-table-wrap { min-width: 0; overflow-x: auto; margin-top: 0.4rem; }
 .fd-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+/* Numeros com largura de digito uniforme: colunas ficam alinhadas na vertical. */
+.fd-table .fd-th--num, .fd-table .fd-cell--valor { font-variant-numeric: tabular-nums; }
 
 .fd-table thead th {
     text-align: left;
@@ -191,8 +193,10 @@
     white-space: nowrap;
 }
 
-.fd-th--num { text-align: right; }
-.fd-th--actions { text-align: right; }
+/* Cabecalhos numericos/acoes acompanham o alinhamento a direita dos dados
+   (a regra generica de thead th e mais especifica, por isso qualificamos). */
+.fd-table thead th.fd-th--num,
+.fd-table thead th.fd-th--actions { text-align: right; }
 .fd-th { cursor: pointer; user-select: none; }
 .fd-th:hover { color: #1d4ed8; }
 .fd-sort-ind { display: inline-block; width: 0.8em; color: #2563eb; font-weight: 800; }
