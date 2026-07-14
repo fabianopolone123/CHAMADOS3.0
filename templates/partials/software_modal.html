@@ -1,0 +1,48 @@
+{% load static %}
+<div class="modal fade" id="softwareModal" tabindex="-1" aria-labelledby="softwareModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Licencas</span>
+                    <h5 class="modal-title" id="softwareModalLabel">Cadastrar novo software</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'licenca_software_create' %}" class="create-ticket-form" id="softwareForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Nome do software</span>
+                        <input type="text" class="form-control" name="nome" id="softwareNome" maxlength="180" placeholder="Ex.: AutoCAD 2026" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Quantidade de licencas contratadas</span>
+                        <input type="number" class="form-control" name="quantidade_licencas" id="softwareQuantidade" min="0" value="1" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Observacoes</span>
+                        <textarea class="form-control" name="observacoes" id="softwareObservacoes" rows="2" placeholder="Opcional"></textarea>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="softwareDeleteBtn">Excluir software</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="softwareSubmit">Cadastrar software</button>
+                </div>
+            </form>
+
+            <div class="lic-delete-confirm is-hidden" id="softwareDeleteConfirm">
+                <p class="lic-delete-confirm__text">
+                    Excluir este software apaga tambem TODAS as licencas cadastradas nele. Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="softwareDeleteForm" class="lic-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="softwareDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

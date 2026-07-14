@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/licencas.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app licencas-app"
+    data-software-update-url="{% url 'licenca_software_update' software_id=0 %}"
+    data-software-delete-url="{% url 'licenca_software_delete' software_id=0 %}"
+    data-licenca-update-url="{% url 'licenca_update' licenca_id=0 %}"
+    data-licenca-delete-url="{% url 'licenca_delete' licenca_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="licencas" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Licencas</h2>
+                <p class="contratos-topbar__subtitle">Controle de licencas de software</p>
+                <p class="topbar-subtitle">Softwares, seriais, usuarios, prazos e formas de pagamento. Pesquise digitando abaixo.</p>
+            </div>
+            <div class="licencas-topbar-actions">
+                <button type="button" class="contratos-add-btn contratos-add-btn--ghost" id="createLicencaButton" title="Cadastrar nova licenca">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                    <span class="contratos-add-btn__label">Nova licenca</span>
+                </button>
+                <button type="button" class="contratos-add-btn" id="createSoftwareButton" title="Cadastrar novo software">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                    <span class="contratos-add-btn__label">Novo software</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="licencas-stats">
+            <article class="licencas-stat licencas-stat--blue">
+                <span class="licencas-stat__label">Softwares</span>
+                <strong class="licencas-stat__value">{{ total_softwares }}</strong>
+            </article>
+            <article class="licencas-stat licencas-stat--green">
+                <span class="licencas-stat__label">Quantidade contratada</span>
+                <strong class="licencas-stat__value">{{ total_contratadas }}</strong>
+            </article>
+            <article class="licencas-stat licencas-stat--indigo">
+                <span class="licencas-stat__label">Licencas cadastradas</span>
+                <strong class="licencas-stat__value">{{ total_licencas }}</strong>
+            </article>
+            <article class="licencas-stat licencas-stat--amber">
+                <span class="licencas-stat__label">Com prazo</span>
+                <strong class="licencas-stat__value">{{ com_prazo }}</strong>
+            </article>
+        </section>
+
+        <section class="licencas-panel">
+            <div class="licencas-search">
+                <span class="licencas-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="licencaSearch"
+                    class="licencas-search__input"
+                    placeholder="Pesquisar por software, serial, usuario, e-mail ou pagamento..."
+                    autocomplete="off"
+                >
+            </div>
+            <p class="licencas-search__status" id="licencaSearchStatus"></p>
+
+            {% if softwares %}
+            <div class="licencas-list" id="licencasList">
+                {% for s in softwares %}
+                <article
+                    class="lic-software"
+                    data-id="{{ s.id }}"
+                    data-nome="{{ s.nome }}"
+                    data-quantidade="{{ s.quantidade_licencas }}"
+                    data-observacoes="{{ s.observacoes }}"
+                    data-search="{{ s.nome|lower }} {{ s.observacoes|lower }}{% for l in s.licencas.all %} {{ l.usuario_atribuido|lower }} {{ l.email_vinculado|lower }} {{ l.serial|lower }} {{ l.forma_pagamento|lower }}{% endfor %}"
+                >
+                    <header class="lic-software__head">
+                        <button type="button" class="lic-software__toggle" aria-expanded="true">
+                            <span class="lic-software__chevron" aria-hidden="true">&#9662;</span>
+                            <span class="lic-software__name">{{ s.nome }}</span>
+                        </button>
+                        <span class="lic-software__count {% if s.licencas_cadastradas >= s.quantidade_licencas %}is-full{% endif %}">
+                            {{ s.licencas_cadastradas }}/{{ s.quantidade_licencas }} licencas
+                        </span>
+                    </header>
+
+                    <div class="lic-software__body">
+                        {% if s.observacoes %}
+                        <p class="lic-software__notes">{{ s.observacoes|linebreaksbr }}</p>
+                        {% endif %}
+
+                        <div class="lic-software__toolbar">
+                            <button type="button" class="lic-btn lic-btn--soft js-add-licenca" data-software-id="{{ s.id }}">+ Adicionar licenca</button>
+                            <button type="button" class="lic-btn lic-btn--soft js-edit-software"
+                                data-id="{{ s.id }}"
+                                data-nome="{{ s.nome }}"
+                                data-quantidade="{{ s.quantidade_licencas }}"
+                                data-observacoes="{{ s.observacoes }}">Editar software</button>
+                        </div>
+
+                        <div class="lic-table-wrap">
+                            <table class="lic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th class="lic-col--hide-sm">E-mail vinculado</th>
+                                        <th class="lic-col--hide-md">Serial</th>
+                                        <th>Prazo</th>
+                                        <th class="lic-col--hide-md">Pagamento</th>
+                                        <th class="lic-th--actions">Acoes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for l in s.licencas.all %}
+                                    <tr class="lic-row"
+                                        data-id="{{ l.id }}"
+                                        data-software="{{ s.id }}"
+                                        data-serial="{{ l.serial }}"
+                                        data-email="{{ l.email_vinculado }}"
+                                        data-tipo="{{ l.tipo_expiracao }}"
+                                        data-expira="{{ l.expira_em|date:'Y-m-d' }}"
+                                        data-pagamento="{{ l.forma_pagamento }}"
+                                        data-cartao="{{ l.final_cartao }}"
+                                        data-usuario="{{ l.usuario_atribuido }}"
+                                        data-observacoes="{{ l.observacoes }}">
+                                        <td data-label="Usuario" class="lic-cell--user">{{ l.usuario_atribuido|default:"-" }}</td>
+                                        <td data-label="E-mail" class="lic-col--hide-sm lic-cell--email">
+                                            {% if l.email_vinculado %}<a href="mailto:{{ l.email_vinculado }}">{{ l.email_vinculado }}</a>{% else %}-{% endif %}
+                                        </td>
+                                        <td data-label="Serial" class="lic-col--hide-md lic-cell--serial">{{ l.serial|default:"-" }}</td>
+                                        <td data-label="Prazo">
+                                            <span class="lic-pill {% if l.tipo_expiracao == 'expira_em' %}lic-pill--warn{% endif %}">{{ l.expira_label }}</span>
+                                        </td>
+                                        <td data-label="Pagamento" class="lic-col--hide-md">
+                                            {{ l.forma_pagamento|default:"-" }}
+                                            {% if l.final_cartao %}<span class="lic-card-final">cartao final {{ l.final_cartao }}</span>{% endif %}
+                                        </td>
+                                        <td data-label="Acoes" class="lic-cell--actions">
+                                            <button type="button" class="lic-icon-btn js-edit-licenca" title="Editar licenca" aria-label="Editar licenca">&#9998;</button>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr class="lic-row-empty">
+                                        <td colspan="6">Nenhuma licenca cadastrada para este software.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <p class="licencas-empty is-hidden" id="licencasNoResults">Nenhum software encontrado para a pesquisa.</p>
+            {% else %}
+            <div class="licencas-empty-state">
+                <p class="licencas-empty-state__title">Nenhum software cadastrado ainda.</p>
+                <p class="licencas-empty-state__hint">Clique em "Novo software" para adicionar o primeiro.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/software_modal.html" %}
+{% include "partials/licenca_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/licencas.js' %}"></script>
+{% endblock %}

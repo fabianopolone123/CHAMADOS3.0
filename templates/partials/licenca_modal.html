@@ -1,0 +1,83 @@
+{% load static %}
+<div class="modal fade" id="licencaModal" tabindex="-1" aria-labelledby="licencaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Licencas</span>
+                    <h5 class="modal-title" id="licencaModalLabel">Cadastrar nova licenca</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'licenca_create' %}" class="create-ticket-form" id="licencaForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="lic-form-grid">
+                        <label class="contrato-field">
+                            <span>Software</span>
+                            <select class="form-select" name="software" id="licencaSoftware" required>
+                                <option value="">— Selecionar —</option>
+                                {% for s in softwares %}
+                                <option value="{{ s.id }}">{{ s.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Usuario usando</span>
+                            <input type="text" class="form-control" name="usuario_atribuido" id="licencaUsuario" maxlength="180" placeholder="Ex.: Fabiano Polone">
+                        </label>
+                        <label class="contrato-field lic-field--full">
+                            <span>Serial / Product key</span>
+                            <input type="text" class="form-control" name="serial" id="licencaSerial" maxlength="240" placeholder="Ex.: XXXXX-XXXXX-XXXXX">
+                        </label>
+                        <label class="contrato-field">
+                            <span>E-mail vinculado (opcional)</span>
+                            <input type="email" class="form-control" name="email_vinculado" id="licencaEmail" maxlength="254" placeholder="nome@sidertec.com.br">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Prazo</span>
+                            <select class="form-select" name="tipo_expiracao" id="licencaTipo">
+                                {% for value, label in tipos_expiracao %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="contrato-field is-hidden" id="licencaExpiraWrap">
+                            <span>Data de expiracao</span>
+                            <input type="date" class="form-control" name="expira_em" id="licencaExpira">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Forma de pagamento</span>
+                            <input type="text" class="form-control" name="forma_pagamento" id="licencaPagamento" maxlength="80" placeholder="Ex.: Cartao corporativo">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Final do cartao</span>
+                            <input type="text" class="form-control" name="final_cartao" id="licencaCartao" maxlength="4" inputmode="numeric" placeholder="Ex.: 1234">
+                        </label>
+                        <label class="contrato-field lic-field--full">
+                            <span>Observacoes</span>
+                            <textarea class="form-control" name="observacoes" id="licencaObservacoes" rows="2" placeholder="Opcional"></textarea>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="licencaDeleteBtn">Excluir licenca</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="licencaSubmit">Cadastrar licenca</button>
+                </div>
+            </form>
+
+            <div class="lic-delete-confirm is-hidden" id="licencaDeleteConfirm">
+                <p class="lic-delete-confirm__text">
+                    Tem certeza que deseja excluir esta licenca? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="licencaDeleteForm" class="lic-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="licencaDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

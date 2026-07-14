@@ -56,6 +56,13 @@
 | `/ramais/criar/` | POST | Cadastra um ramal; o e-mail pode ser digitado ou vir de uma `ContaEmail` selecionada; notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/ramais/<id>/editar/` | POST | Edita um ramal existente (apenas TI/admin) | Implementada |
 | `/ramais/<id>/excluir/` | POST | Exclui um ramal (apenas TI/admin) | Implementada |
+| `/licencas/` | GET | Modulo Licencas: lista de softwares (cards expansiveis com suas licencas), cartoes de resumo e busca dinamica (apenas TI/admin) | Implementada |
+| `/licencas/softwares/criar/` | POST | Cadastra um software (nome, quantidade contratada, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/licencas/softwares/<id>/editar/` | POST | Edita um software (apenas TI/admin) | Implementada |
+| `/licencas/softwares/<id>/excluir/` | POST | Exclui um software e todas as suas licencas em cascata (apenas TI/admin) | Implementada |
+| `/licencas/criar/` | POST | Cadastra uma licenca vinculada a um software (serial, usuario, e-mail, prazo, pagamento); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/licencas/<id>/editar/` | POST | Edita uma licenca existente (apenas TI/admin) | Implementada |
+| `/licencas/<id>/excluir/` | POST | Exclui uma licenca (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -169,6 +176,14 @@
 - `criar/` e `<id>/retirar/` usam `POST` JSON com CSRF (GET retorna `405`). O cadastro valida nome e quantidade inicial obrigatoria e nao negativa.
 - A retirada valida no backend: quantidade > 0 (bloqueia zero/negativo com `400`) e menor/igual ao estoque (`409` se insuficiente); `entregue_para` e `motivo` obrigatorios. Em uma transacao com `select_for_update`, abate `quantidade_atual` e cria o registro em `RetiradaInsumoTI`. A resposta traz o insumo atualizado (quantidade e status) e a retirada, para atualizar o card e o historico sem refresh.
 - O historico de retiradas nao e apagado e insumos nao sao excluidos automaticamente (campo `ativo` preparado para desativacao futura).
+
+## Regras do modulo Licencas
+
+- `/licencas/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Licencas" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend (usuario comum e redirecionado com toast de erro).
+- A tela lista os softwares em cards expansiveis; cada card mostra o nome, um badge `cadastradas/contratadas` e uma tabela responsiva de licencas (usuario, e-mail vinculado, serial, prazo, pagamento e acoes). Cartoes de resumo no topo: total de softwares, quantidade contratada, licencas cadastradas e com prazo. Busca client-side filtra os softwares por nome, serial, usuario, e-mail ou pagamento.
+- As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico: validam, gravam, notificam via Django messages (toast) e redirecionam para `/licencas/`.
+- Cadastro de software exige nome (minimo 2 caracteres) e quantidade nao negativa. Cadastro/edicao de licenca exige um software valido; quando o prazo e `indeterminado`, a data de expiracao e ignorada.
+- Excluir um software remove em cascata todas as suas licencas (`on_delete=CASCADE`); a exclusao (de software ou licenca) pede confirmacao no proprio modal antes de enviar.
 
 ## Regras das rotas de historico
 

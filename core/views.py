@@ -38,6 +38,8 @@ from .models import (
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
     InsumoTI,
+    Licenca,
+    LicencaSoftware,
     LogUsoAssinaturaTI,
     OrcamentoContrato,
     OrcamentoDocumento,
@@ -2639,3 +2641,212 @@ def ramal_delete_view(request, ramal_id: int):
     ramal.delete()
     messages.success(request, f"Ramal de {nome} excluido com sucesso.")
     return redirect("ramais_dashboard")
+
+
+# ==========================================================================
+# Modulo Licencas (controle de licencas de software) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def licencas_dashboard_view(request):
+    """Lista os softwares cadastrados, cada um com suas licencas, alem de
+    cartoes de resumo e busca client-side."""
+    softwares = list(
+        LicencaSoftware.objects.prefetch_related("licencas").all()
+    )
+    total_softwares = len(softwares)
+    total_contratadas = sum(s.quantidade_licencas for s in softwares)
+    total_licencas = Licenca.objects.count()
+    com_prazo = Licenca.objects.filter(
+        tipo_expiracao=Licenca.TipoExpiracao.EXPIRA_EM
+    ).count()
+
+    context = {
+        "page_title": "Licencas",
+        "softwares": softwares,
+        "total_softwares": total_softwares,
+        "total_contratadas": total_contratadas,
+        "total_licencas": total_licencas,
+        "com_prazo": com_prazo,
+        "tipos_expiracao": Licenca.TipoExpiracao.choices,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/licencas.html", context)
+
+
+def _ler_dados_software(request):
+    """Le e valida os campos do formulario de software (create/update)."""
+    nome = (request.POST.get("nome") or "").strip()
+    if len(nome) < 2:
+        return None, "Informe o nome do software (minimo 2 caracteres)."
+
+    try:
+        quantidade = int(request.POST.get("quantidade_licencas") or 1)
+    except (TypeError, ValueError):
+        return None, "Quantidade de licencas invalida."
+    if quantidade < 0:
+        return None, "A quantidade de licencas nao pode ser negativa."
+
+    dados = {
+        "nome": nome,
+        "quantidade_licencas": quantidade,
+        "observacoes": (request.POST.get("observacoes") or "").strip(),
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def licenca_software_create_view(request):
+    """Cadastra um novo software (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar softwares.")
+        return redirect("licencas_dashboard")
+
+    dados, erro = _ler_dados_software(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("licencas_dashboard")
+
+    LicencaSoftware.objects.create(criado_por=request.user, **dados)
+    messages.success(request, f'Software "{dados["nome"]}" cadastrado com sucesso.')
+    return redirect("licencas_dashboard")
+
+
+@login_required
+@require_POST
+def licenca_software_update_view(request, software_id: int):
+    """Edita um software existente (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar softwares.")
+        return redirect("licencas_dashboard")
+
+    software = LicencaSoftware.objects.filter(pk=software_id).first()
+    if not software:
+        messages.error(request, "Software nao encontrado.")
+        return redirect("licencas_dashboard")
+
+    dados, erro = _ler_dados_software(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("licencas_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(software, campo, valor)
+    software.save()
+    messages.success(request, f'Software "{software.nome}" atualizado com sucesso.')
+    return redirect("licencas_dashboard")
+
+
+@login_required
+@require_POST
+def licenca_software_delete_view(request, software_id: int):
+    """Exclui um software e todas as suas licencas (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir softwares.")
+        return redirect("licencas_dashboard")
+
+    software = LicencaSoftware.objects.filter(pk=software_id).first()
+    if not software:
+        messages.error(request, "Software nao encontrado.")
+        return redirect("licencas_dashboard")
+
+    nome = software.nome
+    software.delete()
+    messages.success(request, f'Software "{nome}" e suas licencas foram excluidos.')
+    return redirect("licencas_dashboard")
+
+
+def _ler_dados_licenca(request):
+    """Le e valida os campos do formulario de licenca (create/update)."""
+    software = LicencaSoftware.objects.filter(
+        pk=(request.POST.get("software") or "").strip()
+    ).first()
+    if not software:
+        return None, "Selecione um software valido para a licenca."
+
+    tipo = (request.POST.get("tipo_expiracao") or "").strip()
+    if tipo not in dict(Licenca.TipoExpiracao.choices):
+        tipo = Licenca.TipoExpiracao.INDETERMINADO
+
+    expira_em = (request.POST.get("expira_em") or "").strip() or None
+    if tipo == Licenca.TipoExpiracao.INDETERMINADO:
+        expira_em = None
+
+    dados = {
+        "software": software,
+        "serial": (request.POST.get("serial") or "").strip(),
+        "email_vinculado": (request.POST.get("email_vinculado") or "").strip(),
+        "tipo_expiracao": tipo,
+        "expira_em": expira_em,
+        "forma_pagamento": (request.POST.get("forma_pagamento") or "").strip(),
+        "final_cartao": (request.POST.get("final_cartao") or "").strip()[:4],
+        "usuario_atribuido": (request.POST.get("usuario_atribuido") or "").strip(),
+        "observacoes": (request.POST.get("observacoes") or "").strip(),
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def licenca_create_view(request):
+    """Cadastra uma nova licenca para um software (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar licencas.")
+        return redirect("licencas_dashboard")
+
+    dados, erro = _ler_dados_licenca(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("licencas_dashboard")
+
+    software = dados["software"]
+    Licenca.objects.create(criado_por=request.user, **dados)
+    messages.success(request, f'Licenca de "{software.nome}" cadastrada com sucesso.')
+    return redirect("licencas_dashboard")
+
+
+@login_required
+@require_POST
+def licenca_update_view(request, licenca_id: int):
+    """Edita uma licenca existente (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar licencas.")
+        return redirect("licencas_dashboard")
+
+    licenca = Licenca.objects.filter(pk=licenca_id).first()
+    if not licenca:
+        messages.error(request, "Licenca nao encontrada.")
+        return redirect("licencas_dashboard")
+
+    dados, erro = _ler_dados_licenca(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("licencas_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(licenca, campo, valor)
+    licenca.save()
+    messages.success(request, f'Licenca de "{licenca.software.nome}" atualizada com sucesso.')
+    return redirect("licencas_dashboard")
+
+
+@login_required
+@require_POST
+def licenca_delete_view(request, licenca_id: int):
+    """Exclui uma licenca (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir licencas.")
+        return redirect("licencas_dashboard")
+
+    licenca = Licenca.objects.filter(pk=licenca_id).first()
+    if not licenca:
+        messages.error(request, "Licenca nao encontrada.")
+        return redirect("licencas_dashboard")
+
+    nome = licenca.software.nome
+    licenca.delete()
+    messages.success(request, f'Licenca de "{nome}" excluida com sucesso.')
+    return redirect("licencas_dashboard")

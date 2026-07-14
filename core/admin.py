@@ -5,6 +5,8 @@ from .models import (
     ContaEmail,
     DocumentoTI,
     DocumentoTIAnexo,
+    Licenca,
+    LicencaSoftware,
     Ramal,
     EmprestimoTI,
     EquipamentoEmprestimoTI,
@@ -162,3 +164,23 @@ class RamalAdmin(admin.ModelAdmin):
     list_display = ("colaborador", "setor", "telefone", "ramal", "email", "atualizado_em")
     list_filter = ("setor",)
     search_fields = ("colaborador", "setor", "telefone", "ramal", "email")
+
+
+class LicencaInline(admin.TabularInline):
+    model = Licenca
+    extra = 0
+    fields = ("usuario_atribuido", "serial", "email_vinculado", "tipo_expiracao", "expira_em", "forma_pagamento", "final_cartao")
+
+
+@admin.register(LicencaSoftware)
+class LicencaSoftwareAdmin(admin.ModelAdmin):
+    list_display = ("nome", "quantidade_licencas", "licencas_cadastradas", "atualizado_em")
+    search_fields = ("nome", "observacoes")
+    inlines = [LicencaInline]
+
+
+@admin.register(Licenca)
+class LicencaAdmin(admin.ModelAdmin):
+    list_display = ("software", "usuario_atribuido", "email_vinculado", "tipo_expiracao", "expira_em", "atualizado_em")
+    list_filter = ("tipo_expiracao", "software")
+    search_fields = ("usuario_atribuido", "email_vinculado", "serial", "forma_pagamento")

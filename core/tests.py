@@ -16,6 +16,8 @@ from .models import (
     ChamadoMensagem,
     ChamadoMensagemAnexo,
     ContaEmail,
+    Licenca,
+    LicencaSoftware,
     OrcamentoContrato,
     OrcamentoDocumento,
     PendenciaTI,
@@ -533,3 +535,125 @@ class RamalCreateTests(TestCase):
         ramal.refresh_from_db()
         self.assertEqual(ramal.colaborador, "Protegido")  # inalterado
         self.assertTrue(Ramal.objects.filter(id=ramal.id).exists())  # nao excluido
+
+
+class LicencaTests(TestCase):
+    """Modulo Licencas: CRUD de software e licenca, prazos e permissoes.
+
+    Obs.: o banco de teste ja vem com os softwares/licencas do seed (migration
+    0015), por isso os testes comparam contagem antes/depois.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def test_ti_creates_software(self):
+        self.client.force_login(self.ti)
+        antes = LicencaSoftware.objects.count()
+        resp = self.client.post(
+            reverse("licenca_software_create"),
+            {"nome": "Photoshop 2026", "quantidade_licencas": 4, "observacoes": "Assinatura"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(LicencaSoftware.objects.count(), antes + 1)
+        soft = LicencaSoftware.objects.get(nome="Photoshop 2026")
+        self.assertEqual(soft.quantidade_licencas, 4)
+        self.assertEqual(soft.criado_por, self.ti)
+
+    def test_software_create_requires_name(self):
+        self.client.force_login(self.ti)
+        antes = LicencaSoftware.objects.count()
+        resp = self.client.post(reverse("licenca_software_create"), {"nome": "", "quantidade_licencas": 1})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(LicencaSoftware.objects.count(), antes)  # nada criado
+
+    def test_ti_creates_license_and_expiration(self):
+        self.client.force_login(self.ti)
+        soft = LicencaSoftware.objects.create(nome="CorelDRAW", quantidade_licencas=2, criado_por=self.ti)
+        resp = self.client.post(
+            reverse("licenca_create"),
+            {
+                "software": soft.id,
+                "usuario_atribuido": "Fulano",
+                "serial": "ABC-123",
+                "email_vinculado": "fulano@x.com",
+                "tipo_expiracao": "expira_em",
+                "expira_em": "2027-01-01",
+                "forma_pagamento": "Boleto",
+                "final_cartao": "9999",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        lic = Licenca.objects.get(serial="ABC-123")
+        self.assertEqual(lic.software, soft)
+        self.assertEqual(lic.expira_label, "01/01/2027")
+        self.assertEqual(lic.final_cartao, "9999")
+
+    def test_indeterminado_clears_expira(self):
+        """Prazo indeterminado ignora a data enviada."""
+        self.client.force_login(self.ti)
+        soft = LicencaSoftware.objects.create(nome="Zoom", quantidade_licencas=1, criado_por=self.ti)
+        self.client.post(
+            reverse("licenca_create"),
+            {"software": soft.id, "tipo_expiracao": "indeterminado", "expira_em": "2027-05-05", "usuario_atribuido": "X"},
+        )
+        lic = Licenca.objects.get(software=soft, usuario_atribuido="X")
+        self.assertIsNone(lic.expira_em)
+        self.assertEqual(lic.expira_label, "Indeterminado")
+
+    def test_license_requires_valid_software(self):
+        self.client.force_login(self.ti)
+        antes = Licenca.objects.count()
+        resp = self.client.post(reverse("licenca_create"), {"software": 999999, "usuario_atribuido": "X"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Licenca.objects.count(), antes)  # nada criado
+
+    def test_ti_updates_and_deletes_license(self):
+        self.client.force_login(self.ti)
+        soft = LicencaSoftware.objects.create(nome="Slack", quantidade_licencas=1, criado_por=self.ti)
+        lic = Licenca.objects.create(software=soft, usuario_atribuido="Antes", criado_por=self.ti)
+        self.client.post(
+            reverse("licenca_update", args=[lic.id]),
+            {"software": soft.id, "usuario_atribuido": "Depois", "tipo_expiracao": "indeterminado"},
+        )
+        lic.refresh_from_db()
+        self.assertEqual(lic.usuario_atribuido, "Depois")
+
+        resp = self.client.post(reverse("licenca_delete", args=[lic.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Licenca.objects.filter(id=lic.id).exists())
+
+    def test_delete_software_cascades_licenses(self):
+        self.client.force_login(self.ti)
+        soft = LicencaSoftware.objects.create(nome="Trello", quantidade_licencas=1, criado_por=self.ti)
+        lic = Licenca.objects.create(software=soft, usuario_atribuido="Y", criado_por=self.ti)
+        resp = self.client.post(reverse("licenca_software_delete", args=[soft.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(LicencaSoftware.objects.filter(id=soft.id).exists())
+        self.assertFalse(Licenca.objects.filter(id=lic.id).exists())  # cascata
+
+    def test_common_user_cannot_access_or_change(self):
+        soft = LicencaSoftware.objects.create(nome="Protegido", quantidade_licencas=1, criado_por=self.ti)
+        self.client.force_login(self.common)
+        # Dashboard redireciona
+        self.assertEqual(self.client.get(reverse("licencas_dashboard")).status_code, 302)
+        # Nao cria software nem licenca
+        antes_s = LicencaSoftware.objects.count()
+        antes_l = Licenca.objects.count()
+        self.client.post(reverse("licenca_software_create"), {"nome": "Hack", "quantidade_licencas": 1})
+        self.client.post(reverse("licenca_create"), {"software": soft.id, "usuario_atribuido": "Hack"})
+        self.assertEqual(LicencaSoftware.objects.count(), antes_s)
+        self.assertEqual(Licenca.objects.count(), antes_l)
+        # Nao exclui
+        self.client.post(reverse("licenca_software_delete", args=[soft.id]))
+        self.assertTrue(LicencaSoftware.objects.filter(id=soft.id).exists())
+
+    def test_dashboard_lists_seeded_software(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("licencas_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "AutoCAD 2014 Full")

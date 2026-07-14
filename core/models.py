@@ -948,3 +948,88 @@ class Ramal(models.Model):
 
     def __str__(self) -> str:
         return f"{self.colaborador or self.setor} ({self.ramal or '-'})"
+
+
+class LicencaSoftware(models.Model):
+    """Software cadastrado no controle de licencas (ex.: AutoCAD, Project).
+
+    Reune o nome, a quantidade de licencas contratadas e observacoes; cada
+    licenca individual (serial, usuario, prazo) fica em `Licenca`.
+    """
+
+    nome = models.CharField(max_length=180)
+    quantidade_licencas = models.PositiveIntegerField(default=1)
+    observacoes = models.TextField(blank=True, default="")
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="softwares_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        verbose_name = "Software"
+        verbose_name_plural = "Softwares"
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @property
+    def licencas_cadastradas(self) -> int:
+        return self.licencas.count()
+
+
+class Licenca(models.Model):
+    """Licenca individual de um software (serial, usuario, prazo, pagamento)."""
+
+    class TipoExpiracao(models.TextChoices):
+        INDETERMINADO = "indeterminado", "Indeterminado"
+        EXPIRA_EM = "expira_em", "Prazo para expirar"
+
+    software = models.ForeignKey(
+        LicencaSoftware,
+        on_delete=models.CASCADE,
+        related_name="licencas",
+    )
+    serial = models.CharField(max_length=240, blank=True, default="")
+    email_vinculado = models.EmailField(max_length=254, blank=True, default="")
+    tipo_expiracao = models.CharField(
+        max_length=20,
+        choices=TipoExpiracao.choices,
+        default=TipoExpiracao.INDETERMINADO,
+    )
+    expira_em = models.DateField(null=True, blank=True)
+    forma_pagamento = models.CharField(max_length=80, blank=True, default="")
+    final_cartao = models.CharField(max_length=4, blank=True, default="")
+    usuario_atribuido = models.CharField(max_length=180, blank=True, default="")
+    observacoes = models.TextField(blank=True, default="")
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="licencas_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["software__nome", "usuario_atribuido", "email_vinculado", "id"]
+        verbose_name = "Licenca de software"
+        verbose_name_plural = "Licencas de software"
+
+    def __str__(self) -> str:
+        dono = self.usuario_atribuido or self.email_vinculado or self.serial or "Sem identificacao"
+        return f"{self.software.nome} - {dono}"
+
+    @property
+    def expira_label(self) -> str:
+        if self.tipo_expiracao == self.TipoExpiracao.INDETERMINADO:
+            return "Indeterminado"
+        if self.expira_em:
+            return self.expira_em.strftime("%d/%m/%Y")
+        return "Prazo nao informado"

@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui vinte e um modelos persistidos:
+O projeto possui vinte e cinco modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -39,6 +39,16 @@ Modulo Emprestimos:
 - `FotoEquipamentoEmprestimoTI`
 - `AssinaturaResponsavelTI`
 - `LogUsoAssinaturaTI`
+
+Modulo Emails / Ramais:
+
+- `ContaEmail`
+- `Ramal`
+
+Modulo Licencas:
+
+- `LicencaSoftware`
+- `Licenca`
 
 ## Modelos implementados
 
@@ -411,6 +421,35 @@ Contato da lista telefonica interna (modulo Ramais). Seed inicial via migration 
 - `colaborador`, `setor`, `telefone`, `ramal`, `email`
 - `conta_email` (FK `ContaEmail` `on_delete=SET_NULL`, related_name `ramais`) — vinculo opcional com a conta de e-mail escolhida no cadastro
 - `criado_por` (FK `on_delete=SET_NULL`), `criado_em`, `atualizado_em`. Migration `0012`.
+
+### LicencaSoftware
+
+Software cadastrado no modulo Licencas (ex.: AutoCAD, Gestarcad, Project). Agrupa a quantidade contratada e as licencas individuais. Seed inicial via migration de dados `0015`, que le um arquivo local ignorado pelo Git (`seed/licencas_seed.json`); os seriais/product keys e nomes de colaboradores NAO sao versionados.
+
+- `nome`
+- `quantidade_licencas` (inteiro positivo; quantidade contratada)
+- `observacoes`
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `softwares_criados`), `criado_em`, `atualizado_em`
+- Propriedade `licencas_cadastradas`: numero de licencas individuais vinculadas. Migration `0014`.
+
+### Licenca
+
+Licenca individual de um software (uma por usuario/serial). Um software 1--N licencas.
+
+- `software` (FK para `LicencaSoftware`, `on_delete=CASCADE`, related_name `licencas`)
+- `serial` (serial/product key), `email_vinculado`, `usuario_atribuido`
+- `tipo_expiracao` (choices: `indeterminado`, `expira_em`; default `indeterminado`)
+- `expira_em` (data, opcional; usada apenas quando `tipo_expiracao = expira_em`)
+- `forma_pagamento`, `final_cartao` (ate 4 digitos)
+- `observacoes`
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `licencas_criadas`), `criado_em`, `atualizado_em`
+- Propriedade `expira_label`: "Indeterminado" ou a data formatada (dd/mm/aaaa). Migration `0014`.
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem softwares e licencas (validado no backend; usuario comum e redirecionado).
+- Excluir um software remove em cascata todas as suas licencas (`on_delete=CASCADE`).
+- Ao escolher `tipo_expiracao = indeterminado`, a data de expiracao enviada e ignorada (fica nula).
 
 ## Modelos previstos para proximas fases
 
