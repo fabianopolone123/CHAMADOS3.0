@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta modelos persistidos:
+O projeto possui trinta e um modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -63,6 +63,10 @@ Modulo Contratos:
 
 - `Contrato`
 - `ContratoAnexo`
+
+Modulo Futura Digital:
+
+- `FuturaDigital`
 
 ## Modelos implementados
 
@@ -523,6 +527,26 @@ Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem contratos e anexos (validado no backend; usuario comum e redirecionado, e detalhe/download retornam `403`/`404`).
 - O valor e opcional e aceita formato brasileiro; a periodicidade e validada. Excluir um contrato remove seus anexos em cascata e apaga os arquivos fisicos; e possivel remover um anexo isolado. O download usa rota protegida.
+
+### FuturaDigital
+
+Fatura mensal da locacao de impressoras (Futura Digital), migrada do banco antigo. Registra o consumo do mes e aplica a regra de cobranca. Seed inicial via migration de dados `0023`, que le `seed/futura_digital_seed.json` (local, ignorado pelo Git); os documentos ficam em `media/futura_digital/` (tambem fora do Git). O seed PRESERVA os valores historicos exatos (excedentes e valor pago), sem recalcular.
+
+- `mes_referencia` (data; sempre normalizada para o 1o dia do mes)
+- `nota_fiscal`
+- `copias_total`, `copias_cor`
+- `franquia_copias` (default 23000), `franquia_valor` (default 1610,00)
+- `valor_copia_excedente` (default 0,07), `valor_copia_cor` (default 0,75)
+- `copias_excedentes` e `valor_pago` (calculados no backend)
+- `documento` (`FileField`, salvo em `MEDIA_ROOT/futura_digital/`)
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `futura_digital_criados`), `criado_em`, `atualizado_em`. Migration `0022`.
+
+Regra de cobranca (aplicada no cadastro/edicao):
+
+- `copias_excedentes = max(copias_total - copias_cor - franquia_copias, 0)` (excedente conta so as copias P&B alem da franquia).
+- `valor_pago = franquia_valor + copias_excedentes * valor_copia_excedente + copias_cor * valor_copia_cor`.
+- As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
+- So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb`, `*_display`.
 
 ## Modelos previstos para proximas fases
 

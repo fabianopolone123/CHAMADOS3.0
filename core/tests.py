@@ -19,6 +19,7 @@ from .models import (
     Contrato,
     ContratoAnexo,
     EnderecoIP,
+    FuturaDigital,
     Licenca,
     LicencaSoftware,
     OrcamentoContrato,
@@ -970,3 +971,103 @@ class ContratoTests(TestCase):
         self.assertEqual(Contrato.objects.count(), antes)
         self.client.post(reverse("contrato_ti_delete", args=[c.id]))
         self.assertTrue(Contrato.objects.filter(id=c.id).exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class FuturaDigitalTests(TestCase):
+    """Modulo Futura Digital: regra de cobranca, CRUD e permissoes.
+
+    Obs.: o banco de teste ja vem com as faturas do seed (migration 0023).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def test_billing_rule(self):
+        """valor = franquia + excedentes*rate_exc + cor*rate_cor;
+        excedentes = (total - cor) - franquia."""
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("futura_digital_create"),
+            {
+                "mes_referencia": "2026-07",
+                "copias_total": "34744",
+                "copias_cor": "317",
+                "franquia_copias": "23000",
+                "franquia_valor": "1610,00",
+                "valor_copia_excedente": "0,07",
+                "valor_copia_cor": "0,75",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        f = FuturaDigital.objects.get(mes_referencia="2026-07-01")
+        # (34744 - 317) - 23000 = 11427
+        self.assertEqual(f.copias_excedentes, 11427)
+        # 1610 + 11427*0.07 + 317*0.75 = 2647.64
+        self.assertEqual(str(f.valor_pago), "2647.64")
+        self.assertEqual(f.criado_por, self.ti)
+
+    def test_month_normalized_to_first_day(self):
+        self.client.force_login(self.ti)
+        self.client.post(
+            reverse("futura_digital_create"),
+            {"mes_referencia": "2026-08", "copias_total": "1000", "copias_cor": "0"},
+        )
+        f = FuturaDigital.objects.get(mes_referencia="2026-08-01")
+        self.assertEqual(f.mes_referencia.day, 1)
+
+    def test_no_excess_when_below_franchise(self):
+        self.client.force_login(self.ti)
+        self.client.post(
+            reverse("futura_digital_create"),
+            {"mes_referencia": "2026-09", "copias_total": "10000", "copias_cor": "0", "franquia_copias": "23000"},
+        )
+        f = FuturaDigital.objects.get(mes_referencia="2026-09-01")
+        self.assertEqual(f.copias_excedentes, 0)
+        self.assertEqual(str(f.valor_pago), "1610.00")  # so a franquia
+
+    def test_create_requires_month(self):
+        self.client.force_login(self.ti)
+        antes = FuturaDigital.objects.count()
+        self.client.post(reverse("futura_digital_create"), {"mes_referencia": "", "copias_total": "10"})
+        self.assertEqual(FuturaDigital.objects.count(), antes)
+
+    def test_update_recalculates(self):
+        self.client.force_login(self.ti)
+        f = FuturaDigital.objects.create(mes_referencia="2027-01-01", copias_total=1000, copias_cor=0)
+        f.recalcular(); f.save()
+        self.client.post(
+            reverse("futura_digital_update", args=[f.id]),
+            {"mes_referencia": "2027-01", "copias_total": "60000", "copias_cor": "500", "franquia_copias": "23000"},
+        )
+        f.refresh_from_db()
+        # (60000 - 500) - 23000 = 36500
+        self.assertEqual(f.copias_excedentes, 36500)
+
+    def test_delete(self):
+        self.client.force_login(self.ti)
+        f = FuturaDigital.objects.create(mes_referencia="2027-02-01", copias_total=1000)
+        resp = self.client.post(reverse("futura_digital_delete", args=[f.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(FuturaDigital.objects.filter(id=f.id).exists())
+
+    def test_common_user_blocked(self):
+        f = FuturaDigital.objects.create(mes_referencia="2027-03-01", copias_total=1000)
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("futura_digital_dashboard")).status_code, 302)
+        antes = FuturaDigital.objects.count()
+        self.client.post(reverse("futura_digital_create"), {"mes_referencia": "2027-04", "copias_total": "1"})
+        self.assertEqual(FuturaDigital.objects.count(), antes)
+        self.client.post(reverse("futura_digital_delete", args=[f.id]))
+        self.assertTrue(FuturaDigital.objects.filter(id=f.id).exists())
+
+    def test_dashboard_renders_chart_data(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("futura_digital_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "fdSerie")
+        self.assertContains(resp, "fd-chart")

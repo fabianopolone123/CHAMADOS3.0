@@ -37,6 +37,7 @@ from .models import (
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
+    FuturaDigital,
     EmprestimoTI,
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
@@ -3425,6 +3426,185 @@ def contrato_ti_anexo_download_view(request, anexo_id: int):
             anexo.arquivo.open("rb"),
             as_attachment=True,
             filename=anexo.nome_original or anexo.arquivo.name.split("/")[-1],
+        )
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+# ==========================================================================
+# Modulo Futura Digital (faturas mensais de impressao) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def futura_digital_dashboard_view(request):
+    """Lista as faturas mensais, com cartoes de resumo e serie para o grafico."""
+    faturas = list(FuturaDigital.objects.select_related("criado_por").all())
+
+    total_pago = sum((f.valor_pago for f in faturas), Decimal("0"))
+    total_copias = sum(f.copias_total for f in faturas)
+    media_pago = (total_pago / len(faturas)) if faturas else Decimal("0")
+
+    inteiro, decimal = f"{total_pago:.2f}".split(".")
+    total_pago_display = f"{int(inteiro):,}".replace(",", ".") + f",{decimal}"
+    inteiro_m, decimal_m = f"{media_pago:.2f}".split(".")
+    media_pago_display = f"{int(inteiro_m):,}".replace(",", ".") + f",{decimal_m}"
+
+    # Serie cronologica (ascendente) para o grafico mes a mes.
+    serie = [
+        {
+            "mes": f.mes_label,
+            "copias": f.copias_total,
+            "cor": f.copias_cor,
+            "excedentes": f.copias_excedentes,
+            "valor": float(f.valor_pago),
+        }
+        for f in sorted(faturas, key=lambda x: x.mes_referencia)
+    ]
+
+    context = {
+        "page_title": "Futura Digital",
+        "faturas": faturas,
+        "total_faturas": len(faturas),
+        "total_pago_display": total_pago_display,
+        "media_pago_display": media_pago_display,
+        "total_copias_display": f"{total_copias:,}".replace(",", "."),
+        "serie": serie,
+        "padrao_franquia_copias": FuturaDigital.FRANQUIA_COPIAS_PADRAO,
+        "padrao_franquia_valor": FuturaDigital.FRANQUIA_VALOR_PADRAO,
+        "padrao_valor_excedente": FuturaDigital.VALOR_EXCEDENTE_PADRAO,
+        "padrao_valor_cor": FuturaDigital.VALOR_COR_PADRAO,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/futura_digital.html", context)
+
+
+def _ler_dados_futura(request):
+    """Le e valida os campos do formulario da fatura Futura Digital."""
+    mes_raw = (request.POST.get("mes_referencia") or "").strip()
+    # Aceita "AAAA-MM" (input type=month) alem de "AAAA-MM-DD".
+    if len(mes_raw) == 7 and mes_raw[4:5] == "-":
+        mes_raw = f"{mes_raw}-01"
+    mes = parse_date(mes_raw)
+    if not mes:
+        return None, "Informe o mes de referencia."
+    # Normaliza para o primeiro dia do mes.
+    mes = mes.replace(day=1)
+
+    def _int(campo):
+        try:
+            return max(int(request.POST.get(campo) or 0), 0)
+        except (TypeError, ValueError):
+            return None
+
+    copias_total = _int("copias_total")
+    copias_cor = _int("copias_cor")
+    franquia_copias = _int("franquia_copias")
+    if copias_total is None or copias_cor is None or franquia_copias is None:
+        return None, "Quantidades de copias invalidas."
+
+    franquia_valor = _parse_valor_brl(request.POST.get("franquia_valor")) if (request.POST.get("franquia_valor") or "").strip() else FuturaDigital.FRANQUIA_VALOR_PADRAO
+    excedente = _parse_valor_brl(request.POST.get("valor_copia_excedente")) if (request.POST.get("valor_copia_excedente") or "").strip() else FuturaDigital.VALOR_EXCEDENTE_PADRAO
+    cor = _parse_valor_brl(request.POST.get("valor_copia_cor")) if (request.POST.get("valor_copia_cor") or "").strip() else FuturaDigital.VALOR_COR_PADRAO
+
+    dados = {
+        "mes_referencia": mes,
+        "nota_fiscal": (request.POST.get("nota_fiscal") or "").strip(),
+        "copias_total": copias_total,
+        "copias_cor": copias_cor,
+        "franquia_copias": franquia_copias or FuturaDigital.FRANQUIA_COPIAS_PADRAO,
+        "franquia_valor": franquia_valor,
+        "valor_copia_excedente": excedente,
+        "valor_copia_cor": cor,
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def futura_digital_create_view(request):
+    """Cadastra uma fatura mensal; calcula excedentes e valor no backend (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar faturas.")
+        return redirect("futura_digital_dashboard")
+
+    dados, erro = _ler_dados_futura(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("futura_digital_dashboard")
+
+    fatura = FuturaDigital(criado_por=request.user, **dados)
+    fatura.recalcular()
+    if request.FILES.get("documento"):
+        fatura.documento = request.FILES["documento"]
+    fatura.save()
+    messages.success(request, f"Fatura de {fatura.mes_label} cadastrada com sucesso.")
+    return redirect("futura_digital_dashboard")
+
+
+@login_required
+@require_POST
+def futura_digital_update_view(request, fatura_id: int):
+    """Edita uma fatura mensal e recalcula excedentes/valor (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar faturas.")
+        return redirect("futura_digital_dashboard")
+
+    fatura = FuturaDigital.objects.filter(pk=fatura_id).first()
+    if not fatura:
+        messages.error(request, "Fatura nao encontrada.")
+        return redirect("futura_digital_dashboard")
+
+    dados, erro = _ler_dados_futura(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("futura_digital_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(fatura, campo, valor)
+    fatura.recalcular()
+    if request.FILES.get("documento"):
+        fatura.documento = request.FILES["documento"]
+    fatura.save()
+    messages.success(request, f"Fatura de {fatura.mes_label} atualizada com sucesso.")
+    return redirect("futura_digital_dashboard")
+
+
+@login_required
+@require_POST
+def futura_digital_delete_view(request, fatura_id: int):
+    """Exclui uma fatura mensal (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir faturas.")
+        return redirect("futura_digital_dashboard")
+
+    fatura = FuturaDigital.objects.filter(pk=fatura_id).first()
+    if not fatura:
+        messages.error(request, "Fatura nao encontrada.")
+        return redirect("futura_digital_dashboard")
+
+    label = fatura.mes_label
+    if fatura.documento:
+        fatura.documento.delete(save=False)
+    fatura.delete()
+    messages.success(request, f"Fatura de {label} excluida com sucesso.")
+    return redirect("futura_digital_dashboard")
+
+
+@login_required
+def futura_digital_documento_view(request, fatura_id: int):
+    """Download protegido do documento de uma fatura (TI/admin)."""
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    fatura = get_object_or_404(FuturaDigital, pk=fatura_id)
+    if not fatura.documento:
+        raise Http404("Sem documento.")
+    try:
+        return FileResponse(
+            fatura.documento.open("rb"),
+            as_attachment=True,
+            filename=fatura.documento.name.split("/")[-1],
         )
     except FileNotFoundError:
         raise Http404("Arquivo nao encontrado no armazenamento.")

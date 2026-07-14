@@ -8,6 +8,7 @@ from .models import (
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
+    FuturaDigital,
     Licenca,
     LicencaSoftware,
     Ramal,
@@ -227,3 +228,11 @@ class ContratoAdmin(admin.ModelAdmin):
     list_filter = ("periodicidade", "forma_pagamento")
     search_fields = ("nome", "observacoes", "forma_pagamento")
     inlines = [ContratoAnexoInline]
+
+
+@admin.register(FuturaDigital)
+class FuturaDigitalAdmin(admin.ModelAdmin):
+    list_display = ("mes_referencia", "copias_total", "copias_cor", "copias_excedentes", "valor_pago", "nota_fiscal")
+    list_filter = ("mes_referencia",)
+    search_fields = ("nota_fiscal",)
+    date_hierarchy = "mes_referencia"

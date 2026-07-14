@@ -1214,3 +1214,99 @@ class ContratoAnexo(models.Model):
 
     def __str__(self) -> str:
         return self.nome_original or self.arquivo.name
+
+
+class FuturaDigital(models.Model):
+    """Fatura mensal da Futura Digital (locacao de impressoras): franquia de
+    copias, excedentes e copias coloridas, com a regra de cobranca.
+
+    Regra: valor_pago = franquia_valor
+                        + copias_excedentes * valor_copia_excedente
+                        + copias_cor * valor_copia_cor
+    onde copias_excedentes = max(copias_total - copias_cor - franquia_copias, 0).
+    """
+
+    FRANQUIA_COPIAS_PADRAO = 23000
+    FRANQUIA_VALOR_PADRAO = Decimal("1610.00")
+    VALOR_EXCEDENTE_PADRAO = Decimal("0.07")
+    VALOR_COR_PADRAO = Decimal("0.75")
+
+    mes_referencia = models.DateField(help_text="Use o primeiro dia do mes de referencia.")
+    nota_fiscal = models.CharField(max_length=80, blank=True, default="")
+    copias_total = models.PositiveIntegerField(default=0)
+    copias_cor = models.PositiveIntegerField(default=0)
+    franquia_copias = models.PositiveIntegerField(default=FRANQUIA_COPIAS_PADRAO)
+    franquia_valor = models.DecimalField(max_digits=12, decimal_places=2, default=FRANQUIA_VALOR_PADRAO)
+    valor_copia_excedente = models.DecimalField(max_digits=8, decimal_places=4, default=VALOR_EXCEDENTE_PADRAO)
+    valor_copia_cor = models.DecimalField(max_digits=8, decimal_places=4, default=VALOR_COR_PADRAO)
+    copias_excedentes = models.PositiveIntegerField(default=0)
+    valor_pago = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    documento = models.FileField(upload_to="futura_digital/", null=True, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="futura_digital_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-mes_referencia", "-id"]
+        verbose_name = "Futura Digital"
+        verbose_name_plural = "Futura Digital"
+
+    def __str__(self) -> str:
+        return f"Futura Digital - {self.mes_referencia:%m/%Y}"
+
+    def calcular_excedentes(self) -> int:
+        return max(int(self.copias_total) - int(self.copias_cor) - int(self.franquia_copias), 0)
+
+    def calcular_valor(self) -> Decimal:
+        excedentes = Decimal(self.copias_excedentes or 0)
+        cor = Decimal(self.copias_cor or 0)
+        return (
+            Decimal(self.franquia_valor or 0)
+            + excedentes * Decimal(self.valor_copia_excedente or 0)
+            + cor * Decimal(self.valor_copia_cor or 0)
+        ).quantize(Decimal("0.01"))
+
+    def recalcular(self) -> None:
+        """Atualiza excedentes e valor_pago a partir dos demais campos."""
+        self.copias_excedentes = self.calcular_excedentes()
+        self.valor_pago = self.calcular_valor()
+
+    @property
+    def mes_label(self) -> str:
+        return self.mes_referencia.strftime("%m/%Y") if self.mes_referencia else "-"
+
+    @property
+    def copias_pb(self) -> int:
+        return max(int(self.copias_total) - int(self.copias_cor), 0)
+
+    @staticmethod
+    def _num(valor) -> str:
+        return f"{int(valor):,}".replace(",", ".")
+
+    @staticmethod
+    def _brl(valor) -> str:
+        valor = valor if isinstance(valor, Decimal) else Decimal(str(valor or "0"))
+        inteiro, decimal = f"{valor:.2f}".split(".")
+        return f"{int(inteiro):,}".replace(",", ".") + f",{decimal}"
+
+    @property
+    def copias_total_display(self) -> str:
+        return self._num(self.copias_total)
+
+    @property
+    def copias_excedentes_display(self) -> str:
+        return self._num(self.copias_excedentes)
+
+    @property
+    def valor_pago_display(self) -> str:
+        return self._brl(self.valor_pago)
+
+    @property
+    def franquia_valor_display(self) -> str:
+        return self._brl(self.franquia_valor)

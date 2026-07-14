@@ -1,0 +1,103 @@
+{% load static %}
+<div class="modal fade" id="faturaModal" tabindex="-1" aria-labelledby="faturaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Futura Digital</span>
+                    <h5 class="modal-title" id="faturaModalLabel">Nova fatura mensal</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'futura_digital_create' %}" enctype="multipart/form-data" class="create-ticket-form" id="faturaForm"
+                data-franquia-copias="{{ padrao_franquia_copias }}"
+                data-franquia-valor="{{ padrao_franquia_valor }}"
+                data-rate-exc="{{ padrao_valor_excedente }}"
+                data-rate-cor="{{ padrao_valor_cor }}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="fd-form-grid">
+                        <label class="contrato-field">
+                            <span>Mes de referencia</span>
+                            <input type="month" class="form-control" name="mes_referencia" id="faturaMes" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Nota fiscal (opcional)</span>
+                            <input type="text" class="form-control" name="nota_fiscal" id="faturaNota" maxlength="80" placeholder="Ex.: 6131">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Total de copias no mes</span>
+                            <input type="number" class="form-control" name="copias_total" id="faturaTotal" min="0" value="0" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Copias coloridas</span>
+                            <input type="number" class="form-control" name="copias_cor" id="faturaCor" min="0" value="0">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Franquia de copias</span>
+                            <input type="number" class="form-control" name="franquia_copias" id="faturaFranquiaCopias" min="0" value="{{ padrao_franquia_copias }}">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Valor da franquia (R$)</span>
+                            <input type="text" class="form-control" name="franquia_valor" id="faturaFranquiaValor" inputmode="decimal" placeholder="1.610,00">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Valor por copia excedente (R$)</span>
+                            <input type="text" class="form-control" name="valor_copia_excedente" id="faturaRateExc" inputmode="decimal" placeholder="0,07">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Valor por copia colorida (R$)</span>
+                            <input type="text" class="form-control" name="valor_copia_cor" id="faturaRateCor" inputmode="decimal" placeholder="0,75">
+                        </label>
+                        <label class="contrato-field fd-field--full">
+                            <span>Documento / NF (opcional)</span>
+                            <input type="file" class="form-control" name="documento" id="faturaDocumento">
+                            <small class="contrato-field__help">Na edicao, envie um arquivo apenas se quiser substituir o atual.</small>
+                        </label>
+                    </div>
+
+                    <div class="fd-calc" aria-live="polite">
+                        <div class="fd-calc__row">
+                            <span>Copias P&amp;B excedentes</span>
+                            <strong id="calcExcedentes">0</strong>
+                        </div>
+                        <div class="fd-calc__row">
+                            <span>Franquia</span>
+                            <strong id="calcFranquia">R$ 0,00</strong>
+                        </div>
+                        <div class="fd-calc__row">
+                            <span>Excedentes <em id="calcExcInfo"></em></span>
+                            <strong id="calcExcValor">R$ 0,00</strong>
+                        </div>
+                        <div class="fd-calc__row">
+                            <span>Coloridas <em id="calcCorInfo"></em></span>
+                            <strong id="calcCorValor">R$ 0,00</strong>
+                        </div>
+                        <div class="fd-calc__row fd-calc__total">
+                            <span>Valor a pagar</span>
+                            <strong id="calcTotal">R$ 0,00</strong>
+                        </div>
+                        <p class="fd-calc__hint">Excedentes = (total &minus; coloridas) &minus; franquia. Calculo automatico; conferido no backend ao salvar.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="faturaDeleteBtn">Excluir fatura</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="faturaSubmit">Cadastrar fatura</button>
+                </div>
+            </form>
+
+            <div class="fd-delete-confirm is-hidden" id="faturaDeleteConfirm">
+                <p class="fd-delete-confirm__text">
+                    Tem certeza que deseja excluir esta fatura? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="faturaDeleteForm" class="fd-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="faturaDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

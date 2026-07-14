@@ -81,6 +81,11 @@
 | `/contratos-ti/<id>/excluir/` | POST | Exclui um contrato e seus anexos (arquivos removidos do disco) (apenas TI/admin) | Implementada |
 | `/contratos-ti/anexos/<id>/` | GET | Download protegido de um anexo de contrato (apenas TI/admin) | Implementada |
 | `/contratos-ti/anexos/<id>/excluir/` | POST | Exclui um anexo isolado de um contrato (apenas TI/admin) | Implementada |
+| `/futura-digital/` | GET | Modulo Futura Digital: faturas mensais de impressao com cartoes de resumo, grafico mes a mes, tabela (busca + ordenacao) e botao "Nova fatura" (apenas TI/admin) | Implementada |
+| `/futura-digital/criar/` | POST | Cadastra uma fatura mensal (copias, cor, franquia, taxas) com documento opcional; calcula excedentes/valor no backend (apenas TI/admin) | Implementada |
+| `/futura-digital/<id>/editar/` | POST | Edita uma fatura e recalcula excedentes/valor (apenas TI/admin) | Implementada |
+| `/futura-digital/<id>/excluir/` | POST | Exclui uma fatura (apenas TI/admin) | Implementada |
+| `/futura-digital/<id>/documento/` | GET | Download protegido do documento da fatura (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -223,6 +228,13 @@
 - A tela lista os contratos em uma tabela responsiva (cards no celular) com nome, valor (destacado, formato brasileiro), periodicidade, forma de pagamento (com "final XXXX"), vigencia (inicio/fim) e status (badge Ativo/Encerrado); cartoes de resumo no topo (contratos, ativos, total mensal dos ativos). Busca client-side (nome/pagamento/observacoes) e ordenacao clicando nos cabecalhos (Valor por numero, Vigencia por data). Clicar na linha (ou no icone de olho) abre um modal de detalhe com observacoes e anexos para download; o icone de lapis abre a edicao.
 - As rotas de escrita usam `POST` (com CSRF); cadastro/edicao aceitam upload de multiplos anexos (`multipart/form-data`) e seguem o padrao classico (valida, grava, Django messages, redireciona). O valor e opcional e aceita formato brasileiro; preencher "encerrado em" marca o contrato como encerrado.
 - Excluir um contrato remove seus anexos em cascata e apaga os arquivos do disco; ha rota para remover um anexo isolado. Detalhe e download sao restritos a TI/admin (`403`/`404` para comum), sem expor a URL direta de `MEDIA`.
+
+## Regras do modulo Futura Digital
+
+- `/futura-digital/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Futura Digital" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend.
+- A tela tem cartoes de resumo (meses registrados, total pago, media por mes, total de copias), um grafico de barras mes a mes com alternancia entre "Valor pago", "Copias" e "Excedentes" (renderizado no cliente a partir de uma serie JSON via `json_script`, sem biblioteca externa) e uma tabela responsiva (cards no celular) com mes, copias, cor, excedentes, valor pago e link do documento. Busca client-side (mes/nota) e ordenacao por cabecalho (numeros e mes por valor real).
+- O cadastro/edicao acontece em um modal com calculo AO VIVO: ao digitar copias/cor/franquia/taxas, o formulario mostra os excedentes e o valor a pagar. O backend recalcula e grava `copias_excedentes` e `valor_pago` (nao confia no cliente). O mes aceita `AAAA-MM` (input `month`) e e normalizado para o 1o dia. As taxas e a franquia tem defaults (0,07 / 0,75 / 23000 / 1.610,00) editaveis por fatura.
+- Excluir uma fatura remove tambem o documento do disco. O download do documento e restrito a TI/admin (`404` para comum), sem expor a URL direta de `MEDIA`.
 
 ## Regras das rotas de historico
 

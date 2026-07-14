@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/futura_digital.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app futura-app"
+    data-update-url="{% url 'futura_digital_update' fatura_id=0 %}"
+    data-delete-url="{% url 'futura_digital_delete' fatura_id=0 %}"
+>
+    {% csrf_token %}
+    {{ serie|json_script:"fdSerie" }}
+    {% include "partials/ti_sidebar.html" with active="futura_digital" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Futura Digital</h2>
+                <p class="contratos-topbar__subtitle">Faturas mensais de impressao (locacao)</p>
+                <p class="topbar-subtitle">Franquia, excedentes e copias coloridas com calculo automatico. Acompanhe o consumo mes a mes.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createFaturaButton" title="Cadastrar nova fatura">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Nova fatura</span>
+            </button>
+        </header>
+
+        <section class="fd-stats">
+            <article class="fd-stat fd-stat--blue">
+                <span class="fd-stat__label">Meses registrados</span>
+                <strong class="fd-stat__value">{{ total_faturas }}</strong>
+            </article>
+            <article class="fd-stat fd-stat--green">
+                <span class="fd-stat__label">Total pago</span>
+                <strong class="fd-stat__value">R$ {{ total_pago_display }}</strong>
+            </article>
+            <article class="fd-stat fd-stat--amber">
+                <span class="fd-stat__label">Media por mes</span>
+                <strong class="fd-stat__value">R$ {{ media_pago_display }}</strong>
+            </article>
+            <article class="fd-stat fd-stat--indigo">
+                <span class="fd-stat__label">Total de copias</span>
+                <strong class="fd-stat__value">{{ total_copias_display }}</strong>
+            </article>
+        </section>
+
+        {% if faturas %}
+        <section class="fd-chart-card">
+            <div class="fd-chart-head">
+                <div>
+                    <h3 class="fd-chart-title">Consumo mes a mes</h3>
+                    <p class="fd-chart-sub" id="fdChartSub"></p>
+                </div>
+                <div class="fd-chart-toggle" role="tablist" aria-label="Metrica do grafico">
+                    <button type="button" class="fd-toggle is-active" data-metric="valor" role="tab" aria-selected="true">Valor pago</button>
+                    <button type="button" class="fd-toggle" data-metric="copias" role="tab" aria-selected="false">Copias</button>
+                    <button type="button" class="fd-toggle" data-metric="excedentes" role="tab" aria-selected="false">Excedentes</button>
+                </div>
+            </div>
+            <div class="fd-chart" id="fdChart" role="img" aria-label="Grafico de consumo mensal"></div>
+            <div class="fd-chart-legend" id="fdChartLegend"></div>
+        </section>
+        {% endif %}
+
+        <section class="fd-panel">
+            <div class="fd-search">
+                <span class="fd-search__icon" aria-hidden="true">&#128269;</span>
+                <input type="search" id="faturaSearch" class="fd-search__input" placeholder="Pesquisar por mes ou nota fiscal..." autocomplete="off">
+            </div>
+            <p class="fd-search__status" id="faturaSearchStatus"></p>
+
+            {% if faturas %}
+            <div class="fd-table-wrap">
+                <table class="fd-table" id="faturasTable">
+                    <thead>
+                        <tr>
+                            <th class="fd-th" data-sort-index="0" data-sort-type="month" aria-sort="none">Mes <span class="fd-sort-ind" aria-hidden="true"></span></th>
+                            <th class="fd-th fd-th--num" data-sort-index="1" data-sort-type="num" aria-sort="none">Copias <span class="fd-sort-ind" aria-hidden="true"></span></th>
+                            <th class="fd-th fd-th--num fd-col--hide-sm" data-sort-index="2" data-sort-type="num" aria-sort="none">Cor <span class="fd-sort-ind" aria-hidden="true"></span></th>
+                            <th class="fd-th fd-th--num fd-col--hide-md" data-sort-index="3" data-sort-type="num" aria-sort="none">Excedentes <span class="fd-sort-ind" aria-hidden="true"></span></th>
+                            <th class="fd-th fd-th--num" data-sort-index="4" data-sort-type="num" aria-sort="none">Valor pago <span class="fd-sort-ind" aria-hidden="true"></span></th>
+                            <th class="fd-th fd-col--hide-md">Documento</th>
+                            <th class="fd-th--actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="faturasTableBody">
+                        {% for f in faturas %}
+                        <tr class="fd-row"
+                            data-id="{{ f.id }}"
+                            data-mes="{{ f.mes_referencia|date:'Y-m-d' }}"
+                            data-nota="{{ f.nota_fiscal }}"
+                            data-total="{{ f.copias_total }}"
+                            data-cor="{{ f.copias_cor }}"
+                            data-franquia-copias="{{ f.franquia_copias }}"
+                            data-franquia-valor="{{ f.franquia_valor }}"
+                            data-rate-exc="{{ f.valor_copia_excedente }}"
+                            data-rate-cor="{{ f.valor_copia_cor }}"
+                            data-search="{{ f.mes_label }} {{ f.nota_fiscal|lower }}">
+                            <td data-label="Mes" class="fd-cell--mes">{{ f.mes_label }}{% if f.nota_fiscal %}<span class="fd-nf">NF {{ f.nota_fiscal }}</span>{% endif %}</td>
+                            <td data-label="Copias" class="fd-th--num" data-sort-value="{{ f.copias_total }}">{{ f.copias_total_display }}</td>
+                            <td data-label="Cor" class="fd-th--num fd-col--hide-sm" data-sort-value="{{ f.copias_cor }}">{{ f.copias_cor }}</td>
+                            <td data-label="Excedentes" class="fd-th--num fd-col--hide-md" data-sort-value="{{ f.copias_excedentes }}">{{ f.copias_excedentes_display }}</td>
+                            <td data-label="Valor pago" class="fd-th--num fd-cell--valor" data-sort-value="{{ f.valor_pago }}">R$ {{ f.valor_pago_display }}</td>
+                            <td data-label="Documento" class="fd-col--hide-md">
+                                {% if f.documento %}<a href="{% url 'futura_digital_documento' f.id %}" target="_blank" rel="noopener" class="fd-doc">&#128206; abrir</a>{% else %}-{% endif %}
+                            </td>
+                            <td data-label="Acoes" class="fd-cell--actions">
+                                <button type="button" class="fd-icon-btn js-edit-fatura" title="Editar" aria-label="Editar">&#9998;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="fd-empty is-hidden" id="faturasNoResults">Nenhuma fatura encontrada para a pesquisa.</p>
+            {% else %}
+            <div class="fd-empty-state">
+                <p class="fd-empty-state__title">Nenhuma fatura cadastrada ainda.</p>
+                <p class="fd-empty-state__hint">Clique em "Nova fatura" para registrar o primeiro mes.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/futura_digital_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/futura_digital.js' %}"></script>
+{% endblock %}
