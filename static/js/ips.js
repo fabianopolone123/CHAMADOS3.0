@@ -139,4 +139,57 @@
     });
 
     updateStatus(rows.length);
+
+    // ------------------------------------------------------------------
+    // Ordenacao ao clicar nos cabecalhos
+    // ------------------------------------------------------------------
+    const tbody = document.getElementById("ipsTableBody");
+    const headers = Array.from(document.querySelectorAll(".ips-th"));
+    let sortState = { index: -1, dir: 1 };
+
+    function cellText(row, index) {
+        const cell = row.children[index];
+        return cell ? cell.textContent.trim() : "";
+    }
+
+    // Converte "192.168.22.10" em um numero comparavel (ordena por octeto).
+    function ipToNumber(value) {
+        const parts = (value || "").split(".");
+        if (parts.length !== 4) return null;
+        let num = 0;
+        for (const p of parts) {
+            const n = parseInt(p, 10);
+            if (Number.isNaN(n)) return null;
+            num = num * 256 + n;
+        }
+        return num;
+    }
+
+    function sortBy(index, type) {
+        const dir = sortState.index === index ? -sortState.dir : 1;
+        sortState = { index, dir };
+        const ordered = rows.slice().sort((a, b) => {
+            const va = cellText(a, index);
+            const vb = cellText(b, index);
+            if (type === "ip") {
+                const na = ipToNumber(va);
+                const nb = ipToNumber(vb);
+                if (na !== null && nb !== null) return (na - nb) * dir;
+            }
+            return va.localeCompare(vb, "pt", { sensitivity: "base", numeric: true }) * dir;
+        });
+        ordered.forEach((row) => tbody.appendChild(row));
+        headers.forEach((h) => {
+            const isActive = Number(h.dataset.sortIndex) === index;
+            h.setAttribute("aria-sort", isActive ? (dir === 1 ? "ascending" : "descending") : "none");
+            const ind = h.querySelector(".ips-sort-ind");
+            if (ind) ind.textContent = isActive ? (dir === 1 ? "↑" : "↓") : "";
+        });
+    }
+
+    headers.forEach((h) => {
+        h.addEventListener("click", () => {
+            sortBy(Number(h.dataset.sortIndex), h.dataset.sortType || "text");
+        });
+    });
 })();

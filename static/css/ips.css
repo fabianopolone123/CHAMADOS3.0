@@ -170,6 +170,22 @@
 
 .ips-th--actions { text-align: right; }
 
+/* Cabecalhos ordenaveis */
+.ips-th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.ips-th:hover { color: #1d4ed8; }
+
+.ips-sort-ind {
+    display: inline-block;
+    width: 0.8em;
+    color: #2563eb;
+    font-weight: 800;
+}
+
 .ips-table tbody td {
     padding: 0.6rem 0.75rem;
     border-bottom: 1px solid #f1f5f9;
