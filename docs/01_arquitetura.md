@@ -7,13 +7,16 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 ## Componentes atuais
 
 - `chamados_ti`: configuracao principal do projeto
-- `core`: app responsavel pela autenticacao, rotas principais, Kanban, portal do solicitante, permissoes, historico, modulo Requisicoes (nomes tecnicos internos com prefixo `Contrato`), modulo Insumos, modulo Documentos e modulo Emprestimos (termo em PDF via `core/termo_pdf.py`)
+- `core`: app unico que concentra autenticacao, rotas, Kanban, portal do solicitante, permissoes, historico e todos os modulos de TI. Modulos atuais: Requisicoes (nomes tecnicos internos com prefixo `Contrato`), Insumos, Documentos, Emprestimos (termo em PDF via `core/termo_pdf.py`), Emails, Ramais, Licencas, IPs, Servicos feitos, Contratos (`/contratos-ti/`, distinto de Requisicoes), Futura Digital, Dicas, Starlinks e Cofre (cifra em `core/crypto.py`)
+- `core/crypto.py`: cifra simetrica (Fernet) do Cofre de senhas; a chave vem de `VAULT_ENCRYPTION_KEY` (env)
 - `templates/core`: templates da autenticacao e de permissoes
-- `templates/chamados`: templates do Kanban, do portal do solicitante e do historico
+- `templates/chamados`: templates das telas autenticadas (Kanban, portal e cada modulo)
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
-- `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral)
-- `static/js`: scripts do front-end (`chamados.js` do Kanban, `contratos.js` do modulo Requisicoes, `insumos.js` do modulo Insumos, `documentos.js` do modulo Documentos, `emprestimos.js` do modulo Emprestimos e `notifications.js` dos toasts)
-- `.env`: configuracao sensivel de ambiente, fora de versionamento
+- `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral, e um CSS por modulo)
+- `static/js`: um script por modulo (ex.: `chamados.js`, `ramais.js`, `ips.js`, `futura_digital.js`, `cofre.js`, etc.) alem de `sidebar.js` (menu responsivo) e `notifications.js` (toasts)
+- `seed/`: arquivos locais de seed com dados/credenciais reais, IGNORADOS pelo Git (nao versionados)
+- `media/`: uploads e anexos, tambem fora de versionamento
+- `.env`: configuracao sensivel de ambiente (inclui `VAULT_ENCRYPTION_KEY`), fora de versionamento
 
 ## Estrutura atual do fluxo autenticado
 
@@ -43,6 +46,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - SortableJS via CDN
 - ReportLab para geracao do termo de emprestimo em PDF (sem dependencia nativa)
 - Pillow para campos de imagem (`ImageField`)
+- cryptography (Fernet) para a cifra das credenciais do Cofre
 - CSS proprio para refinamento visual
 
 ## Observacoes de infraestrutura
