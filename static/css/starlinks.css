@@ -134,32 +134,6 @@
     color: #334155;
 }
 
-/* Senha */
-.star-pass { display: flex; align-items: center; gap: 0.4rem; }
-.star-pass__value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    letter-spacing: 0.06em;
-    color: #0f172a;
-    overflow-wrap: anywhere;
-    min-width: 0;
-}
-
-.star-mini {
-    flex: 0 0 auto;
-    border: 1px solid #dbeafe;
-    background: #eff5ff;
-    color: #1d4ed8;
-    width: 1.7rem;
-    height: 1.7rem;
-    border-radius: 0.45rem;
-    cursor: pointer;
-    font-size: 0.78rem;
-    line-height: 1;
-    transition: background 0.15s ease;
-}
-.star-mini:hover { background: #dbeafe; }
-.star-mini.is-copied { background: #dcfce7; border-color: #bbf7d0; }
-
 /* ----- Acoes ----- */
 .star-card__actions { margin-top: 0.8rem; display: flex; justify-content: flex-end; }
 
@@ -179,9 +153,6 @@
 /* ----- Modal ----- */
 .star-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .star-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; color: #0f172a; font-weight: 600; }
-
-.star-pass-input { position: relative; display: flex; align-items: center; gap: 0.4rem; }
-.star-pass-input .form-control { flex: 1 1 auto; }
 
 .star-delete-confirm { padding: 1.2rem 1.25rem 1.4rem; border-top: 1px solid #f1f5f9; }
 .star-delete-confirm__text { margin: 0 0 1rem; color: #b91c1c; font-weight: 600; }

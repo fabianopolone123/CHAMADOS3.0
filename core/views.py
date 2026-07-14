@@ -3780,7 +3780,6 @@ def _ler_dados_starlink(request):
         "nome": nome,
         "local": (request.POST.get("local") or "").strip(),
         "email": (request.POST.get("email") or "").strip(),
-        "senha": (request.POST.get("senha") or "").strip(),
         "ativo": request.POST.get("ativo") == "1",
         "forma_pagamento": forma,
         "final_cartao": (request.POST.get("final_cartao") or "").strip()[:4],
@@ -3827,10 +3826,6 @@ def starlink_update_view(request, starlink_id: int):
     if erro:
         messages.error(request, erro)
         return redirect("starlinks_dashboard")
-
-    # Mantem a senha atual se o campo vier vazio na edicao.
-    if not dados["senha"]:
-        dados["senha"] = starlink.senha
 
     for campo, valor in dados.items():
         setattr(starlink, campo, valor)

@@ -1359,7 +1359,6 @@ class Starlink(models.Model):
     nome = models.CharField(max_length=160)
     local = models.CharField(max_length=180, blank=True, default="")
     email = models.EmailField(max_length=254, blank=True, default="")
-    senha = models.CharField(max_length=255, blank=True, default="")
     ativo = models.BooleanField(default=True)
     forma_pagamento = models.CharField(
         max_length=12,

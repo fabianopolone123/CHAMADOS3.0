@@ -68,7 +68,6 @@
                     data-nome="{{ s.nome }}"
                     data-local="{{ s.local }}"
                     data-email="{{ s.email }}"
-                    data-senha="{{ s.senha }}"
                     data-ativo="{% if s.ativo %}1{% else %}0{% endif %}"
                     data-forma="{{ s.forma_pagamento }}"
                     data-cartao="{{ s.final_cartao }}"
@@ -91,16 +90,6 @@
                             <dt>E-mail</dt>
                             <dd class="star-field--copy">
                                 {% if s.email %}<a href="mailto:{{ s.email }}">{{ s.email }}</a>{% else %}-{% endif %}
-                            </dd>
-                        </div>
-                        <div class="star-field">
-                            <dt>Senha</dt>
-                            <dd class="star-pass">
-                                {% if s.senha %}
-                                <span class="star-pass__value" data-real="{{ s.senha }}">••••••••</span>
-                                <button type="button" class="star-mini js-toggle-pass" title="Mostrar/ocultar" aria-label="Mostrar/ocultar senha">&#128065;</button>
-                                <button type="button" class="star-mini js-copy-pass" title="Copiar" aria-label="Copiar senha">&#128203;</button>
-                                {% else %}-{% endif %}
                             </dd>
                         </div>
                         <div class="star-field">

@@ -1181,15 +1181,15 @@ class StarlinkTests(TestCase):
             reverse("starlink_create"),
             {
                 "nome": "Star99", "local": "Obra X", "email": "star99@sidertec.com.br",
-                "senha": "segredo123", "ativo": "1", "forma_pagamento": "cartao",
+                "ativo": "1", "forma_pagamento": "cartao",
                 "final_cartao": "1234", "numero_serie": "SN123", "numero_kit": "KIT123",
             },
         )
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(Starlink.objects.count(), antes + 1)
         s = Starlink.objects.get(nome="Star99")
-        self.assertEqual(s.senha, "segredo123")
         self.assertTrue(s.ativo)
+        self.assertEqual(s.numero_serie, "SN123")
         self.assertEqual(s.criado_por, self.ti)
 
     def test_create_requires_name(self):
@@ -1205,25 +1205,15 @@ class StarlinkTests(TestCase):
         self.assertFalse(s.ativo)  # sem 'ativo' no POST => inativa
         self.assertEqual(s.forma_pagamento, "pix")
 
-    def test_update_keeps_password_when_blank(self):
+    def test_update_changes_fields(self):
         self.client.force_login(self.ti)
-        s = Starlink.objects.create(nome="Star", senha="antiga", ativo=True)
+        s = Starlink.objects.create(nome="Star", local="Antigo", ativo=True)
         self.client.post(
             reverse("starlink_update", args=[s.id]),
-            {"nome": "Star", "senha": "", "ativo": "1", "forma_pagamento": "cartao"},
+            {"nome": "Star", "local": "Novo", "ativo": "1", "forma_pagamento": "cartao"},
         )
         s.refresh_from_db()
-        self.assertEqual(s.senha, "antiga")  # senha preservada
-
-    def test_update_changes_password_when_filled(self):
-        self.client.force_login(self.ti)
-        s = Starlink.objects.create(nome="Star", senha="antiga", ativo=True)
-        self.client.post(
-            reverse("starlink_update", args=[s.id]),
-            {"nome": "Star", "senha": "nova456", "ativo": "1", "forma_pagamento": "cartao"},
-        )
-        s.refresh_from_db()
-        self.assertEqual(s.senha, "nova456")
+        self.assertEqual(s.local, "Novo")
 
     def test_delete(self):
         self.client.force_login(self.ti)
@@ -1233,7 +1223,7 @@ class StarlinkTests(TestCase):
         self.assertFalse(Starlink.objects.filter(id=s.id).exists())
 
     def test_common_user_blocked(self):
-        s = Starlink.objects.create(nome="Protegida", senha="x")
+        s = Starlink.objects.create(nome="Protegida")
         self.client.force_login(self.common)
         self.assertEqual(self.client.get(reverse("starlinks_dashboard")).status_code, 302)
         antes = Starlink.objects.count()

@@ -12,42 +12,6 @@
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v == null ? "" : v; };
 
     // ------------------------------------------------------------------
-    // Senha nos cards: mostrar/ocultar e copiar
-    // ------------------------------------------------------------------
-    document.querySelectorAll(".js-toggle-pass").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const val = btn.parentElement.querySelector(".star-pass__value");
-            if (!val) return;
-            const real = val.dataset.real || "";
-            if (val.dataset.shown === "1") {
-                val.textContent = "••••••••";
-                val.dataset.shown = "0";
-            } else {
-                val.textContent = real || "-";
-                val.dataset.shown = "1";
-            }
-        });
-    });
-
-    document.querySelectorAll(".js-copy-pass").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-            const val = btn.parentElement.querySelector(".star-pass__value");
-            const real = val ? (val.dataset.real || "") : "";
-            if (!real) return;
-            try {
-                await navigator.clipboard.writeText(real);
-            } catch (e) {
-                const ta = document.createElement("textarea");
-                ta.value = real; document.body.appendChild(ta); ta.select();
-                try { document.execCommand("copy"); } catch (err) {}
-                document.body.removeChild(ta);
-            }
-            btn.classList.add("is-copied");
-            setTimeout(() => btn.classList.remove("is-copied"), 1200);
-        });
-    });
-
-    // ------------------------------------------------------------------
     // Modal cadastro / edicao
     // ------------------------------------------------------------------
     const modalEl = document.getElementById("starModal");
@@ -56,8 +20,6 @@
     const deleteForm = document.getElementById("starDeleteForm");
     const deleteConfirm = document.getElementById("starDeleteConfirm");
     const deleteBtn = document.getElementById("starDeleteBtn");
-    const senhaInput = document.getElementById("starSenha");
-    const senhaHelp = document.getElementById("starSenhaHelp");
     const createAction = form ? form.getAttribute("action") : "";
 
     function resetDelete() {
@@ -70,11 +32,9 @@
         document.getElementById("starModalLabel").textContent = "Nova Starlink";
         document.getElementById("starSubmit").textContent = "Cadastrar Starlink";
         form.action = createAction;
-        ["starNome","starLocal","starEmail","starSenha","starCartao","starIdent","starVersao","starSerie","starKit"].forEach((id) => setVal(id, ""));
+        ["starNome","starLocal","starEmail","starCartao","starIdent","starVersao","starSerie","starKit"].forEach((id) => setVal(id, ""));
         setVal("starForma", "cartao");
         const ativo = document.getElementById("starAtivo"); if (ativo) ativo.checked = true;
-        if (senhaInput) senhaInput.type = "password";
-        if (senhaHelp) senhaHelp.textContent = "";
         deleteBtn?.classList.add("is-hidden");
         resetDelete();
         modal?.show();
@@ -90,7 +50,6 @@
         setVal("starNome", d.nome);
         setVal("starLocal", d.local);
         setVal("starEmail", d.email);
-        setVal("starSenha", "");
         setVal("starForma", d.forma || "cartao");
         setVal("starCartao", d.cartao);
         setVal("starIdent", d.identificador);
@@ -98,8 +57,6 @@
         setVal("starSerie", d.serie);
         setVal("starKit", d.kit);
         const ativo = document.getElementById("starAtivo"); if (ativo) ativo.checked = d.ativo === "1";
-        if (senhaInput) senhaInput.type = "password";
-        if (senhaHelp) senhaHelp.textContent = d.senha ? "Deixe em branco para manter a senha atual." : "";
         deleteBtn?.classList.remove("is-hidden");
         resetDelete();
         modal?.show();
@@ -108,9 +65,6 @@
     document.getElementById("createStarButton")?.addEventListener("click", openCreate);
     document.querySelectorAll(".js-edit-star").forEach((btn) => {
         btn.addEventListener("click", () => openEdit(btn.closest(".star-card")));
-    });
-    document.getElementById("starSenhaToggle")?.addEventListener("click", () => {
-        if (senhaInput) senhaInput.type = senhaInput.type === "password" ? "text" : "password";
     });
     deleteBtn?.addEventListener("click", () => {
         form?.classList.add("is-hidden");

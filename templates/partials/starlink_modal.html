@@ -27,14 +27,6 @@
                             <input type="email" class="form-control" name="email" id="starEmail" maxlength="254" placeholder="conta@sidertec.com.br">
                         </label>
                         <label class="contrato-field">
-                            <span>Senha</span>
-                            <div class="star-pass-input">
-                                <input type="password" class="form-control" name="senha" id="starSenha" autocomplete="new-password" placeholder="Senha da conta">
-                                <button type="button" class="star-mini" id="starSenhaToggle" title="Mostrar/ocultar" aria-label="Mostrar/ocultar">&#128065;</button>
-                            </div>
-                            <small class="contrato-field__help" id="starSenhaHelp"></small>
-                        </label>
-                        <label class="contrato-field">
                             <span>Forma de pagamento</span>
                             <select class="form-select" name="forma_pagamento" id="starForma">
                                 {% for value, label in formas_pagamento %}

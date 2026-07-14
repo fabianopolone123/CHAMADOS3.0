@@ -572,9 +572,9 @@ Regras atuais:
 
 ### Starlink
 
-Antena/conta Starlink da empresa (modulo Starlinks), migrada do banco antigo. Seed inicial via migration de dados `0027`, que le `seed/starlinks_seed.json` (local, ignorado pelo Git). No sistema antigo a senha era guardada cifrada (Fernet); na migracao ela foi decifrada com a chave do `.env` antigo e re-armazenada em texto no campo `senha` (o arquivo de seed com as credenciais NAO e versionado).
+Antena/conta Starlink da empresa (modulo Starlinks), migrada do banco antigo. Seed inicial via migration de dados `0027`, que le `seed/starlinks_seed.json` (local, ignorado pelo Git).
 
-- `nome`, `local`, `email`, `senha`
+- `nome`, `local`, `email`
 - `ativo` (boolean), `forma_pagamento` (choices: `pix`, `cartao`; default `cartao`), `final_cartao`
 - `identificador`, `versao_software`, `numero_serie`, `numero_kit` (dados do kit)
 - `criado_por` (FK `on_delete=SET_NULL`, related_name `starlinks_criados`), `criado_em`, `atualizado_em`. Migration `0026`.
@@ -582,7 +582,7 @@ Antena/conta Starlink da empresa (modulo Starlinks), migrada do banco antigo. Se
 Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem Starlinks (validado no backend; usuario comum e redirecionado).
-- Na edicao, deixar o campo senha em branco mantem a senha atual. A senha aparece mascarada na tela, com botoes para mostrar/ocultar e copiar.
+- O campo de senha foi removido do modulo (migration `0028`): as Starlinks nao guardam credencial de acesso. No sistema antigo havia uma senha cifrada (Fernet), descartada nesta versao por nao ser necessaria.
 
 ## Modelos previstos para proximas fases
 
