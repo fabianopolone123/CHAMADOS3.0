@@ -1072,3 +1072,64 @@ class EnderecoIP(models.Model):
     def __str__(self) -> str:
         rotulo = self.nome or self.fabricante or self.endereco_ip
         return f"{self.endereco_ip} - {rotulo}"
+
+
+class ServicoFeito(models.Model):
+    """Servico de TI ja executado, com empresa, valor, data e anexos (NFs,
+    orcamentos, relatorios). Migrado do modulo 'Servicos feitos' antigo."""
+
+    nome_servico = models.CharField(max_length=180)
+    empresa = models.CharField(max_length=180, blank=True, default="")
+    descricao = models.TextField(blank=True, default="")
+    data_servico = models.DateField(default=timezone.localdate)
+    valor = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="servicos_feitos_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-data_servico", "-id"]
+        verbose_name = "Servico feito"
+        verbose_name_plural = "Servicos feitos"
+
+    def __str__(self) -> str:
+        return f"{self.nome_servico} - {self.empresa}"
+
+    @property
+    def anexos_total(self) -> int:
+        return self.anexos.count()
+
+    @property
+    def valor_display(self) -> str:
+        """Valor formatado no padrao brasileiro (1.234,56)."""
+        valor = self.valor if isinstance(self.valor, Decimal) else Decimal(str(self.valor or "0"))
+        inteiro, decimal = f"{valor:.2f}".split(".")
+        inteiro = f"{int(inteiro):,}".replace(",", ".")
+        return f"{inteiro},{decimal}"
+
+
+class ServicoFeitoAnexo(models.Model):
+    """Arquivo anexado a um servico feito (NF, orcamento, relatorio, etc.)."""
+
+    servico = models.ForeignKey(
+        ServicoFeito,
+        on_delete=models.CASCADE,
+        related_name="anexos",
+    )
+    arquivo = models.FileField(upload_to="servicos_feitos/")
+    nome_original = models.CharField(max_length=255, blank=True, default="")
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Anexo de servico feito"
+        verbose_name_plural = "Anexos de servicos feitos"
+
+    def __str__(self) -> str:
+        return self.nome_original or self.arquivo.name

@@ -1,0 +1,50 @@
+{% load static %}
+<div class="modal fade" id="servicoDetailModal" tabindex="-1" aria-labelledby="servicoDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Servicos feitos</span>
+                    <h5 class="modal-title" id="servicoDetailLabel">Detalhe do servico</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <h4 class="servico-detail__name" id="detailNome">-</h4>
+                <div class="servico-detail__meta">
+                    <div class="servico-detail__meta-item">
+                        <span class="servico-detail__label">Empresa</span>
+                        <strong id="detailEmpresa">-</strong>
+                    </div>
+                    <div class="servico-detail__meta-item">
+                        <span class="servico-detail__label">Data</span>
+                        <strong id="detailData">-</strong>
+                    </div>
+                    <div class="servico-detail__meta-item">
+                        <span class="servico-detail__label">Valor</span>
+                        <strong class="servico-detail__valor" id="detailValor">-</strong>
+                    </div>
+                    <div class="servico-detail__meta-item">
+                        <span class="servico-detail__label">Cadastrado por</span>
+                        <strong id="detailAutor">-</strong>
+                    </div>
+                </div>
+
+                <div class="servico-detail__block">
+                    <span class="servico-detail__label">Descricao</span>
+                    <p class="servico-detail__desc" id="detailDescricao">-</p>
+                </div>
+
+                <div class="servico-detail__block">
+                    <span class="servico-detail__label">Anexos</span>
+                    <ul class="servico-detail__files" id="detailAnexos"></ul>
+                    <p class="servico-detail__empty is-hidden" id="detailAnexosEmpty">Nenhum anexo cadastrado.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="detailEditBtn">Editar</button>
+            </div>
+        </div>
+    </div>
+</div>

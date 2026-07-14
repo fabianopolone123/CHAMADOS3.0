@@ -18,6 +18,8 @@ from .models import (
     OrcamentoDocumento,
     RequisicaoContrato,
     RetiradaInsumoTI,
+    ServicoFeito,
+    ServicoFeitoAnexo,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -192,3 +194,19 @@ class EnderecoIPAdmin(admin.ModelAdmin):
     list_display = ("endereco_ip", "categoria", "nome", "fabricante", "mac", "atualizado_em")
     list_filter = ("categoria",)
     search_fields = ("endereco_ip", "nome", "fabricante", "mac", "acesso")
+
+
+class ServicoFeitoAnexoInline(admin.TabularInline):
+    model = ServicoFeitoAnexo
+    extra = 0
+    fields = ("arquivo", "nome_original", "enviado_em")
+    readonly_fields = ("enviado_em",)
+
+
+@admin.register(ServicoFeito)
+class ServicoFeitoAdmin(admin.ModelAdmin):
+    list_display = ("nome_servico", "empresa", "data_servico", "valor", "anexos_total", "atualizado_em")
+    list_filter = ("empresa", "data_servico")
+    search_fields = ("nome_servico", "empresa", "descricao")
+    date_hierarchy = "data_servico"
+    inlines = [ServicoFeitoAnexoInline]

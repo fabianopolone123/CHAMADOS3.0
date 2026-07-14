@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/servicos_feitos.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app servicos-app"
+    data-detail-url="{% url 'servico_feito_detail' servico_id=0 %}"
+    data-update-url="{% url 'servico_feito_update' servico_id=0 %}"
+    data-delete-url="{% url 'servico_feito_delete' servico_id=0 %}"
+    data-anexo-delete-url="{% url 'servico_feito_anexo_delete' anexo_id=0 %}"
+    data-csrf="{{ csrf_token }}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="servicos_feitos" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Servicos feitos</h2>
+                <p class="contratos-topbar__subtitle">Registro de servicos de TI ja executados</p>
+                <p class="topbar-subtitle">Servico, empresa, data, valor e anexos (NFs, orcamentos). Pesquise ou ordene clicando no cabecalho.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createServicoButton" title="Cadastrar novo servico">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Novo servico</span>
+            </button>
+        </header>
+
+        <section class="servicos-stats">
+            <article class="servicos-stat servicos-stat--blue">
+                <span class="servicos-stat__label">Servicos feitos</span>
+                <strong class="servicos-stat__value">{{ total_servicos }}</strong>
+            </article>
+            <article class="servicos-stat servicos-stat--green">
+                <span class="servicos-stat__label">Valor total</span>
+                <strong class="servicos-stat__value">R$ {{ total_valor_display }}</strong>
+            </article>
+            <article class="servicos-stat servicos-stat--indigo">
+                <span class="servicos-stat__label">Anexos</span>
+                <strong class="servicos-stat__value">{{ total_anexos }}</strong>
+            </article>
+        </section>
+
+        <section class="servicos-panel">
+            <div class="servicos-search">
+                <span class="servicos-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="servicoSearch"
+                    class="servicos-search__input"
+                    placeholder="Pesquisar por servico, empresa ou descricao..."
+                    autocomplete="off"
+                >
+            </div>
+            <p class="servicos-search__status" id="servicoSearchStatus"></p>
+
+            {% if servicos %}
+            <div class="servicos-table-wrap">
+                <table class="servicos-table" id="servicosTable">
+                    <thead>
+                        <tr>
+                            <th class="servicos-th" data-sort-index="0" aria-sort="none">Servico <span class="servicos-sort-ind" aria-hidden="true"></span></th>
+                            <th class="servicos-th servicos-col--hide-sm" data-sort-index="1" aria-sort="none">Empresa <span class="servicos-sort-ind" aria-hidden="true"></span></th>
+                            <th class="servicos-th" data-sort-index="2" data-sort-type="date" aria-sort="none">Data <span class="servicos-sort-ind" aria-hidden="true"></span></th>
+                            <th class="servicos-th servicos-th--num" data-sort-index="3" data-sort-type="num" aria-sort="none">Valor <span class="servicos-sort-ind" aria-hidden="true"></span></th>
+                            <th class="servicos-th servicos-col--hide-sm" data-sort-index="4" data-sort-type="num" aria-sort="none">Anexos <span class="servicos-sort-ind" aria-hidden="true"></span></th>
+                            <th class="servicos-th--actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="servicosTableBody">
+                        {% for s in servicos %}
+                        <tr class="servicos-row"
+                            data-id="{{ s.id }}"
+                            data-nome="{{ s.nome_servico }}"
+                            data-empresa="{{ s.empresa }}"
+                            data-data="{{ s.data_servico|date:'Y-m-d' }}"
+                            data-valor="{{ s.valor }}"
+                            data-descricao="{{ s.descricao }}"
+                            data-sort-valor="{{ s.valor }}"
+                            data-search="{{ s.nome_servico|lower }} {{ s.empresa|lower }} {{ s.descricao|lower }}"
+                            tabindex="0" role="button" aria-label="Ver servico {{ s.nome_servico }}">
+                            <td data-label="Servico" class="servicos-cell--name">{{ s.nome_servico }}</td>
+                            <td data-label="Empresa" class="servicos-col--hide-sm">{{ s.empresa|default:"-" }}</td>
+                            <td data-label="Data">{{ s.data_servico|date:"d/m/Y" }}</td>
+                            <td data-label="Valor" class="servicos-th--num servicos-cell--valor" data-sort-value="{{ s.valor }}">R$ {{ s.valor_display }}</td>
+                            <td data-label="Anexos" class="servicos-col--hide-sm" data-sort-value="{{ s.anexos_total }}">
+                                {% if s.anexos_total %}<span class="servicos-clip">&#128206; {{ s.anexos_total }}</span>{% else %}-{% endif %}
+                            </td>
+                            <td data-label="Acoes" class="servicos-cell--actions">
+                                <button type="button" class="servicos-icon-btn js-view-servico" title="Ver detalhes" aria-label="Ver detalhes">&#128065;</button>
+                                <button type="button" class="servicos-icon-btn js-edit-servico" title="Editar" aria-label="Editar">&#9998;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="servicos-empty is-hidden" id="servicosNoResults">Nenhum servico encontrado para a pesquisa.</p>
+            {% else %}
+            <div class="servicos-empty-state">
+                <p class="servicos-empty-state__title">Nenhum servico cadastrado ainda.</p>
+                <p class="servicos-empty-state__hint">Clique em "Novo servico" para registrar o primeiro.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/servico_modal.html" %}
+{% include "partials/servico_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/servicos_feitos.js' %}"></script>
+{% endblock %}

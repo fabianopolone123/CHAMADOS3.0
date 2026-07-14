@@ -48,6 +48,8 @@ from .models import (
     Ramal,
     RequisicaoContrato,
     RetiradaInsumoTI,
+    ServicoFeito,
+    ServicoFeitoAnexo,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -2976,3 +2978,220 @@ def ip_delete_view(request, ip_id: int):
     ip.delete()
     messages.success(request, f"IP {endereco} excluido com sucesso.")
     return redirect("ips_dashboard")
+
+
+# ==========================================================================
+# Modulo Servicos feitos (servicos de TI ja executados) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def servicos_feitos_dashboard_view(request):
+    """Lista os servicos feitos, com cartoes de resumo e busca/ordenacao."""
+    servicos = list(
+        ServicoFeito.objects.prefetch_related("anexos").select_related("criado_por").all()
+    )
+    total_valor = sum((s.valor for s in servicos), Decimal("0"))
+    total_anexos = sum(s.anexos_total for s in servicos)
+
+    inteiro, decimal = f"{total_valor:.2f}".split(".")
+    total_valor_display = f"{int(inteiro):,}".replace(",", ".") + f",{decimal}"
+
+    context = {
+        "page_title": "Servicos feitos",
+        "servicos": servicos,
+        "total_servicos": len(servicos),
+        "total_valor_display": total_valor_display,
+        "total_anexos": total_anexos,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/servicos_feitos.html", context)
+
+
+def _parse_valor_brl(raw: str) -> Decimal:
+    """Converte um valor digitado (1.234,56 ou 1234.56) em Decimal."""
+    valor = (raw or "").strip()
+    if not valor:
+        return Decimal("0")
+    if "," in valor:
+        valor = valor.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(valor).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
+def _ler_dados_servico(request):
+    """Le e valida os campos do formulario de servico feito (create/update)."""
+    nome = (request.POST.get("nome_servico") or "").strip()
+    if len(nome) < 2:
+        return None, "Informe o nome do servico (minimo 2 caracteres)."
+
+    valor = _parse_valor_brl(request.POST.get("valor"))
+    if valor < 0:
+        return None, "O valor nao pode ser negativo."
+
+    data_servico = parse_date((request.POST.get("data_servico") or "").strip()) or timezone.localdate()
+
+    dados = {
+        "nome_servico": nome,
+        "empresa": (request.POST.get("empresa") or "").strip(),
+        "descricao": (request.POST.get("descricao") or "").strip(),
+        "data_servico": data_servico,
+        "valor": valor,
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def servico_feito_create_view(request):
+    """Cadastra um novo servico feito, com anexos opcionais (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar servicos.")
+        return redirect("servicos_feitos_dashboard")
+
+    dados, erro = _ler_dados_servico(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("servicos_feitos_dashboard")
+
+    anexos = request.FILES.getlist("anexos")
+    with transaction.atomic():
+        servico = ServicoFeito.objects.create(criado_por=request.user, **dados)
+        for arquivo in anexos:
+            ServicoFeitoAnexo.objects.create(
+                servico=servico, arquivo=arquivo, nome_original=arquivo.name
+            )
+
+    messages.success(request, f'Servico "{servico.nome_servico}" cadastrado com sucesso.')
+    return redirect("servicos_feitos_dashboard")
+
+
+@login_required
+@require_POST
+def servico_feito_update_view(request, servico_id: int):
+    """Edita um servico feito; pode adicionar novos anexos (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar servicos.")
+        return redirect("servicos_feitos_dashboard")
+
+    servico = ServicoFeito.objects.filter(pk=servico_id).first()
+    if not servico:
+        messages.error(request, "Servico nao encontrado.")
+        return redirect("servicos_feitos_dashboard")
+
+    dados, erro = _ler_dados_servico(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("servicos_feitos_dashboard")
+
+    anexos = request.FILES.getlist("anexos")
+    with transaction.atomic():
+        for campo, valor in dados.items():
+            setattr(servico, campo, valor)
+        servico.save()
+        for arquivo in anexos:
+            ServicoFeitoAnexo.objects.create(
+                servico=servico, arquivo=arquivo, nome_original=arquivo.name
+            )
+
+    messages.success(request, f'Servico "{servico.nome_servico}" atualizado com sucesso.')
+    return redirect("servicos_feitos_dashboard")
+
+
+@login_required
+@require_POST
+def servico_feito_delete_view(request, servico_id: int):
+    """Exclui um servico feito e seus anexos (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir servicos.")
+        return redirect("servicos_feitos_dashboard")
+
+    servico = ServicoFeito.objects.filter(pk=servico_id).first()
+    if not servico:
+        messages.error(request, "Servico nao encontrado.")
+        return redirect("servicos_feitos_dashboard")
+
+    nome = servico.nome_servico
+    with transaction.atomic():
+        for anexo in servico.anexos.all():
+            anexo.arquivo.delete(save=False)
+        servico.delete()
+
+    messages.success(request, f'Servico "{nome}" excluido com sucesso.')
+    return redirect("servicos_feitos_dashboard")
+
+
+@login_required
+@require_POST
+def servico_feito_anexo_delete_view(request, anexo_id: int):
+    """Exclui um anexo isolado de um servico feito (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir anexos.")
+        return redirect("servicos_feitos_dashboard")
+
+    anexo = ServicoFeitoAnexo.objects.filter(pk=anexo_id).first()
+    if not anexo:
+        messages.error(request, "Anexo nao encontrado.")
+        return redirect("servicos_feitos_dashboard")
+
+    anexo.arquivo.delete(save=False)
+    anexo.delete()
+    messages.success(request, "Anexo excluido com sucesso.")
+    return redirect("servicos_feitos_dashboard")
+
+
+@login_required
+def servico_feito_detail_view(request, servico_id: int):
+    """Detalhe (JSON) de um servico feito, usado pelo modal de visualizacao."""
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver servicos.", status=403)
+
+    servico = (
+        ServicoFeito.objects.select_related("criado_por")
+        .prefetch_related("anexos")
+        .filter(pk=servico_id)
+        .first()
+    )
+    if not servico:
+        return _json_error("Servico nao encontrado.", status=404)
+
+    anexos = [
+        {
+            "id": a.id,
+            "nome": a.nome_original or a.arquivo.name.split("/")[-1],
+            "url": reverse("servico_feito_anexo_download", args=[a.id]),
+        }
+        for a in servico.anexos.all()
+    ]
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": servico.id,
+            "nome_servico": servico.nome_servico,
+            "empresa": servico.empresa or "-",
+            "descricao": servico.descricao or "",
+            "data_servico": servico.data_servico.strftime("%d/%m/%Y") if servico.data_servico else "-",
+            "valor_display": servico.valor_display,
+            "criado_por": _attendant_display(servico.criado_por) or "-",
+            "anexos": anexos,
+        }
+    )
+
+
+@login_required
+def servico_feito_anexo_download_view(request, anexo_id: int):
+    """Download protegido de um anexo de servico feito (TI/admin)."""
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    anexo = get_object_or_404(ServicoFeitoAnexo, pk=anexo_id)
+    try:
+        return FileResponse(
+            anexo.arquivo.open("rb"),
+            as_attachment=True,
+            filename=anexo.nome_original or anexo.arquivo.name.split("/")[-1],
+        )
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")

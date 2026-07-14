@@ -67,6 +67,13 @@
 | `/ips/criar/` | POST | Cadastra um IP (categoria, endereco unico, nome, fabricante, MAC, acesso, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/ips/<id>/editar/` | POST | Edita um IP existente (apenas TI/admin) | Implementada |
 | `/ips/<id>/excluir/` | POST | Exclui um IP (apenas TI/admin) | Implementada |
+| `/servicos-feitos/` | GET | Modulo Servicos feitos: lista de servicos de TI executados (tabela responsiva + busca + ordenacao) e botao "Novo servico" (apenas TI/admin) | Implementada |
+| `/servicos-feitos/criar/` | POST | Cadastra um servico (nome, empresa, data, valor, descricao) com anexos opcionais (multipart); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/servicos-feitos/<id>/` | GET | Detalhe (JSON) de um servico com anexos, usado pelo modal de visualizacao (apenas TI/admin) | Implementada |
+| `/servicos-feitos/<id>/editar/` | POST | Edita um servico e permite adicionar novos anexos (apenas TI/admin) | Implementada |
+| `/servicos-feitos/<id>/excluir/` | POST | Exclui um servico e seus anexos (arquivos removidos do disco) (apenas TI/admin) | Implementada |
+| `/servicos-feitos/anexos/<id>/` | GET | Download protegido de um anexo de servico (apenas TI/admin) | Implementada |
+| `/servicos-feitos/anexos/<id>/excluir/` | POST | Exclui um anexo isolado de um servico (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -195,6 +202,13 @@
 - A tela lista os IPs em uma tabela responsiva (que vira lista de cards no celular) com badge colorido de categoria, IP e MAC em fonte mono, nome, fabricante e acesso. Cartoes de resumo no topo (total de IPs, categorias, com acesso salvo). A busca inteligente (client-side) filtra por IP, nome, fabricante, MAC, acesso ou categoria; chips de categoria filtram a lista (combinam com a busca).
 - As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico: validam, gravam, notificam via Django messages (toast) e redirecionam para `/ips/`.
 - `endereco_ip` e unico: cadastro/edicao bloqueia duplicidade (na edicao, ignora o proprio registro) e exige uma categoria valida. A exclusao pede confirmacao no proprio modal antes de enviar.
+
+## Regras do modulo Servicos feitos
+
+- `/servicos-feitos/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Servicos feitos" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend.
+- A tela lista os servicos em uma tabela responsiva (cards no celular) com nome, empresa, data, valor (destacado) e contagem de anexos; cartoes de resumo no topo (servicos, valor total, anexos). Busca client-side (nome/empresa/descricao) e ordenacao clicando nos cabecalhos (data e valor ordenam corretamente por valor/data, nao como texto). Clicar na linha (ou no icone de olho) abre um modal de detalhe com a descricao e os anexos para download; o icone de lapis abre o modal de edicao.
+- As rotas de escrita usam `POST` (com CSRF); o cadastro/edicao aceita upload de multiplos anexos (`multipart/form-data`) e segue o padrao classico: valida, grava, notifica via Django messages (toast) e redireciona. O valor aceita o formato brasileiro (1.234,56).
+- Excluir um servico remove seus anexos em cascata e apaga os arquivos do disco; ha rota para remover um anexo isolado. O detalhe e o download dos anexos sao restritos a TI/admin (`403`/`404` para usuario comum), sem expor a URL direta de `MEDIA`.
 
 ## Regras das rotas de historico
 

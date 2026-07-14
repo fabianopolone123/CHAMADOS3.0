@@ -1,0 +1,68 @@
+{% load static %}
+<div class="modal fade" id="servicoModal" tabindex="-1" aria-labelledby="servicoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Servicos feitos</span>
+                    <h5 class="modal-title" id="servicoModalLabel">Cadastrar novo servico</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'servico_feito_create' %}" enctype="multipart/form-data" class="create-ticket-form" id="servicoForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="servico-form-grid">
+                        <label class="contrato-field servico-field--full">
+                            <span>Nome do servico</span>
+                            <input type="text" class="form-control" name="nome_servico" id="servicoNome" maxlength="180" placeholder="Ex.: Reimplantacao de cameras" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Empresa / fornecedor</span>
+                            <input type="text" class="form-control" name="empresa" id="servicoEmpresa" maxlength="180" placeholder="Ex.: Elvio">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Data do servico</span>
+                            <input type="date" class="form-control" name="data_servico" id="servicoData">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Valor (R$)</span>
+                            <input type="text" class="form-control" name="valor" id="servicoValor" inputmode="decimal" placeholder="Ex.: 8185,00">
+                        </label>
+                        <label class="contrato-field servico-field--full">
+                            <span>Descricao</span>
+                            <textarea class="form-control" name="descricao" id="servicoDescricao" rows="3" placeholder="Detalhes do servico executado"></textarea>
+                        </label>
+                        <label class="contrato-field servico-field--full">
+                            <span>Anexos (NFs, orcamentos, relatorios)</span>
+                            <input type="file" class="form-control" name="anexos" id="servicoAnexos" multiple>
+                            <small class="contrato-field__help">Pode selecionar varios arquivos. Na edicao, os novos sao adicionados aos existentes.</small>
+                        </label>
+                    </div>
+
+                    <div class="servico-existing is-hidden" id="servicoExistingWrap">
+                        <span class="servico-existing__title">Anexos ja cadastrados</span>
+                        <ul class="servico-existing__list" id="servicoExistingList"></ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="servicoDeleteBtn">Excluir servico</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="servicoSubmit">Cadastrar servico</button>
+                </div>
+            </form>
+
+            <div class="servico-delete-confirm is-hidden" id="servicoDeleteConfirm">
+                <p class="servico-delete-confirm__text">
+                    Tem certeza que deseja excluir este servico? Os anexos vinculados tambem serao removidos. Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="servicoDeleteForm" class="servico-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="servicoDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

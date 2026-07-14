@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui vinte e seis modelos persistidos:
+O projeto possui vinte e oito modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -53,6 +53,11 @@ Modulo Licencas:
 Modulo IPs:
 
 - `EnderecoIP`
+
+Modulo Servicos feitos:
+
+- `ServicoFeito`
+- `ServicoFeitoAnexo`
 
 ## Modelos implementados
 
@@ -468,6 +473,27 @@ Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem IPs (validado no backend; usuario comum e redirecionado).
 - `endereco_ip` e unico; a validacao no backend bloqueia duplicidade (na edicao, ignora o proprio registro) e exige uma categoria valida.
+
+### ServicoFeito
+
+Servico de TI ja executado (modulo Servicos feitos), migrado do banco antigo. Seed inicial via migration de dados `0019`, que le `seed/servicos_feitos_seed.json` (local, ignorado pelo Git); os PDFs ficam em `media/servicos_feitos/` (tambem fora do Git).
+
+- `nome_servico`, `empresa`, `descricao`
+- `data_servico` (data), `valor` (Decimal, padrao brasileiro na exibicao)
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `servicos_feitos_criados`), `criado_em`, `atualizado_em`. Migration `0018`.
+- Propriedades `anexos_total` (qtd de anexos) e `valor_display` (valor formatado 1.234,56).
+
+### ServicoFeitoAnexo
+
+Arquivo anexado a um servico feito (NF, orcamento, relatorio). Um servico 1--N anexos.
+
+- `servico` (FK `on_delete=CASCADE`, related_name `anexos`)
+- `arquivo` (`FileField`, salvo em `MEDIA_ROOT/servicos_feitos/`), `nome_original`, `enviado_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem servicos e anexos (validado no backend; usuario comum e redirecionado, e endpoints de detalhe/download retornam `403`/`404`).
+- O valor aceita formato brasileiro (1.234,56) ou com ponto decimal; e convertido para Decimal no backend. Excluir um servico remove seus anexos em cascata e apaga os arquivos fisicos; e possivel remover um anexo isolado. O download dos anexos usa rota protegida (nao expoe a URL direta de `MEDIA`).
 
 ## Modelos previstos para proximas fases
 

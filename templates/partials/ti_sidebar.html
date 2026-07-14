@@ -1,7 +1,7 @@
 {% comment %}
 Menu lateral padrao da area de TI (Atendente TI / Admin).
 Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
-Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "permissoes".
+Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "servicos_feitos", "permissoes".
 {% endcomment %}
 <aside class="tickets-sidebar">
     <div class="sidebar-brand sidebar-brand--compact">
@@ -85,6 +85,13 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimo
                 <path d="M10 17h8"></path>
             </svg>
             <span>IPs</span>
+        </a>
+        <a href="{% url 'servicos_feitos_dashboard' %}" class="menu-link{% if active == 'servicos_feitos' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>Servicos feitos</span>
         </a>
         <a href="{% url 'permissions' %}" class="menu-link{% if active == 'permissoes' %} active{% endif %}">
             <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

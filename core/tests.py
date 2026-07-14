@@ -24,6 +24,8 @@ from .models import (
     PendenciaTI,
     Ramal,
     RequisicaoContrato,
+    ServicoFeito,
+    ServicoFeitoAnexo,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -747,3 +749,112 @@ class EnderecoIPTests(TestCase):
         resp = self.client.get(reverse("ips_dashboard"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "ips-table")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ServicoFeitoTests(TestCase):
+    """Modulo Servicos feitos: CRUD, anexos, valor BR e permissoes.
+
+    Obs.: o banco de teste ja vem com os servicos do seed (migration 0019),
+    por isso os testes comparam contagem antes/depois.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _arquivo(self, nome="nota.pdf"):
+        return SimpleUploadedFile(nome, b"%PDF-1.4 conteudo", content_type="application/pdf")
+
+    def test_ti_creates_service_with_attachments(self):
+        self.client.force_login(self.ti)
+        antes = ServicoFeito.objects.count()
+        resp = self.client.post(
+            reverse("servico_feito_create"),
+            {
+                "nome_servico": "Troca de switch",
+                "empresa": "Acme",
+                "data_servico": "2026-05-10",
+                "valor": "1.234,56",
+                "descricao": "Substituicao do switch principal",
+                "anexos": [self._arquivo("nf1.pdf"), self._arquivo("nf2.pdf")],
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(ServicoFeito.objects.count(), antes + 1)
+        servico = ServicoFeito.objects.get(nome_servico="Troca de switch")
+        self.assertEqual(str(servico.valor), "1234.56")  # valor BR convertido
+        self.assertEqual(servico.anexos.count(), 2)
+        self.assertEqual(servico.criado_por, self.ti)
+
+    def test_create_requires_name(self):
+        self.client.force_login(self.ti)
+        antes = ServicoFeito.objects.count()
+        resp = self.client.post(reverse("servico_feito_create"), {"nome_servico": "", "valor": "10"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(ServicoFeito.objects.count(), antes)
+
+    def test_valor_display_pt_br(self):
+        s = ServicoFeito.objects.create(nome_servico="X", valor="20796.01", criado_por=self.ti)
+        self.assertEqual(s.valor_display, "20.796,01")
+
+    def test_ti_updates_and_adds_attachment(self):
+        self.client.force_login(self.ti)
+        s = ServicoFeito.objects.create(nome_servico="Antes", valor="100", criado_por=self.ti)
+        resp = self.client.post(
+            reverse("servico_feito_update", args=[s.id]),
+            {"nome_servico": "Depois", "valor": "200", "data_servico": "2026-06-01", "anexos": [self._arquivo()]},
+        )
+        self.assertEqual(resp.status_code, 302)
+        s.refresh_from_db()
+        self.assertEqual(s.nome_servico, "Depois")
+        self.assertEqual(str(s.valor), "200.00")
+        self.assertEqual(s.anexos.count(), 1)
+
+    def test_delete_service_cascades_attachments(self):
+        self.client.force_login(self.ti)
+        s = ServicoFeito.objects.create(nome_servico="Apagar", valor="1", criado_por=self.ti)
+        a = ServicoFeitoAnexo.objects.create(servico=s, arquivo=self._arquivo(), nome_original="x.pdf")
+        resp = self.client.post(reverse("servico_feito_delete", args=[s.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(ServicoFeito.objects.filter(id=s.id).exists())
+        self.assertFalse(ServicoFeitoAnexo.objects.filter(id=a.id).exists())
+
+    def test_delete_single_attachment(self):
+        self.client.force_login(self.ti)
+        s = ServicoFeito.objects.create(nome_servico="Com anexo", valor="1", criado_por=self.ti)
+        a = ServicoFeitoAnexo.objects.create(servico=s, arquivo=self._arquivo(), nome_original="x.pdf")
+        resp = self.client.post(reverse("servico_feito_anexo_delete", args=[a.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(ServicoFeitoAnexo.objects.filter(id=a.id).exists())
+        self.assertTrue(ServicoFeito.objects.filter(id=s.id).exists())  # servico permanece
+
+    def test_detail_json_and_download(self):
+        self.client.force_login(self.ti)
+        s = ServicoFeito.objects.create(nome_servico="Detalhe", empresa="Y", valor="50", criado_por=self.ti)
+        a = ServicoFeitoAnexo.objects.create(servico=s, arquivo=self._arquivo(), nome_original="doc.pdf")
+        resp = self.client.get(reverse("servico_feito_detail", args=[s.id]))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["valor_display"], "50,00")
+        self.assertEqual(len(data["anexos"]), 1)
+        # Download protegido funciona para TI
+        dl = self.client.get(reverse("servico_feito_anexo_download", args=[a.id]))
+        self.assertEqual(dl.status_code, 200)
+
+    def test_common_user_blocked(self):
+        s = ServicoFeito.objects.create(nome_servico="Protegido", valor="1", criado_por=self.ti)
+        a = ServicoFeitoAnexo.objects.create(servico=s, arquivo=self._arquivo(), nome_original="x.pdf")
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("servicos_feitos_dashboard")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("servico_feito_detail", args=[s.id])).status_code, 403)
+        self.assertEqual(self.client.get(reverse("servico_feito_anexo_download", args=[a.id])).status_code, 404)
+        antes = ServicoFeito.objects.count()
+        self.client.post(reverse("servico_feito_create"), {"nome_servico": "Hack", "valor": "1"})
+        self.assertEqual(ServicoFeito.objects.count(), antes)
+        self.client.post(reverse("servico_feito_delete", args=[s.id]))
+        self.assertTrue(ServicoFeito.objects.filter(id=s.id).exists())
