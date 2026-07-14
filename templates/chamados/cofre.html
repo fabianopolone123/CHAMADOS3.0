@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/cofre.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app cofre-app"
+    data-reveal-url="{% url 'cofre_credencial_reveal' credencial_id=0 %}"
+    data-update-url="{% url 'cofre_credencial_update' credencial_id=0 %}"
+    data-delete-url="{% url 'cofre_credencial_delete' credencial_id=0 %}"
+    data-unlock-segundos="{{ unlock_segundos }}"
+    data-estado="{{ estado }}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="cofre" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Cofre</h2>
+                <p class="contratos-topbar__subtitle">Senhas e credenciais da empresa</p>
+                <p class="topbar-subtitle">Acesso restrito: equipe de TI + senha-mestra. Todas as acoes sao auditadas.</p>
+            </div>
+            {% if estado == "aberto" %}
+            <div class="cofre-topbar-actions">
+                <button type="button" class="contratos-add-btn contratos-add-btn--ghost" id="cofreLockBtn" title="Travar o cofre">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">&#128274;</span>
+                    <span class="contratos-add-btn__label">Travar</span>
+                </button>
+                <button type="button" class="contratos-add-btn" id="createCredButton" title="Nova credencial">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                    <span class="contratos-add-btn__label">Nova credencial</span>
+                </button>
+            </div>
+            {% endif %}
+        </header>
+
+        {# ---------------- Estado: SETUP (sem senha-mestra) ---------------- #}
+        {% if estado == "setup" %}
+        <section class="cofre-gate">
+            <div class="cofre-gate__card">
+                <div class="cofre-gate__icon" aria-hidden="true">&#128273;</div>
+                <h3 class="cofre-gate__title">Configurar o cofre</h3>
+                {% if is_admin %}
+                <p class="cofre-gate__text">Defina a <strong>senha-mestra</strong> que a equipe de TI usara para destravar o cofre. Guarde-a com cuidado.</p>
+                <form method="post" action="{% url 'cofre_set_master' %}" class="cofre-gate__form">
+                    {% csrf_token %}
+                    <input type="password" class="form-control" name="nova_senha" placeholder="Nova senha-mestra (min. 6)" autocomplete="new-password" required>
+                    <input type="password" class="form-control" name="confirma_senha" placeholder="Confirmar senha-mestra" autocomplete="new-password" required>
+                    <button type="submit" class="btn btn-primary">Definir senha-mestra</button>
+                </form>
+                {% else %}
+                <p class="cofre-gate__text">O cofre ainda nao foi configurado. Peca a um <strong>administrador</strong> para definir a senha-mestra.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        {# ---------------- Estado: BLOQUEADO ---------------- #}
+        {% elif estado == "bloqueado" %}
+        <section class="cofre-gate">
+            <div class="cofre-gate__card">
+                <div class="cofre-gate__icon cofre-gate__icon--danger" aria-hidden="true">&#9888;</div>
+                <h3 class="cofre-gate__title">Cofre bloqueado temporariamente</h3>
+                <p class="cofre-gate__text">Muitas tentativas incorretas. Tente novamente em <strong id="cofreBloqueio" data-restante="{{ bloqueio_restante }}">{{ bloqueio_restante }}s</strong>.</p>
+            </div>
+        </section>
+
+        {# ---------------- Estado: TRAVADO (pede senha-mestra) ---------------- #}
+        {% elif estado == "travado" %}
+        <section class="cofre-gate">
+            <div class="cofre-gate__card">
+                <div class="cofre-gate__icon" aria-hidden="true">&#128274;</div>
+                <h3 class="cofre-gate__title">Cofre travado</h3>
+                <p class="cofre-gate__text">Digite a senha-mestra para acessar as credenciais.</p>
+                <form method="post" action="{% url 'cofre_unlock' %}" class="cofre-gate__form">
+                    {% csrf_token %}
+                    <div class="cofre-gate__pass">
+                        <input type="password" class="form-control" name="senha_mestra" id="cofreUnlockInput" placeholder="Senha-mestra" autocomplete="off" autofocus required>
+                        <button type="button" class="cofre-eye" id="cofreUnlockEye" title="Mostrar/ocultar" aria-label="Mostrar/ocultar">&#128065;</button>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Destravar cofre</button>
+                </form>
+                {% if is_admin %}
+                <details class="cofre-gate__change">
+                    <summary>Alterar senha-mestra</summary>
+                    <form method="post" action="{% url 'cofre_set_master' %}" class="cofre-gate__form">
+                        {% csrf_token %}
+                        <input type="password" class="form-control" name="senha_atual" placeholder="Senha-mestra atual" autocomplete="off" required>
+                        <input type="password" class="form-control" name="nova_senha" placeholder="Nova senha-mestra (min. 6)" autocomplete="new-password" required>
+                        <input type="password" class="form-control" name="confirma_senha" placeholder="Confirmar nova senha" autocomplete="new-password" required>
+                        <button type="submit" class="btn btn-light">Salvar nova senha-mestra</button>
+                    </form>
+                </details>
+                {% endif %}
+            </div>
+        </section>
+
+        {# ---------------- Estado: ABERTO ---------------- #}
+        {% else %}
+        <section class="cofre-open" data-unlock-segundos="{{ unlock_segundos }}">
+            <div class="cofre-bar">
+                <div class="cofre-search">
+                    <span class="cofre-search__icon" aria-hidden="true">&#128269;</span>
+                    <input type="search" id="credSearch" class="cofre-search__input" placeholder="Pesquisar por rotulo, usuario ou nota..." autocomplete="off">
+                </div>
+                <span class="cofre-timer" id="cofreTimer" title="Tempo ate travar automaticamente"></span>
+            </div>
+            <p class="cofre-status" id="credSearchStatus"></p>
+
+            {% if credenciais %}
+            <div class="cofre-grid" id="credGrid">
+                {% for c in credenciais %}
+                <article class="cred-card"
+                    data-id="{{ c.id }}"
+                    data-rotulo="{{ c.rotulo }}"
+                    data-usuario="{{ c.usuario }}"
+                    data-notas="{{ c.notas }}"
+                    data-search="{{ c.rotulo|lower }} {{ c.usuario|lower }} {{ c.notas|lower }}">
+                    <header class="cred-card__head">
+                        <h3 class="cred-card__title">{{ c.rotulo }}</h3>
+                        <button type="button" class="cred-mini js-edit-cred" title="Editar" aria-label="Editar">&#9998;</button>
+                    </header>
+                    {% if c.usuario %}
+                    <div class="cred-line">
+                        <span class="cred-line__label">Usuario</span>
+                        <span class="cred-line__value">{{ c.usuario }}</span>
+                        <button type="button" class="cred-mini js-copy-user" title="Copiar usuario" aria-label="Copiar usuario">&#128203;</button>
+                    </div>
+                    {% endif %}
+                    <div class="cred-line">
+                        <span class="cred-line__label">Senha</span>
+                        <span class="cred-line__value cred-pass" data-loaded="0">••••••••</span>
+                        <button type="button" class="cred-mini js-reveal-pass" title="Mostrar/ocultar" aria-label="Mostrar/ocultar senha">&#128065;</button>
+                        <button type="button" class="cred-mini js-copy-pass" title="Copiar senha" aria-label="Copiar senha">&#128203;</button>
+                    </div>
+                    {% if c.notas %}
+                    <p class="cred-notas">{{ c.notas }}</p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            <p class="cofre-empty is-hidden" id="credNoResults">Nenhuma credencial encontrada.</p>
+            {% else %}
+            <div class="cofre-empty-state">
+                <p class="cofre-empty-state__title">Nenhuma credencial no cofre ainda.</p>
+                <p class="cofre-empty-state__hint">Clique em "Nova credencial" para adicionar a primeira.</p>
+            </div>
+            {% endif %}
+
+            {% if is_admin and auditoria %}
+            <details class="cofre-audit">
+                <summary>Auditoria recente ({{ auditoria|length }})</summary>
+                <div class="cofre-audit__list">
+                    <table class="cofre-audit__table">
+                        <thead><tr><th>Quando</th><th>Acao</th><th>Usuario</th><th>Credencial</th><th>IP</th></tr></thead>
+                        <tbody>
+                            {% for a in auditoria %}
+                            <tr>
+                                <td>{{ a.criado_em|date:"d/m/Y H:i" }}</td>
+                                <td>{{ a.get_acao_display }}</td>
+                                <td>{{ a.ator.username|default:"-" }}</td>
+                                <td>{{ a.rotulo_credencial|default:"-" }}</td>
+                                <td>{{ a.ip|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endif %}
+        </section>
+        {% endif %}
+    </section>
+</main>
+
+{% if estado == "aberto" %}
+{% include "partials/cofre_credencial_modal.html" %}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/cofre.js' %}"></script>
+{% endblock %}

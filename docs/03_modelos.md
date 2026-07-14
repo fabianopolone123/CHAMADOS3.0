@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e tres modelos persistidos:
+O projeto possui trinta e seis modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -75,6 +75,12 @@ Modulo Dicas:
 Modulo Starlinks:
 
 - `Starlink`
+
+Modulo Cofre:
+
+- `CofreConfig`
+- `CofreCredencial`
+- `CofreAuditoria`
 
 ## Modelos implementados
 
@@ -583,6 +589,19 @@ Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem Starlinks (validado no backend; usuario comum e redirecionado).
 - O campo de senha foi removido do modulo (migration `0028`): as Starlinks nao guardam credencial de acesso. No sistema antigo havia uma senha cifrada (Fernet), descartada nesta versao por nao ser necessaria.
+
+### CofreConfig / CofreCredencial / CofreAuditoria
+
+Modulo Cofre (cofre de senhas da empresa), migrado do app `cofre` antigo. Migrations `0029` (modelos) e `0030` (seed das credenciais a partir de `seed/cofre_seed.json`, local e ignorado pelo Git). A cifra usa `core/crypto.py` (Fernet) com a `VAULT_ENCRYPTION_KEY` (env; ver `docs/08_deploy_seguro.md`).
+
+- **`CofreConfig`** (singleton, `load()`): `senha_mestra_hash` (hash da senha-mestra, nunca em texto), `tentativas_falhas`, `bloqueado_ate`. Metodos: `definir_senha_mestra`, `conferir_senha_mestra`, `esta_bloqueado`, `registrar_falha`, `resetar_falhas`. A senha-mestra destrava o cofre na sessao; anti-brute-force com bloqueio temporario.
+- **`CofreCredencial`**: `rotulo`, `usuario`, `senha_cifrada` (texto cifrado Fernet — NUNCA em claro), `notas`, `criado_por`, timestamps. Metodos `definir_senha`/`obter_senha` (cifra/decifra). Ordenada por rotulo.
+- **`CofreAuditoria`**: trilha de auditoria (`acao`, `ator`, `credencial`, `rotulo_credencial`, `ip`, `detalhes`, `criado_em`). Acoes: destrave OK/falha, bloqueio, lock manual, senha-mestra definida/alterada, credencial criada/atualizada/excluida e **senha revelada/copiada**.
+
+Regras atuais:
+
+- Acesso = **Atendente TI/Admin** **+** senha-mestra (destrava a sessao por `VAULT_UNLOCK_SECONDS`, padrao 15 min, com auto-lock). So **admin** define/altera a senha-mestra (no 1o acesso e para trocar, exigindo a atual).
+- As senhas ficam **cifradas em repouso**; sao **reveladas uma a uma sob demanda** (endpoint `revelar`, JSON), nunca todas no HTML. Cada revelacao/cópia e auditada. Operacoes com credenciais exigem o cofre destravado (senao `403`).
 
 ## Modelos previstos para proximas fases
 

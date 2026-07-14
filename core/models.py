@@ -1387,3 +1387,161 @@ class Starlink(models.Model):
 
     def __str__(self) -> str:
         return self.nome
+
+
+class CofreConfig(models.Model):
+    """Configuracao unica do Cofre: senha-mestra (hash) e anti-brute-force.
+
+    A senha-mestra destrava o cofre na sessao; e guardada apenas como hash
+    (make_password), nunca em texto. O acesso ainda exige ser Atendente TI/Admin.
+    """
+
+    senha_mestra_hash = models.CharField(max_length=255, blank=True, default="")
+    tentativas_falhas = models.PositiveSmallIntegerField(default=0)
+    bloqueado_ate = models.DateTimeField(null=True, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuracao do Cofre"
+        verbose_name_plural = "Configuracoes do Cofre"
+
+    def __str__(self) -> str:
+        return "Configuracao do Cofre"
+
+    @classmethod
+    def load(cls) -> "CofreConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def tem_senha_mestra(self) -> bool:
+        return bool(self.senha_mestra_hash)
+
+    def definir_senha_mestra(self, raw_password: str) -> None:
+        from django.contrib.auth.hashers import make_password
+
+        self.senha_mestra_hash = make_password(raw_password)
+        self.tentativas_falhas = 0
+        self.bloqueado_ate = None
+
+    def conferir_senha_mestra(self, raw_password: str) -> bool:
+        from django.contrib.auth.hashers import check_password
+
+        if not self.senha_mestra_hash:
+            return False
+        return check_password(raw_password, self.senha_mestra_hash)
+
+    def esta_bloqueado(self) -> bool:
+        return bool(self.bloqueado_ate and self.bloqueado_ate > timezone.now())
+
+    def segundos_bloqueio_restante(self) -> int:
+        if not self.bloqueado_ate:
+            return 0
+        return max(int((self.bloqueado_ate - timezone.now()).total_seconds()), 0)
+
+    def registrar_falha(self) -> None:
+        from django.conf import settings as dj_settings
+
+        maximo = int(getattr(dj_settings, "VAULT_MAX_FAILED_ATTEMPTS", 5) or 5)
+        bloqueio = int(getattr(dj_settings, "VAULT_LOCKOUT_SECONDS", 300) or 300)
+        self.tentativas_falhas += 1
+        if self.tentativas_falhas >= maximo:
+            self.bloqueado_ate = timezone.now() + timedelta(seconds=bloqueio)
+            self.tentativas_falhas = 0
+        self.save(update_fields=["tentativas_falhas", "bloqueado_ate", "atualizado_em"])
+
+    def resetar_falhas(self) -> None:
+        self.tentativas_falhas = 0
+        self.bloqueado_ate = None
+        self.save(update_fields=["tentativas_falhas", "bloqueado_ate", "atualizado_em"])
+
+
+class CofreCredencial(models.Model):
+    """Credencial guardada no cofre. A senha e cifrada em repouso (Fernet)."""
+
+    rotulo = models.CharField(max_length=160)
+    usuario = models.CharField(max_length=180, blank=True, default="")
+    senha_cifrada = models.TextField(blank=True, default="")
+    notas = models.TextField(blank=True, default="")
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cofre_credenciais_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["rotulo", "id"]
+        verbose_name = "Credencial do Cofre"
+        verbose_name_plural = "Credenciais do Cofre"
+
+    def __str__(self) -> str:
+        return self.rotulo
+
+    def definir_senha(self, raw_password: str) -> None:
+        from .crypto import encrypt_text
+
+        self.senha_cifrada = encrypt_text(raw_password or "")
+
+    def obter_senha(self) -> str:
+        from .crypto import decrypt_text
+
+        return decrypt_text(self.senha_cifrada)
+
+
+class CofreAuditoria(models.Model):
+    """Trilha de auditoria do cofre: destrave, falhas, visualizacao/copia, CRUD."""
+
+    ACAO_UNLOCK_OK = "unlock_ok"
+    ACAO_UNLOCK_FALHA = "unlock_falha"
+    ACAO_BLOQUEIO = "bloqueio"
+    ACAO_LOCK = "lock"
+    ACAO_SENHA_MESTRA = "senha_mestra"
+    ACAO_CRED_CRIADA = "cred_criada"
+    ACAO_CRED_ATUALIZADA = "cred_atualizada"
+    ACAO_CRED_EXCLUIDA = "cred_excluida"
+    ACAO_CRED_REVELADA = "cred_revelada"
+
+    ACAO_CHOICES = [
+        (ACAO_UNLOCK_OK, "Destravou o cofre"),
+        (ACAO_UNLOCK_FALHA, "Falha ao destravar"),
+        (ACAO_BLOQUEIO, "Bloqueio temporario"),
+        (ACAO_LOCK, "Travou o cofre"),
+        (ACAO_SENHA_MESTRA, "Senha-mestra definida/alterada"),
+        (ACAO_CRED_CRIADA, "Credencial criada"),
+        (ACAO_CRED_ATUALIZADA, "Credencial atualizada"),
+        (ACAO_CRED_EXCLUIDA, "Credencial excluida"),
+        (ACAO_CRED_REVELADA, "Senha revelada/copiada"),
+    ]
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    acao = models.CharField(max_length=32, choices=ACAO_CHOICES)
+    ator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cofre_auditorias",
+    )
+    credencial = models.ForeignKey(
+        CofreCredencial,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="auditorias",
+    )
+    rotulo_credencial = models.CharField(max_length=160, blank=True, default="")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    detalhes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+        verbose_name = "Auditoria do Cofre"
+        verbose_name_plural = "Auditoria do Cofre"
+
+    def __str__(self) -> str:
+        ator = self.ator.username if self.ator else "?"
+        return f"{self.criado_em:%d/%m/%Y %H:%M} - {self.acao} - {ator}"

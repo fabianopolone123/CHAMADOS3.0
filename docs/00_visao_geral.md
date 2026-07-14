@@ -30,6 +30,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Modulo Futura Digital (apenas TI/admin): faturas mensais de impressao (locacao) com franquia, excedentes e copias coloridas, regra de cobranca com calculo automatico, grafico de consumo mes a mes e CRUD
 - Modulo Dicas (apenas TI/admin): base de conhecimento (resolucoes, configuracoes, procedimentos) em cards com filtro por categoria, busca, detalhe com conteudo formatado + anexo e CRUD
 - Modulo Starlinks (apenas TI/admin): antenas/contas Starlink em cards (local, conta, dados do kit), com resumo, busca, filtro por status e CRUD
+- Modulo Cofre (apenas TI/admin + senha-mestra): cofre de senhas da empresa com credenciais cifradas em repouso, destrave por senha-mestra com auto-lock e anti-brute-force, revelacao sob demanda e auditoria completa
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional
 - Documentacao tecnica e funcional do projeto

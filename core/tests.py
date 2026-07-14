@@ -15,6 +15,9 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    CofreAuditoria,
+    CofreConfig,
+    CofreCredencial,
     ContaEmail,
     Contrato,
     ContratoAnexo,
@@ -34,7 +37,7 @@ from .models import (
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
-from .permissions import ATTENDANT_GROUP_NAME
+from .permissions import ADMIN_GROUP_NAME, ATTENDANT_GROUP_NAME
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
@@ -1237,3 +1240,132 @@ class StarlinkTests(TestCase):
         resp = self.client.get(reverse("starlinks_dashboard"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "star-card")
+
+
+class CofreCryptoTests(TestCase):
+    """Cifra/decifra das credenciais do cofre."""
+
+    def test_encrypt_decrypt_round_trip(self):
+        from core.crypto import decrypt_text, encrypt_text
+        token = encrypt_text("segredo-super-secreto")
+        self.assertNotEqual(token, "segredo-super-secreto")  # cifrado
+        self.assertEqual(decrypt_text(token), "segredo-super-secreto")
+        self.assertEqual(decrypt_text(""), "")
+
+    def test_credencial_set_get_password(self):
+        c = CofreCredencial(rotulo="X")
+        c.definir_senha("minha-senha")
+        self.assertNotIn("minha-senha", c.senha_cifrada)  # nao fica em texto
+        self.assertEqual(c.obter_senha(), "minha-senha")
+
+
+class CofreTests(TestCase):
+    """Cofre: senha-mestra, destrave, revelar sob demanda, auditoria e permissoes."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        self.admin = User.objects.create_user(username="adm", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        Group.objects.get_or_create(name=ADMIN_GROUP_NAME)
+        att = Group.objects.get(name=ATTENDANT_GROUP_NAME)
+        adm = Group.objects.get(name=ADMIN_GROUP_NAME)
+        self.ti.groups.add(att)
+        self.admin.groups.add(adm, att)
+        # Zera qualquer config de seed para comecar do estado 'setup'.
+        CofreConfig.objects.all().delete()
+
+    def test_dashboard_setup_state_without_master(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse("cofre_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Configurar o cofre")
+
+    def test_common_user_blocked(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("cofre_dashboard")).status_code, 302)
+
+    def test_only_admin_sets_master(self):
+        # TI (nao admin) nao pode definir senha-mestra
+        self.client.force_login(self.ti)
+        self.client.post(reverse("cofre_set_master"), {"nova_senha": "abcdef", "confirma_senha": "abcdef"})
+        self.assertFalse(CofreConfig.load().tem_senha_mestra)
+        # Admin pode
+        self.client.force_login(self.admin)
+        self.client.post(reverse("cofre_set_master"), {"nova_senha": "abcdef", "confirma_senha": "abcdef"})
+        self.assertTrue(CofreConfig.load().tem_senha_mestra)
+
+    def test_unlock_flow_and_reveal_requires_unlock(self):
+        cfg = CofreConfig.load()
+        cfg.definir_senha_mestra("chave123")
+        cfg.save()
+        cred = CofreCredencial(rotulo="Roteador", usuario="admin")
+        cred.definir_senha("root123")
+        cred.save()
+
+        self.client.force_login(self.ti)
+        # Travado: revelar deve dar 403
+        r = self.client.post(reverse("cofre_credencial_reveal", args=[cred.id]))
+        self.assertEqual(r.status_code, 403)
+
+        # Senha-mestra errada
+        self.client.post(reverse("cofre_unlock"), {"senha_mestra": "errada"})
+        r = self.client.post(reverse("cofre_credencial_reveal", args=[cred.id]))
+        self.assertEqual(r.status_code, 403)
+
+        # Senha-mestra certa -> destrava
+        self.client.post(reverse("cofre_unlock"), {"senha_mestra": "chave123"})
+        r = self.client.post(reverse("cofre_credencial_reveal", args=[cred.id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["senha"], "root123")
+        # Revelacao auditada
+        self.assertTrue(CofreAuditoria.objects.filter(acao=CofreAuditoria.ACAO_CRED_REVELADA, credencial=cred).exists())
+
+    def test_lockout_after_max_attempts(self):
+        cfg = CofreConfig.load()
+        cfg.definir_senha_mestra("chave123")
+        cfg.save()
+        self.client.force_login(self.ti)
+        for _ in range(5):
+            self.client.post(reverse("cofre_unlock"), {"senha_mestra": "errada"})
+        cfg.refresh_from_db()
+        self.assertTrue(cfg.esta_bloqueado())
+        # Mesmo com a senha certa, bloqueado nao destrava
+        self.client.post(reverse("cofre_unlock"), {"senha_mestra": "chave123"})
+        r = self.client.post(reverse("cofre_credencial_reveal", args=[CofreCredencial.objects.create(rotulo="Y").id]))
+        self.assertEqual(r.status_code, 403)
+
+    def test_credential_crud_requires_unlock(self):
+        cfg = CofreConfig.load()
+        cfg.definir_senha_mestra("chave123")
+        cfg.save()
+        self.client.force_login(self.ti)
+        # Travado: criar credencial nao funciona
+        antes = CofreCredencial.objects.count()
+        self.client.post(reverse("cofre_credencial_create"), {"rotulo": "Nova", "senha": "s"})
+        self.assertEqual(CofreCredencial.objects.count(), antes)
+        # Destrava e cria
+        self.client.post(reverse("cofre_unlock"), {"senha_mestra": "chave123"})
+        self.client.post(reverse("cofre_credencial_create"), {"rotulo": "Nova", "usuario": "u", "senha": "s3nha"})
+        cred = CofreCredencial.objects.get(rotulo="Nova")
+        self.assertEqual(cred.obter_senha(), "s3nha")
+        # Atualiza mantendo senha (branco)
+        self.client.post(reverse("cofre_credencial_update", args=[cred.id]), {"rotulo": "Nova2", "senha": ""})
+        cred.refresh_from_db()
+        self.assertEqual(cred.rotulo, "Nova2")
+        self.assertEqual(cred.obter_senha(), "s3nha")
+        # Exclui
+        self.client.post(reverse("cofre_credencial_delete", args=[cred.id]))
+        self.assertFalse(CofreCredencial.objects.filter(id=cred.id).exists())
+
+    def test_lock_clears_session(self):
+        cfg = CofreConfig.load()
+        cfg.definir_senha_mestra("chave123")
+        cfg.save()
+        self.client.force_login(self.ti)
+        self.client.post(reverse("cofre_unlock"), {"senha_mestra": "chave123"})
+        cred = CofreCredencial.objects.create(rotulo="Z")
+        self.assertEqual(self.client.post(reverse("cofre_credencial_reveal", args=[cred.id])).status_code, 200)
+        self.client.post(reverse("cofre_lock"))
+        self.assertEqual(self.client.post(reverse("cofre_credencial_reveal", args=[cred.id])).status_code, 403)

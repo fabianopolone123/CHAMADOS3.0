@@ -95,6 +95,14 @@
 | `/starlinks/criar/` | POST | Cadastra uma Starlink (nome, local, conta, dados do kit) (apenas TI/admin) | Implementada |
 | `/starlinks/<id>/editar/` | POST | Edita uma Starlink (apenas TI/admin) | Implementada |
 | `/starlinks/<id>/excluir/` | POST | Exclui uma Starlink (apenas TI/admin) | Implementada |
+| `/cofre/` | GET | Modulo Cofre: estados setup/travado/bloqueado/aberto; lista de credenciais quando destravado (apenas TI/admin) | Implementada |
+| `/cofre/senha-mestra/` | POST | Define (1o acesso) ou altera a senha-mestra (apenas admin) | Implementada |
+| `/cofre/destravar/` | POST | Destrava o cofre conferindo a senha-mestra (apenas TI/admin) | Implementada |
+| `/cofre/travar/` | POST | Trava o cofre (limpa a sessao) | Implementada |
+| `/cofre/credenciais/criar/` | POST | Cria uma credencial (senha cifrada) — exige cofre destravado | Implementada |
+| `/cofre/credenciais/<id>/editar/` | POST | Edita uma credencial (senha em branco mantem a atual) — exige destravado | Implementada |
+| `/cofre/credenciais/<id>/excluir/` | POST | Exclui uma credencial — exige destravado | Implementada |
+| `/cofre/credenciais/<id>/revelar/` | POST | Devolve (JSON) a senha decifrada de UMA credencial — exige destravado; auditado | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -257,6 +265,14 @@
 - `/starlinks/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Starlinks" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend.
 - A tela mostra as Starlinks em uma grade de cards responsiva (nome, local, badge Ativa/Inativa e os campos: e-mail, pagamento, identificador, numero de serie, numero do kit e versao do software). Cartoes de resumo (total, ativas, inativas), busca client-side (nome/local/e-mail/serial/kit/identificador) e chips de filtro por status (Todas/Ativas/Inativas). O modulo NAO guarda senha (campo removido na migration `0028`).
 - As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico (valida, grava, Django messages, redireciona).
+
+## Regras do modulo Cofre
+
+- Todas as rotas usam `ti_required` (Atendente TI/Admin; usuario comum e redirecionado). Alem disso, o cofre so mostra/opera credenciais quando **destravado** com a senha-mestra na sessao (`VAULT_UNLOCK_SECONDS`, padrao 900s, com auto-lock).
+- `/cofre/` decide o estado: **setup** (sem senha-mestra — admin define), **bloqueado** (lockout por tentativas), **travado** (pede a senha-mestra) ou **aberto** (lista as credenciais, senhas mascaradas).
+- `/cofre/senha-mestra/` e restrita a **admin**; para alterar uma senha-mestra existente, exige a atual. A senha-mestra e guardada apenas como hash.
+- `/cofre/destravar/` valida a senha-mestra; erros incrementam o contador e, ao atingir `VAULT_MAX_FAILED_ATTEMPTS`, aplicam bloqueio por `VAULT_LOCKOUT_SECONDS`. Sucesso reseta o contador e abre a sessao.
+- As senhas sao **cifradas em repouso** (Fernet, `core/crypto.py`) e **reveladas sob demanda** por `/cofre/credenciais/<id>/revelar/` (POST, JSON) — nunca renderizadas no HTML inicial. Toda revelacao/cópia, destrave, falha e alteracao e registrada em `CofreAuditoria` (com IP). As operacoes de credencial exigem o cofre destravado (`403` caso contrario). Ver o guia de deploy seguro em `docs/08_deploy_seguro.md`.
 
 ## Regras das rotas de historico
 

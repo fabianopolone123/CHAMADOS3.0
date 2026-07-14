@@ -1,0 +1,177 @@
+/* ==========================================================================
+   Modulo Cofre: senhas da empresa (portao de senha-mestra + lista cifrada)
+   ========================================================================== */
+
+.cofre-topbar-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+.contratos-add-btn--ghost { background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; box-shadow: none; }
+.contratos-add-btn--ghost:hover { background: #e0e7ff; }
+
+/* ----- Portao (setup / travado / bloqueado) ----- */
+.cofre-gate { display: flex; justify-content: center; padding: 2rem 1rem; }
+
+.cofre-gate__card {
+    width: 100%;
+    max-width: 460px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.4rem;
+    box-shadow: 0 22px 45px rgba(15, 23, 42, 0.1);
+    padding: 2rem 1.8rem;
+    text-align: center;
+}
+
+.cofre-gate__icon { font-size: 2.6rem; line-height: 1; margin-bottom: 0.6rem; }
+.cofre-gate__icon--danger { color: #b91c1c; }
+.cofre-gate__title { margin: 0 0 0.5rem; font-size: 1.2rem; font-weight: 800; color: #0f172a; }
+.cofre-gate__text { margin: 0 0 1.2rem; color: #64748b; font-size: 0.92rem; }
+
+.cofre-gate__form { display: flex; flex-direction: column; gap: 0.6rem; text-align: left; }
+.cofre-gate__form .btn { margin-top: 0.3rem; }
+
+.cofre-gate__pass { position: relative; display: flex; align-items: center; gap: 0.4rem; }
+.cofre-gate__pass .form-control { flex: 1 1 auto; }
+
+.cofre-gate__change { margin-top: 1.4rem; text-align: left; }
+.cofre-gate__change summary { cursor: pointer; font-size: 0.85rem; color: #2563eb; font-weight: 700; }
+.cofre-gate__change .cofre-gate__form { margin-top: 0.8rem; }
+
+/* ----- Barra do cofre aberto ----- */
+.cofre-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+
+.cofre-search { position: relative; display: flex; align-items: center; flex: 1 1 260px; }
+.cofre-search__icon { position: absolute; left: 0.9rem; font-size: 0.95rem; opacity: 0.6; pointer-events: none; }
+.cofre-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.cofre-search__input:focus { outline: none; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14); }
+
+.cofre-timer {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #92400e;
+    background: #fef3c7;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    white-space: nowrap;
+}
+
+.cofre-status { margin: 0.6rem 0 0.2rem; font-size: 0.82rem; color: #64748b; min-height: 1rem; }
+
+/* ----- Grade de credenciais ----- */
+.cofre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+    gap: 1rem;
+    margin-top: 0.6rem;
+}
+
+.cred-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.1rem;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+}
+
+.cred-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.cred-card__title { margin: 0; font-size: 1rem; font-weight: 800; color: #0f172a; overflow-wrap: anywhere; }
+
+.cred-line {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cred-line__label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; }
+.cred-line__value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.86rem;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+.cred-pass { letter-spacing: 0.08em; }
+
+.cred-notas {
+    margin: 0.2rem 0 0;
+    padding: 0.5rem 0.7rem;
+    background: #f8fafc;
+    border-radius: 0.6rem;
+    color: #475569;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.cred-mini {
+    flex: 0 0 auto;
+    border: 1px solid #dbeafe;
+    background: #eff5ff;
+    color: #1d4ed8;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.45rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    line-height: 1;
+    transition: background 0.15s ease;
+}
+.cred-mini:hover { background: #dbeafe; }
+.cred-mini.is-copied { background: #dcfce7; border-color: #bbf7d0; }
+
+/* ----- Modal senha ----- */
+.cofre-pass-input { position: relative; display: flex; align-items: center; gap: 0.4rem; }
+.cofre-pass-input .form-control { flex: 1 1 auto; }
+
+.cofre-eye {
+    flex: 0 0 auto;
+    border: 1px solid #dbeafe;
+    background: #eff5ff;
+    color: #1d4ed8;
+    width: 2.3rem;
+    height: 2.3rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+.cofre-eye:hover { background: #dbeafe; }
+
+.cofre-delete-confirm { padding: 1.2rem 1.25rem 1.4rem; border-top: 1px solid #f1f5f9; }
+.cofre-delete-confirm__text { margin: 0 0 1rem; color: #b91c1c; font-weight: 600; }
+.cofre-delete-confirm__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin: 0; }
+
+/* ----- Auditoria ----- */
+.cofre-audit { margin-top: 1.5rem; }
+.cofre-audit summary { cursor: pointer; font-weight: 700; color: #334155; font-size: 0.9rem; }
+.cofre-audit__list { overflow-x: auto; margin-top: 0.7rem; }
+.cofre-audit__table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.cofre-audit__table th {
+    text-align: left; padding: 0.45rem 0.6rem; background: #f8fafc; color: #64748b;
+    text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+}
+.cofre-audit__table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #f1f5f9; color: #334155; white-space: nowrap; }
+
+/* ----- Estados vazios ----- */
+.cofre-empty, .cofre-empty-state__hint { margin: 0.6rem 0 0; color: #64748b; font-size: 0.9rem; }
+.cofre-empty-state { padding: 2.5rem 1rem; text-align: center; }
+.cofre-empty-state__title { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+
+.is-hidden { display: none !important; }
+
+@media (max-width: 640px) {
+    .cred-line { grid-template-columns: 1fr auto auto; }
+    .cred-line__label { grid-column: 1 / -1; }
+}

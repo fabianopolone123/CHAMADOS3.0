@@ -3,6 +3,9 @@ from django.contrib import admin
 from .models import (
     AssinaturaResponsavelTI,
     ContaEmail,
+    CofreAuditoria,
+    CofreConfig,
+    CofreCredencial,
     Contrato,
     ContratoAnexo,
     Dica,
@@ -252,3 +255,29 @@ class StarlinkAdmin(admin.ModelAdmin):
     list_display = ("nome", "local", "email", "ativo", "forma_pagamento", "numero_serie", "atualizado_em")
     list_filter = ("ativo", "forma_pagamento")
     search_fields = ("nome", "local", "email", "numero_serie", "numero_kit", "identificador")
+
+
+@admin.register(CofreCredencial)
+class CofreCredencialAdmin(admin.ModelAdmin):
+    # NAO expoe a senha (nem cifrada nem em texto) na listagem/edicao.
+    list_display = ("rotulo", "usuario", "criado_por", "atualizado_em")
+    search_fields = ("rotulo", "usuario", "notas")
+    exclude = ("senha_cifrada",)
+    readonly_fields = ("criado_por", "criado_em", "atualizado_em")
+
+
+@admin.register(CofreAuditoria)
+class CofreAuditoriaAdmin(admin.ModelAdmin):
+    list_display = ("criado_em", "acao", "ator", "rotulo_credencial", "ip")
+    list_filter = ("acao",)
+    search_fields = ("rotulo_credencial", "detalhes")
+    readonly_fields = ("criado_em", "acao", "ator", "credencial", "rotulo_credencial", "ip", "detalhes")
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(CofreConfig)
+class CofreConfigAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "tentativas_falhas", "bloqueado_ate", "atualizado_em")
+    readonly_fields = ("senha_mestra_hash", "atualizado_em")

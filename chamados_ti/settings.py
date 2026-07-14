@@ -182,3 +182,35 @@ AD_LDAP_USER_ATTR_MAP = _env_json_dict(
         "email": "mail",
     },
 )
+
+# ---------------------------------------------------------------------------
+# Cofre de senhas (modulo Cofre)
+# ---------------------------------------------------------------------------
+# Chave Fernet usada para cifrar as credenciais em repouso. Em PRODUCAO defina
+# VAULT_ENCRYPTION_KEY no ambiente (nunca no codigo/Git). Gere com:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+VAULT_ENCRYPTION_KEY = (os.environ.get("VAULT_ENCRYPTION_KEY", "") or "").strip()
+# Em dev (DEBUG), permite derivar uma chave da SECRET_KEY quando a chave real
+# nao esta configurada. Em producao (DEBUG=False) o padrao e NAO permitir.
+VAULT_ALLOW_INSECURE_KEY_DERIVATION = _env_bool("VAULT_ALLOW_INSECURE_KEY_DERIVATION", DEBUG)
+# Tempo (segundos) que o cofre fica destravado na sessao antes de re-travar.
+VAULT_UNLOCK_SECONDS = _env_int("VAULT_UNLOCK_SECONDS", 900)
+# Anti-brute-force da senha-mestra.
+VAULT_MAX_FAILED_ATTEMPTS = _env_int("VAULT_MAX_FAILED_ATTEMPTS", 5)
+VAULT_LOCKOUT_SECONDS = _env_int("VAULT_LOCKOUT_SECONDS", 300)
+
+# ---------------------------------------------------------------------------
+# Endurecimento para producao (HTTPS). Deixe SECURE_COOKIES=1 no ambiente
+# quando o servidor estiver atras de HTTPS (nginx + TLS). Em dev fica desligado
+# para nao quebrar o acesso por http.
+# ---------------------------------------------------------------------------
+_secure_cookies = _env_bool("SECURE_COOKIES", False)
+SESSION_COOKIE_SECURE = _secure_cookies
+CSRF_COOKIE_SECURE = _secure_cookies
+SESSION_COOKIE_HTTPONLY = True
+if _secure_cookies:
+    SECURE_HSTS_SECONDS = _env_int("SECURE_HSTS_SECONDS", 31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

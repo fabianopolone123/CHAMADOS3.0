@@ -18,7 +18,8 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils.dateparse import parse_date
+from django.conf import settings as dj_settings
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -32,6 +33,9 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    CofreAuditoria,
+    CofreConfig,
+    CofreCredencial,
     Contrato,
     ContratoAnexo,
     Dica,
@@ -3851,3 +3855,270 @@ def starlink_delete_view(request, starlink_id: int):
     starlink.delete()
     messages.success(request, f'Starlink "{nome}" excluida com sucesso.')
     return redirect("starlinks_dashboard")
+
+
+# ==========================================================================
+# Modulo Cofre (cofre de senhas da empresa) - apenas TI/admin + senha-mestra.
+# ==========================================================================
+
+
+def _cofre_ip(request):
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR") or None
+
+
+def _cofre_audit(request, acao, credencial=None, detalhes=""):
+    CofreAuditoria.objects.create(
+        acao=acao,
+        ator=request.user if request.user.is_authenticated else None,
+        credencial=credencial,
+        rotulo_credencial=(credencial.rotulo if credencial else ""),
+        ip=_cofre_ip(request),
+        detalhes=detalhes[:255],
+    )
+
+
+def _cofre_unlocked(request) -> bool:
+    raw = request.session.get("cofre_unlocked_until")
+    if not raw:
+        return False
+    dt = parse_datetime(raw)
+    return bool(dt and dt > timezone.now())
+
+
+def _cofre_unlock(request) -> None:
+    segundos = int(getattr(dj_settings, "VAULT_UNLOCK_SECONDS", 900) or 900)
+    ate = timezone.now() + timedelta(seconds=segundos)
+    request.session["cofre_unlocked_until"] = ate.isoformat()
+
+
+def _cofre_lock(request) -> None:
+    request.session.pop("cofre_unlocked_until", None)
+
+
+@ti_required
+def cofre_dashboard_view(request):
+    """Tela do cofre. Estados: 'setup' (sem senha-mestra), 'bloqueado'
+    (lockout), 'travado' (pede senha-mestra) e 'aberto' (lista de credenciais)."""
+    config = CofreConfig.load()
+    is_admin = is_admin_user(request.user)
+
+    if not config.tem_senha_mestra:
+        estado = "setup"
+    elif config.esta_bloqueado():
+        estado = "bloqueado"
+    elif _cofre_unlocked(request):
+        estado = "aberto"
+    else:
+        estado = "travado"
+
+    context = {
+        "page_title": "Cofre",
+        "estado": estado,
+        "is_admin": is_admin,
+        "is_attendant": is_attendant_user(request.user),
+        "bloqueio_restante": config.segundos_bloqueio_restante(),
+        "unlock_segundos": int(getattr(dj_settings, "VAULT_UNLOCK_SECONDS", 900) or 900),
+    }
+
+    if estado == "aberto":
+        context["credenciais"] = list(
+            CofreCredencial.objects.select_related("criado_por").all()
+        )
+        context["total_credenciais"] = len(context["credenciais"])
+        if is_admin:
+            context["auditoria"] = list(
+                CofreAuditoria.objects.select_related("ator")[:40]
+            )
+
+    return render(request, "chamados/cofre.html", context)
+
+
+@login_required
+@require_POST
+def cofre_set_master_view(request):
+    """Define (1o acesso) ou altera a senha-mestra. Apenas admin."""
+    if not is_admin_user(request.user):
+        messages.error(request, "Apenas administradores definem a senha-mestra do cofre.")
+        return redirect("cofre_dashboard")
+
+    config = CofreConfig.load()
+    nova = (request.POST.get("nova_senha") or "").strip()
+    confirma = (request.POST.get("confirma_senha") or "").strip()
+
+    if len(nova) < 6:
+        messages.error(request, "A senha-mestra deve ter pelo menos 6 caracteres.")
+        return redirect("cofre_dashboard")
+    if nova != confirma:
+        messages.error(request, "A confirmacao nao confere com a nova senha-mestra.")
+        return redirect("cofre_dashboard")
+
+    if config.tem_senha_mestra:
+        atual = (request.POST.get("senha_atual") or "").strip()
+        if not config.conferir_senha_mestra(atual):
+            messages.error(request, "Senha-mestra atual incorreta.")
+            return redirect("cofre_dashboard")
+
+    config.definir_senha_mestra(nova)
+    config.save()
+    _cofre_unlock(request)
+    _cofre_audit(request, CofreAuditoria.ACAO_SENHA_MESTRA)
+    messages.success(request, "Senha-mestra definida com sucesso. Cofre aberto.")
+    return redirect("cofre_dashboard")
+
+
+@login_required
+@require_POST
+def cofre_unlock_view(request):
+    """Destrava o cofre conferindo a senha-mestra (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para acessar o cofre.")
+        return redirect("my_tickets")
+
+    config = CofreConfig.load()
+    if not config.tem_senha_mestra:
+        return redirect("cofre_dashboard")
+
+    if config.esta_bloqueado():
+        _cofre_audit(request, CofreAuditoria.ACAO_BLOQUEIO)
+        messages.error(request, "Cofre bloqueado temporariamente por tentativas incorretas.")
+        return redirect("cofre_dashboard")
+
+    senha = (request.POST.get("senha_mestra") or "").strip()
+    if config.conferir_senha_mestra(senha):
+        config.resetar_falhas()
+        _cofre_unlock(request)
+        _cofre_audit(request, CofreAuditoria.ACAO_UNLOCK_OK)
+        messages.success(request, "Cofre aberto.")
+    else:
+        config.registrar_falha()
+        _cofre_audit(request, CofreAuditoria.ACAO_UNLOCK_FALHA)
+        if config.esta_bloqueado():
+            messages.error(request, "Muitas tentativas. Cofre bloqueado temporariamente.")
+        else:
+            messages.error(request, "Senha-mestra incorreta.")
+    return redirect("cofre_dashboard")
+
+
+@login_required
+@require_POST
+def cofre_lock_view(request):
+    """Trava o cofre manualmente (limpa a sessao)."""
+    _cofre_lock(request)
+    if _is_ti(request.user):
+        _cofre_audit(request, CofreAuditoria.ACAO_LOCK)
+    messages.success(request, "Cofre travado.")
+    return redirect("cofre_dashboard")
+
+
+def _cofre_guard(request):
+    """Valida permissao TI + cofre aberto para operacoes com credenciais."""
+    if not _is_ti(request.user):
+        return "Voce nao tem permissao para acessar o cofre."
+    if not _cofre_unlocked(request):
+        return "O cofre esta travado. Destrave com a senha-mestra."
+    return None
+
+
+def _ler_dados_credencial(request):
+    rotulo = (request.POST.get("rotulo") or "").strip()
+    if len(rotulo) < 2:
+        return None, "Informe um rotulo (minimo 2 caracteres)."
+    return {
+        "rotulo": rotulo,
+        "usuario": (request.POST.get("usuario") or "").strip(),
+        "notas": (request.POST.get("notas") or "").strip(),
+        "senha": request.POST.get("senha") or "",
+    }, None
+
+
+@login_required
+@require_POST
+def cofre_credencial_create_view(request):
+    erro = _cofre_guard(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("cofre_dashboard")
+
+    dados, msg = _ler_dados_credencial(request)
+    if msg:
+        messages.error(request, msg)
+        return redirect("cofre_dashboard")
+
+    cred = CofreCredencial(
+        rotulo=dados["rotulo"], usuario=dados["usuario"], notas=dados["notas"], criado_por=request.user
+    )
+    cred.definir_senha(dados["senha"])
+    cred.save()
+    _cofre_audit(request, CofreAuditoria.ACAO_CRED_CRIADA, credencial=cred)
+    messages.success(request, f'Credencial "{cred.rotulo}" adicionada.')
+    return redirect("cofre_dashboard")
+
+
+@login_required
+@require_POST
+def cofre_credencial_update_view(request, credencial_id: int):
+    erro = _cofre_guard(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("cofre_dashboard")
+
+    cred = CofreCredencial.objects.filter(pk=credencial_id).first()
+    if not cred:
+        messages.error(request, "Credencial nao encontrada.")
+        return redirect("cofre_dashboard")
+
+    dados, msg = _ler_dados_credencial(request)
+    if msg:
+        messages.error(request, msg)
+        return redirect("cofre_dashboard")
+
+    cred.rotulo = dados["rotulo"]
+    cred.usuario = dados["usuario"]
+    cred.notas = dados["notas"]
+    if (dados["senha"] or "").strip():
+        cred.definir_senha(dados["senha"])
+    cred.save()
+    _cofre_audit(request, CofreAuditoria.ACAO_CRED_ATUALIZADA, credencial=cred)
+    messages.success(request, f'Credencial "{cred.rotulo}" atualizada.')
+    return redirect("cofre_dashboard")
+
+
+@login_required
+@require_POST
+def cofre_credencial_delete_view(request, credencial_id: int):
+    erro = _cofre_guard(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("cofre_dashboard")
+
+    cred = CofreCredencial.objects.filter(pk=credencial_id).first()
+    if not cred:
+        messages.error(request, "Credencial nao encontrada.")
+        return redirect("cofre_dashboard")
+
+    rotulo = cred.rotulo
+    _cofre_audit(request, CofreAuditoria.ACAO_CRED_EXCLUIDA, credencial=cred, detalhes=rotulo)
+    cred.delete()
+    messages.success(request, f'Credencial "{rotulo}" excluida.')
+    return redirect("cofre_dashboard")
+
+
+@login_required
+@require_POST
+def cofre_credencial_reveal_view(request, credencial_id: int):
+    """Devolve a senha decifrada de UMA credencial (JSON), so com o cofre aberto.
+    Cada revelacao e auditada. Feito sob demanda para nao expor tudo no HTML."""
+    if not _is_ti(request.user):
+        return _json_error("Sem permissao.", status=403)
+    if not _cofre_unlocked(request):
+        return _json_error("Cofre travado.", status=403)
+
+    cred = CofreCredencial.objects.filter(pk=credencial_id).first()
+    if not cred:
+        return _json_error("Credencial nao encontrada.", status=404)
+
+    _cofre_audit(request, CofreAuditoria.ACAO_CRED_REVELADA, credencial=cred)
+    return JsonResponse({"ok": True, "senha": cred.obter_senha()})

@@ -1,0 +1,54 @@
+{% load static %}
+<div class="modal fade" id="credModal" tabindex="-1" aria-labelledby="credModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Cofre</span>
+                    <h5 class="modal-title" id="credModalLabel">Nova credencial</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'cofre_credencial_create' %}" class="create-ticket-form" id="credForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Rotulo</span>
+                        <input type="text" class="form-control" name="rotulo" id="credRotulo" maxlength="160" placeholder="Ex.: Roteador Fabrica TPLink" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Usuario / login</span>
+                        <input type="text" class="form-control" name="usuario" id="credUsuario" maxlength="180" placeholder="Ex.: admin">
+                    </label>
+                    <label class="contrato-field">
+                        <span>Senha</span>
+                        <div class="cofre-pass-input">
+                            <input type="password" class="form-control" name="senha" id="credSenha" autocomplete="new-password" placeholder="Senha">
+                            <button type="button" class="cofre-eye" id="credSenhaEye" title="Mostrar/ocultar" aria-label="Mostrar/ocultar">&#128065;</button>
+                        </div>
+                        <small class="contrato-field__help" id="credSenhaHelp"></small>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Notas</span>
+                        <textarea class="form-control" name="notas" id="credNotas" rows="3" placeholder="Observacoes, URL, porta, etc."></textarea>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="credDeleteBtn">Excluir</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="credSubmit">Adicionar credencial</button>
+                </div>
+            </form>
+
+            <div class="cofre-delete-confirm is-hidden" id="credDeleteConfirm">
+                <p class="cofre-delete-confirm__text">Tem certeza que deseja excluir esta credencial? Esta acao nao pode ser desfeita.</p>
+                <form method="post" id="credDeleteForm" class="cofre-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="credDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
