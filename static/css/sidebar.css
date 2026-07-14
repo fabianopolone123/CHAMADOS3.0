@@ -163,6 +163,26 @@
     letter-spacing: 0.08em;
 }
 
+/* Nome do usuario logado (versao compacta: so o nome, bem pequeno) */
+.sidebar-user-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgba(226, 232, 240, 0.72);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Marca compacta: so o simbolo "TI" (sem titulo/descricao) */
+.sidebar-brand--compact {
+    align-items: center;
+}
+
+/* Sem o bloco de texto, o hamburger (mobile) vai para a direita. */
+.sidebar-brand--compact .sidebar-toggle {
+    margin-left: auto;
+}
+
 .sidebar-logout {
     border-radius: 999px;
     font-weight: 700;
