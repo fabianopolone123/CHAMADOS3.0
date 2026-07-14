@@ -10,7 +10,11 @@
 
 {% block content %}
 <main class="tickets-app portal-app">
-    {% include "partials/portal_sidebar.html" with active="meus" %}
+    {% if is_admin or is_attendant %}
+        {% include "partials/ti_sidebar.html" %}
+    {% else %}
+        {% include "partials/portal_sidebar.html" with active="meus" %}
+    {% endif %}
 
     <section class="tickets-main">
         <header class="tickets-topbar">

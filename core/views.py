@@ -983,7 +983,13 @@ def open_ticket_view(request):
                 continue
         else:
             messages.error(request, "Nao foi possivel gerar o numero do chamado. Tente novamente.")
-            context = {"page_title": "Abrir Chamado", "form": form, "can_view_history": False}
+            context = {
+                "page_title": "Abrir Chamado",
+                "form": form,
+                "is_admin": is_admin_user(request.user),
+                "is_attendant": is_attendant_user(request.user),
+                "can_view_history": is_admin_user(request.user) or is_attendant_user(request.user),
+            }
             return render(request, "chamados/abrir_chamado.html", context)
 
         messages.success(request, f"Chamado {chamado.numero} aberto com sucesso.")
