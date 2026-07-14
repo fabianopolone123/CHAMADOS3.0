@@ -16,6 +16,7 @@ from .models import (
     ChamadoMensagem,
     ChamadoMensagemAnexo,
     ContaEmail,
+    EnderecoIP,
     Licenca,
     LicencaSoftware,
     OrcamentoContrato,
@@ -657,3 +658,92 @@ class LicencaTests(TestCase):
         resp = self.client.get(reverse("licencas_dashboard"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "AutoCAD 2014 Full")
+
+
+class EnderecoIPTests(TestCase):
+    """Modulo IPs: CRUD, unicidade do IP, categoria e permissoes.
+
+    Obs.: o banco de teste ja vem com os IPs do seed (migration 0017).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def test_ti_creates_ip(self):
+        self.client.force_login(self.ti)
+        antes = EnderecoIP.objects.count()
+        resp = self.client.post(
+            reverse("ip_create"),
+            {"categoria": "servers", "endereco_ip": "10.0.0.9", "nome": "SRV-TESTE", "mac": "AA:BB:CC:DD:EE:FF"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(EnderecoIP.objects.count(), antes + 1)
+        ip = EnderecoIP.objects.get(endereco_ip="10.0.0.9")
+        self.assertEqual(ip.categoria, "servers")
+        self.assertEqual(ip.criado_por, self.ti)
+
+    def test_create_requires_ip_and_valid_category(self):
+        self.client.force_login(self.ti)
+        antes = EnderecoIP.objects.count()
+        # sem endereco
+        self.client.post(reverse("ip_create"), {"categoria": "servers", "endereco_ip": ""})
+        # categoria invalida
+        self.client.post(reverse("ip_create"), {"categoria": "xpto", "endereco_ip": "10.0.0.10"})
+        self.assertEqual(EnderecoIP.objects.count(), antes)  # nada criado
+
+    def test_duplicate_ip_is_rejected(self):
+        self.client.force_login(self.ti)
+        EnderecoIP.objects.create(categoria="wifi", endereco_ip="10.0.0.20", criado_por=self.ti)
+        antes = EnderecoIP.objects.count()
+        resp = self.client.post(
+            reverse("ip_create"), {"categoria": "servers", "endereco_ip": "10.0.0.20"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(EnderecoIP.objects.count(), antes)  # nao duplicou
+
+    def test_ti_updates_and_deletes_ip(self):
+        self.client.force_login(self.ti)
+        ip = EnderecoIP.objects.create(categoria="printers", endereco_ip="10.0.0.30", nome="Antes", criado_por=self.ti)
+        resp = self.client.post(
+            reverse("ip_update", args=[ip.id]),
+            {"categoria": "printers", "endereco_ip": "10.0.0.30", "nome": "Depois"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        ip.refresh_from_db()
+        self.assertEqual(ip.nome, "Depois")
+
+        resp = self.client.post(reverse("ip_delete", args=[ip.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(EnderecoIP.objects.filter(id=ip.id).exists())
+
+    def test_update_keeps_own_ip_without_duplicate_error(self):
+        """Editar mantendo o mesmo IP nao dispara falso positivo de duplicidade."""
+        self.client.force_login(self.ti)
+        ip = EnderecoIP.objects.create(categoria="switches", endereco_ip="10.0.0.40", criado_por=self.ti)
+        resp = self.client.post(
+            reverse("ip_update", args=[ip.id]),
+            {"categoria": "switches", "endereco_ip": "10.0.0.40", "nome": "Switch Novo"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        ip.refresh_from_db()
+        self.assertEqual(ip.nome, "Switch Novo")
+
+    def test_common_user_cannot_access_or_change(self):
+        ip = EnderecoIP.objects.create(categoria="wifi", endereco_ip="10.0.0.50", criado_por=self.ti)
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("ips_dashboard")).status_code, 302)
+        antes = EnderecoIP.objects.count()
+        self.client.post(reverse("ip_create"), {"categoria": "servers", "endereco_ip": "10.0.0.99"})
+        self.assertEqual(EnderecoIP.objects.count(), antes)
+        self.client.post(reverse("ip_delete", args=[ip.id]))
+        self.assertTrue(EnderecoIP.objects.filter(id=ip.id).exists())
+
+    def test_dashboard_renders_with_seeded_data(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("ips_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "ips-table")

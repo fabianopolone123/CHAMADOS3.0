@@ -1,15 +1,11 @@
 {% comment %}
 Menu lateral padrao da area de TI (Atendente TI / Admin).
 Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
-Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "permissoes".
+Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "permissoes".
 {% endcomment %}
 <aside class="tickets-sidebar">
-    <div class="sidebar-brand">
+    <div class="sidebar-brand sidebar-brand--compact">
         <div class="system-mark">TI</div>
-        <div class="sidebar-brand__text">
-            <h1 class="sidebar-title">Sistema de Chamados TI</h1>
-            <p class="sidebar-copy">Area de atendimento da equipe de TI para triagem, movimentacao e acompanhamento dos chamados.</p>
-        </div>
         <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
             <span class="sidebar-toggle__bar"></span>
             <span class="sidebar-toggle__bar"></span>
@@ -79,6 +75,17 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimo
             </svg>
             <span>Licencas</span>
         </a>
+        <a href="{% url 'ips_dashboard' %}" class="menu-link{% if active == 'ips' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="8" rx="1.5"></rect>
+                <rect x="2" y="13" width="20" height="8" rx="1.5"></rect>
+                <path d="M6 7h.01"></path>
+                <path d="M6 17h.01"></path>
+                <path d="M10 7h8"></path>
+                <path d="M10 17h8"></path>
+            </svg>
+            <span>IPs</span>
+        </a>
         <a href="{% url 'permissions' %}" class="menu-link{% if active == 'permissoes' %} active{% endif %}">
             <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5l-8-3Z"></path>
@@ -89,11 +96,7 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimo
     </nav>
 
     <div class="sidebar-footer">
-        <div class="sidebar-user-card">
-            <span class="sidebar-user-label">Usuario logado</span>
-            <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-            <span>{{ request.user.username }}</span>
-        </div>
+        <span class="sidebar-user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
         <a href="{% url 'logout' %}" class="btn btn-light sidebar-logout">Sair</a>
     </div>
 </aside>

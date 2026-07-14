@@ -34,6 +34,7 @@ from .models import (
     ChamadoMensagemAnexo,
     DocumentoTI,
     DocumentoTIAnexo,
+    EnderecoIP,
     EmprestimoTI,
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
@@ -2850,3 +2851,128 @@ def licenca_delete_view(request, licenca_id: int):
     licenca.delete()
     messages.success(request, f'Licenca de "{nome}" excluida com sucesso.')
     return redirect("licencas_dashboard")
+
+
+# ==========================================================================
+# Modulo IPs (equipamentos e enderecos da rede interna) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def ips_dashboard_view(request):
+    """Lista os IPs/equipamentos da rede, com cartoes de resumo, filtro por
+    categoria e busca client-side."""
+    ips = list(EnderecoIP.objects.all())
+    contagem = {}
+    for ip in ips:
+        contagem[ip.categoria] = contagem.get(ip.categoria, 0) + 1
+
+    categorias = [
+        {"value": value, "label": label, "count": contagem.get(value, 0)}
+        for value, label in EnderecoIP.Categoria.choices
+    ]
+
+    context = {
+        "page_title": "IPs",
+        "ips": ips,
+        "total_ips": len(ips),
+        "categorias": categorias,
+        "total_categorias": len(categorias),
+        "com_acesso": sum(1 for ip in ips if ip.acesso.strip()),
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/ips.html", context)
+
+
+def _ler_dados_ip(request, ip_atual=None):
+    """Le e valida os campos do formulario de IP (create/update).
+
+    Retorna (dados, erro). Valida categoria e unicidade do endereco IP.
+    """
+    endereco = (request.POST.get("endereco_ip") or "").strip()
+    if not endereco:
+        return None, "Informe o endereco IP."
+
+    categoria = (request.POST.get("categoria") or "").strip()
+    if categoria not in dict(EnderecoIP.Categoria.choices):
+        return None, "Selecione uma categoria valida."
+
+    duplicado = EnderecoIP.objects.filter(endereco_ip=endereco)
+    if ip_atual is not None:
+        duplicado = duplicado.exclude(pk=ip_atual.pk)
+    if duplicado.exists():
+        return None, f"O endereco IP {endereco} ja esta cadastrado."
+
+    dados = {
+        "categoria": categoria,
+        "endereco_ip": endereco,
+        "nome": (request.POST.get("nome") or "").strip(),
+        "fabricante": (request.POST.get("fabricante") or "").strip(),
+        "mac": (request.POST.get("mac") or "").strip(),
+        "acesso": (request.POST.get("acesso") or "").strip(),
+        "observacoes": (request.POST.get("observacoes") or "").strip(),
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def ip_create_view(request):
+    """Cadastra um novo IP (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar IPs.")
+        return redirect("ips_dashboard")
+
+    dados, erro = _ler_dados_ip(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("ips_dashboard")
+
+    EnderecoIP.objects.create(criado_por=request.user, **dados)
+    messages.success(request, f"IP {dados['endereco_ip']} cadastrado com sucesso.")
+    return redirect("ips_dashboard")
+
+
+@login_required
+@require_POST
+def ip_update_view(request, ip_id: int):
+    """Edita um IP existente (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar IPs.")
+        return redirect("ips_dashboard")
+
+    ip = EnderecoIP.objects.filter(pk=ip_id).first()
+    if not ip:
+        messages.error(request, "IP nao encontrado.")
+        return redirect("ips_dashboard")
+
+    dados, erro = _ler_dados_ip(request, ip_atual=ip)
+    if erro:
+        messages.error(request, erro)
+        return redirect("ips_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(ip, campo, valor)
+    ip.save()
+    messages.success(request, f"IP {ip.endereco_ip} atualizado com sucesso.")
+    return redirect("ips_dashboard")
+
+
+@login_required
+@require_POST
+def ip_delete_view(request, ip_id: int):
+    """Exclui um IP (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir IPs.")
+        return redirect("ips_dashboard")
+
+    ip = EnderecoIP.objects.filter(pk=ip_id).first()
+    if not ip:
+        messages.error(request, "IP nao encontrado.")
+        return redirect("ips_dashboard")
+
+    endereco = ip.endereco_ip
+    ip.delete()
+    messages.success(request, f"IP {endereco} excluido com sucesso.")
+    return redirect("ips_dashboard")

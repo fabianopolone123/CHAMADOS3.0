@@ -1,0 +1,71 @@
+{% load static %}
+<div class="modal fade" id="ipModal" tabindex="-1" aria-labelledby="ipModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">IPs</span>
+                    <h5 class="modal-title" id="ipModalLabel">Cadastrar novo IP</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'ip_create' %}" class="create-ticket-form" id="ipForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="ip-form-grid">
+                        <label class="contrato-field">
+                            <span>Categoria</span>
+                            <select class="form-select" name="categoria" id="ipCategoria" required>
+                                <option value="">— Selecionar —</option>
+                                {% for c in categorias %}
+                                <option value="{{ c.value }}">{{ c.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Endereco IP</span>
+                            <input type="text" class="form-control" name="endereco_ip" id="ipEndereco" maxlength="45" placeholder="Ex.: 192.168.22.10" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Nome</span>
+                            <input type="text" class="form-control" name="nome" id="ipNome" maxlength="180" placeholder="Ex.: CPD-SERVER1">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Fabricante / modelo</span>
+                            <input type="text" class="form-control" name="fabricante" id="ipFabricante" maxlength="180" placeholder="Ex.: Dell PowerEdge R7525">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Endereco MAC</span>
+                            <input type="text" class="form-control" name="mac" id="ipMac" maxlength="80" placeholder="Ex.: 84:39:8F:72:EB:0D">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Acesso (usuario/senha)</span>
+                            <input type="text" class="form-control" name="acesso" id="ipAcesso" placeholder="Opcional">
+                        </label>
+                        <label class="contrato-field ip-field--full">
+                            <span>Observacoes</span>
+                            <textarea class="form-control" name="observacoes" id="ipObservacoes" rows="2" placeholder="Opcional"></textarea>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="ipDeleteBtn">Excluir IP</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="ipSubmit">Cadastrar IP</button>
+                </div>
+            </form>
+
+            <div class="ip-delete-confirm is-hidden" id="ipDeleteConfirm">
+                <p class="ip-delete-confirm__text">
+                    Tem certeza que deseja excluir este IP? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="ipDeleteForm" class="ip-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="ipDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

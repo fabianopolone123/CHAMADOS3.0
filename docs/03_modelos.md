@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui vinte e cinco modelos persistidos:
+O projeto possui vinte e seis modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -49,6 +49,10 @@ Modulo Licencas:
 
 - `LicencaSoftware`
 - `Licenca`
+
+Modulo IPs:
+
+- `EnderecoIP`
 
 ## Modelos implementados
 
@@ -450,6 +454,20 @@ Regras atuais:
 - So Atendente TI/Admin acessam, cadastram, editam e excluem softwares e licencas (validado no backend; usuario comum e redirecionado).
 - Excluir um software remove em cascata todas as suas licencas (`on_delete=CASCADE`).
 - Ao escolher `tipo_expiracao = indeterminado`, a data de expiracao enviada e ignorada (fica nula).
+
+### EnderecoIP
+
+Endereco/equipamento da rede interna (modulo IPs), migrado do sistema antigo. Seed inicial via migration de dados `0017`, que le um arquivo local ignorado pelo Git (`seed/ips_seed.json`); os MACs e credenciais de acesso NAO sao versionados.
+
+- `categoria` (choices: `servers` Servidores, `switches` Switchs, `idface_turnstiles` IdFace + Catracas, `printers` Impressoras, `wifi` Wi-Fi, `monitoring` Zabbix & Grafana)
+- `endereco_ip` (unico)
+- `nome`, `fabricante`, `mac`, `acesso` (usuario/senha do equipamento), `observacoes`
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `ips_criados`), `criado_em`, `atualizado_em`. Migration `0016`.
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem IPs (validado no backend; usuario comum e redirecionado).
+- `endereco_ip` e unico; a validacao no backend bloqueia duplicidade (na edicao, ignora o proprio registro) e exige uma categoria valida.
 
 ## Modelos previstos para proximas fases
 

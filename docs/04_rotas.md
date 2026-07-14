@@ -63,6 +63,10 @@
 | `/licencas/criar/` | POST | Cadastra uma licenca vinculada a um software (serial, usuario, e-mail, prazo, pagamento); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/licencas/<id>/editar/` | POST | Edita uma licenca existente (apenas TI/admin) | Implementada |
 | `/licencas/<id>/excluir/` | POST | Exclui uma licenca (apenas TI/admin) | Implementada |
+| `/ips/` | GET | Modulo IPs: inventario de IPs/equipamentos da rede (tabela responsiva + busca inteligente + filtro por categoria) e botao "Novo IP" (apenas TI/admin) | Implementada |
+| `/ips/criar/` | POST | Cadastra um IP (categoria, endereco unico, nome, fabricante, MAC, acesso, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
+| `/ips/<id>/editar/` | POST | Edita um IP existente (apenas TI/admin) | Implementada |
+| `/ips/<id>/excluir/` | POST | Exclui um IP (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -184,6 +188,13 @@
 - As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico: validam, gravam, notificam via Django messages (toast) e redirecionam para `/licencas/`.
 - Cadastro de software exige nome (minimo 2 caracteres) e quantidade nao negativa. Cadastro/edicao de licenca exige um software valido; quando o prazo e `indeterminado`, a data de expiracao e ignorada.
 - Excluir um software remove em cascata todas as suas licencas (`on_delete=CASCADE`); a exclusao (de software ou licenca) pede confirmacao no proprio modal antes de enviar.
+
+## Regras do modulo IPs
+
+- `/ips/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "IPs" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend (usuario comum e redirecionado com toast de erro).
+- A tela lista os IPs em uma tabela responsiva (que vira lista de cards no celular) com badge colorido de categoria, IP e MAC em fonte mono, nome, fabricante e acesso. Cartoes de resumo no topo (total de IPs, categorias, com acesso salvo). A busca inteligente (client-side) filtra por IP, nome, fabricante, MAC, acesso ou categoria; chips de categoria filtram a lista (combinam com a busca).
+- As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico: validam, gravam, notificam via Django messages (toast) e redirecionam para `/ips/`.
+- `endereco_ip` e unico: cadastro/edicao bloqueia duplicidade (na edicao, ignora o proprio registro) e exige uma categoria valida. A exclusao pede confirmacao no proprio modal antes de enviar.
 
 ## Regras das rotas de historico
 

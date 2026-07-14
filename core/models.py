@@ -1033,3 +1033,42 @@ class Licenca(models.Model):
         if self.expira_em:
             return self.expira_em.strftime("%d/%m/%Y")
         return "Prazo nao informado"
+
+
+class EnderecoIP(models.Model):
+    """IP/equipamento da rede interna (modulo IPs): servidores, switches,
+    catracas/IdFace, impressoras, Wi-Fi e monitoramento."""
+
+    class Categoria(models.TextChoices):
+        SERVIDORES = "servers", "Servidores"
+        SWITCHES = "switches", "Switchs"
+        IDFACE_CATRACAS = "idface_turnstiles", "IdFace + Catracas"
+        IMPRESSORAS = "printers", "Impressoras"
+        WIFI = "wifi", "Wi-Fi"
+        MONITORAMENTO = "monitoring", "Zabbix & Grafana"
+
+    categoria = models.CharField(max_length=30, choices=Categoria.choices)
+    endereco_ip = models.CharField(max_length=45, unique=True)
+    nome = models.CharField(max_length=180, blank=True, default="")
+    fabricante = models.CharField(max_length=180, blank=True, default="")
+    mac = models.CharField(max_length=80, blank=True, default="")
+    acesso = models.TextField(blank=True, default="")
+    observacoes = models.TextField(blank=True, default="")
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ips_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["categoria", "endereco_ip"]
+        verbose_name = "IP"
+        verbose_name_plural = "IPs"
+
+    def __str__(self) -> str:
+        rotulo = self.nome or self.fabricante or self.endereco_ip
+        return f"{self.endereco_ip} - {rotulo}"

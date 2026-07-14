@@ -5,6 +5,7 @@ from .models import (
     ContaEmail,
     DocumentoTI,
     DocumentoTIAnexo,
+    EnderecoIP,
     Licenca,
     LicencaSoftware,
     Ramal,
@@ -184,3 +185,10 @@ class LicencaAdmin(admin.ModelAdmin):
     list_display = ("software", "usuario_atribuido", "email_vinculado", "tipo_expiracao", "expira_em", "atualizado_em")
     list_filter = ("tipo_expiracao", "software")
     search_fields = ("usuario_atribuido", "email_vinculado", "serial", "forma_pagamento")
+
+
+@admin.register(EnderecoIP)
+class EnderecoIPAdmin(admin.ModelAdmin):
+    list_display = ("endereco_ip", "categoria", "nome", "fabricante", "mac", "atualizado_em")
+    list_filter = ("categoria",)
+    search_fields = ("endereco_ip", "nome", "fabricante", "mac", "acesso")

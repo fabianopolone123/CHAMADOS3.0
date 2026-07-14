@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/ips.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app ips-app"
+    data-ip-update-url="{% url 'ip_update' ip_id=0 %}"
+    data-ip-delete-url="{% url 'ip_delete' ip_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="ips" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">IPs</h2>
+                <p class="contratos-topbar__subtitle">Inventario de IPs da rede interna</p>
+                <p class="topbar-subtitle">Servidores, switches, catracas, impressoras, Wi-Fi e monitoramento. Pesquise ou filtre por categoria.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createIpButton" title="Cadastrar novo IP">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Novo IP</span>
+            </button>
+        </header>
+
+        <section class="ips-stats">
+            <article class="ips-stat ips-stat--blue">
+                <span class="ips-stat__label">Total de IPs</span>
+                <strong class="ips-stat__value">{{ total_ips }}</strong>
+            </article>
+            <article class="ips-stat ips-stat--indigo">
+                <span class="ips-stat__label">Categorias</span>
+                <strong class="ips-stat__value">{{ total_categorias }}</strong>
+            </article>
+            <article class="ips-stat ips-stat--green">
+                <span class="ips-stat__label">Com acesso salvo</span>
+                <strong class="ips-stat__value">{{ com_acesso }}</strong>
+            </article>
+        </section>
+
+        <section class="ips-panel">
+            <div class="ips-search">
+                <span class="ips-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="ipSearch"
+                    class="ips-search__input"
+                    placeholder="Pesquisar por IP, nome, fabricante, MAC, acesso ou categoria..."
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="ips-chips" id="ipChips" role="tablist" aria-label="Filtrar por categoria">
+                <button type="button" class="ips-chip is-active" data-category="" role="tab" aria-selected="true">
+                    Todas <span class="ips-chip__count">{{ total_ips }}</span>
+                </button>
+                {% for c in categorias %}
+                <button type="button" class="ips-chip ips-chip--{{ c.value }}" data-category="{{ c.value }}" role="tab" aria-selected="false">
+                    {{ c.label }} <span class="ips-chip__count">{{ c.count }}</span>
+                </button>
+                {% endfor %}
+            </div>
+
+            <p class="ips-search__status" id="ipSearchStatus"></p>
+
+            {% if ips %}
+            <div class="ips-table-wrap">
+                <table class="ips-table" id="ipsTable">
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th>IP</th>
+                            <th>Nome</th>
+                            <th class="ips-col--hide-sm">Fabricante</th>
+                            <th class="ips-col--hide-md">MAC</th>
+                            <th class="ips-col--hide-md">Acesso</th>
+                            <th class="ips-th--actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ipsTableBody">
+                        {% for ip in ips %}
+                        <tr class="ips-row"
+                            data-id="{{ ip.id }}"
+                            data-categoria="{{ ip.categoria }}"
+                            data-endereco="{{ ip.endereco_ip }}"
+                            data-nome="{{ ip.nome }}"
+                            data-fabricante="{{ ip.fabricante }}"
+                            data-mac="{{ ip.mac }}"
+                            data-acesso="{{ ip.acesso }}"
+                            data-observacoes="{{ ip.observacoes }}"
+                            data-search="{{ ip.get_categoria_display|lower }} {{ ip.endereco_ip|lower }} {{ ip.nome|lower }} {{ ip.fabricante|lower }} {{ ip.mac|lower }} {{ ip.acesso|lower }} {{ ip.observacoes|lower }}">
+                            <td data-label="Categoria">
+                                <span class="ips-badge ips-badge--{{ ip.categoria }}">{{ ip.get_categoria_display }}</span>
+                            </td>
+                            <td data-label="IP" class="ips-cell--ip">{{ ip.endereco_ip }}</td>
+                            <td data-label="Nome" class="ips-cell--name">{{ ip.nome|default:"-" }}</td>
+                            <td data-label="Fabricante" class="ips-col--hide-sm">{{ ip.fabricante|default:"-" }}</td>
+                            <td data-label="MAC" class="ips-col--hide-md ips-cell--mac">{{ ip.mac|default:"-" }}</td>
+                            <td data-label="Acesso" class="ips-col--hide-md">{{ ip.acesso|default:"-" }}</td>
+                            <td data-label="Acoes" class="ips-cell--actions">
+                                <button type="button" class="ips-icon-btn js-edit-ip" title="Editar IP" aria-label="Editar IP">&#9998;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="ips-empty is-hidden" id="ipsNoResults">Nenhum IP encontrado para o filtro atual.</p>
+            {% else %}
+            <div class="ips-empty-state">
+                <p class="ips-empty-state__title">Nenhum IP cadastrado ainda.</p>
+                <p class="ips-empty-state__hint">Clique em "Novo IP" para adicionar o primeiro equipamento.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/ip_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/ips.js' %}"></script>
+{% endblock %}
