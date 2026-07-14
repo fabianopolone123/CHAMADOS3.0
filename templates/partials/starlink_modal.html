@@ -1,0 +1,89 @@
+{% load static %}
+<div class="modal fade" id="starModal" tabindex="-1" aria-labelledby="starModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Starlinks</span>
+                    <h5 class="modal-title" id="starModalLabel">Nova Starlink</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'starlink_create' %}" class="create-ticket-form" id="starForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="star-form-grid">
+                        <label class="contrato-field">
+                            <span>Nome</span>
+                            <input type="text" class="form-control" name="nome" id="starNome" maxlength="160" placeholder="Ex.: Star01" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Local</span>
+                            <input type="text" class="form-control" name="local" id="starLocal" maxlength="180" placeholder="Ex.: Fazenda Copacabana">
+                        </label>
+                        <label class="contrato-field">
+                            <span>E-mail da conta</span>
+                            <input type="email" class="form-control" name="email" id="starEmail" maxlength="254" placeholder="conta@sidertec.com.br">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Senha</span>
+                            <div class="star-pass-input">
+                                <input type="password" class="form-control" name="senha" id="starSenha" autocomplete="new-password" placeholder="Senha da conta">
+                                <button type="button" class="star-mini" id="starSenhaToggle" title="Mostrar/ocultar" aria-label="Mostrar/ocultar">&#128065;</button>
+                            </div>
+                            <small class="contrato-field__help" id="starSenhaHelp"></small>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Forma de pagamento</span>
+                            <select class="form-select" name="forma_pagamento" id="starForma">
+                                {% for value, label in formas_pagamento %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Final do cartao</span>
+                            <input type="text" class="form-control" name="final_cartao" id="starCartao" maxlength="4" inputmode="numeric" placeholder="Ex.: 8380">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Identificador Starlink</span>
+                            <input type="text" class="form-control" name="identificador" id="starIdent" maxlength="80" placeholder="Ex.: 01000000-00000000-0037b250">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Versao do software</span>
+                            <input type="text" class="form-control" name="versao_software" id="starVersao" maxlength="80" placeholder="Ex.: 2026.05.20.cr80465">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Numero de serie</span>
+                            <input type="text" class="form-control" name="numero_serie" id="starSerie" maxlength="120">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Numero do kit</span>
+                            <input type="text" class="form-control" name="numero_kit" id="starKit" maxlength="120">
+                        </label>
+                        <label class="star-check">
+                            <input type="checkbox" name="ativo" value="1" id="starAtivo" checked> Ativa
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="starDeleteBtn">Excluir</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="starSubmit">Cadastrar Starlink</button>
+                </div>
+            </form>
+
+            <div class="star-delete-confirm is-hidden" id="starDeleteConfirm">
+                <p class="star-delete-confirm__text">
+                    Tem certeza que deseja excluir esta Starlink? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="starDeleteForm" class="star-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="starDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -91,6 +91,10 @@
 | `/dicas/<id>/editar/` | POST | Edita uma dica; pode substituir ou remover o anexo (apenas TI/admin) | Implementada |
 | `/dicas/<id>/excluir/` | POST | Exclui uma dica (e seu anexo do disco) (apenas TI/admin) | Implementada |
 | `/dicas/<id>/anexo/` | GET | Abre/baixa o anexo da dica por rota protegida (apenas TI/admin) | Implementada |
+| `/starlinks/` | GET | Modulo Starlinks: antenas/contas Starlink em cards com resumo, busca e filtro por status (apenas TI/admin) | Implementada |
+| `/starlinks/criar/` | POST | Cadastra uma Starlink (nome, local, conta, senha, kit) (apenas TI/admin) | Implementada |
+| `/starlinks/<id>/editar/` | POST | Edita uma Starlink; senha em branco mantem a atual (apenas TI/admin) | Implementada |
+| `/starlinks/<id>/excluir/` | POST | Exclui uma Starlink (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -247,6 +251,12 @@
 - A tela mostra as dicas em uma grade de cards (categoria com badge colorido, titulo, previa do conteudo e indicador de anexo). Chips de categoria (Todas, Geral, Configuracao, Resolucao) com contagem filtram a grade, combinando com a busca client-side (titulo/conteudo/categoria). Clicar no card abre um modal de detalhe com o conteudo completo (quebras de linha preservadas, URLs viram links clicaveis) e o anexo; o icone de lapis abre a edicao.
 - As rotas de escrita usam `POST` (com CSRF); cadastro/edicao aceitam um anexo (`multipart/form-data`) e seguem o padrao classico (valida, grava, Django messages, redireciona). Na edicao e possivel substituir o anexo (novo upload) ou marcar para remover o atual.
 - Excluir uma dica apaga tambem o anexo do disco. A abertura/download do anexo e restrita a TI/admin (`404` para comum), servida por rota protegida (imagens abrem inline), sem expor a URL direta de `MEDIA`.
+
+## Regras do modulo Starlinks
+
+- `/starlinks/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Starlinks" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend.
+- A tela mostra as Starlinks em uma grade de cards responsiva (nome, local, badge Ativa/Inativa e os campos: e-mail, senha, pagamento, identificador, numero de serie, numero do kit e versao do software). Cartoes de resumo (total, ativas, inativas), busca client-side (nome/local/e-mail/serial/kit/identificador) e chips de filtro por status (Todas/Ativas/Inativas). A senha aparece mascarada, com botoes para mostrar/ocultar e copiar (sem expor no HTML alem do card, que ja e restrito a TI/admin).
+- As rotas de escrita usam `POST` (com CSRF) e seguem o padrao classico (valida, grava, Django messages, redireciona). Na edicao, deixar o campo senha em branco mantem a senha atual; a origem antiga (Fernet) foi decifrada na migracao e as senhas ficam em texto no campo `senha` (seed nao versionado).
 
 ## Regras das rotas de historico
 

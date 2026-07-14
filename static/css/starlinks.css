@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Modulo Starlinks: antenas/contas Starlink (cards com credenciais)
+   ========================================================================== */
+
+/* ----- Cartoes de resumo ----- */
+.star-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.star-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 1rem 1.2rem;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-left: 4px solid #2563eb;
+    border-radius: 1.1rem;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.star-stat--blue { border-left-color: #2563eb; }
+.star-stat--green { border-left-color: #059669; }
+.star-stat--slate { border-left-color: #64748b; }
+
+.star-stat__label { font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+.star-stat__value { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; }
+
+/* ----- Painel + busca ----- */
+.star-panel {
+    min-width: 0;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    border-radius: 1.6rem;
+    box-shadow: 0 22px 45px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(14px);
+}
+
+.star-search { position: relative; display: flex; align-items: center; }
+.star-search__icon { position: absolute; left: 0.9rem; font-size: 0.95rem; opacity: 0.6; pointer-events: none; }
+
+.star-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+.star-search__input:focus { outline: none; border-color: #2563eb; background: #fff; box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14); }
+
+.star-search__status { margin: 0.6rem 0 0.2rem; font-size: 0.82rem; color: #64748b; min-height: 1rem; }
+
+/* ----- Chips ----- */
+.star-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.85rem; }
+
+.star-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.star-chip:hover { border-color: #cbd5e1; background: #f8fafc; }
+.star-chip.is-active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+.star-chip__count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.5rem; height: 1.25rem; padding: 0 0.35rem;
+    border-radius: 999px; background: #f1f5f9; color: #64748b; font-size: 0.72rem; font-weight: 800;
+}
+.star-chip.is-active .star-chip__count { background: rgba(255, 255, 255, 0.25); color: #fff; }
+
+/* ----- Grade de cards ----- */
+.star-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.star-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.1rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 1.1rem;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+}
+
+.star-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.7rem; }
+.star-card__title { margin: 0; font-size: 1.05rem; font-weight: 800; color: #0f172a; }
+.star-card__local { margin: 0.15rem 0 0; font-size: 0.82rem; color: #64748b; }
+
+.star-badge { flex: 0 0 auto; padding: 0.25rem 0.65rem; border-radius: 999px; font-weight: 700; font-size: 0.74rem; white-space: nowrap; }
+.star-badge--on { background: #dcfce7; color: #166534; }
+.star-badge--off { background: #e2e8f0; color: #475569; }
+
+/* ----- Campos ----- */
+.star-fields { display: grid; grid-template-columns: 1fr; gap: 0.5rem; margin: 0; }
+
+.star-field {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: 0.5rem 0.75rem;
+    align-items: baseline;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.star-field:last-child { border-bottom: 0; }
+
+.star-field dt { margin: 0; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; }
+.star-field dd { margin: 0; font-size: 0.88rem; color: #1f2937; overflow-wrap: anywhere; min-width: 0; }
+
+.star-field--copy a { color: #2563eb; text-decoration: none; }
+.star-field--copy a:hover { text-decoration: underline; }
+
+.star-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82rem;
+    color: #334155;
+}
+
+/* Senha */
+.star-pass { display: flex; align-items: center; gap: 0.4rem; }
+.star-pass__value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.06em;
+    color: #0f172a;
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.star-mini {
+    flex: 0 0 auto;
+    border: 1px solid #dbeafe;
+    background: #eff5ff;
+    color: #1d4ed8;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 0.45rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    line-height: 1;
+    transition: background 0.15s ease;
+}
+.star-mini:hover { background: #dbeafe; }
+.star-mini.is-copied { background: #dcfce7; border-color: #bbf7d0; }
+
+/* ----- Acoes ----- */
+.star-card__actions { margin-top: 0.8rem; display: flex; justify-content: flex-end; }
+
+.star-edit {
+    border: 1px solid #dbeafe;
+    background: #eff5ff;
+    color: #1d4ed8;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.9rem;
+    border-radius: 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.star-edit:hover { background: #dbeafe; }
+
+/* ----- Modal ----- */
+.star-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.star-check { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.45rem; font-size: 0.9rem; color: #0f172a; font-weight: 600; }
+
+.star-pass-input { position: relative; display: flex; align-items: center; gap: 0.4rem; }
+.star-pass-input .form-control { flex: 1 1 auto; }
+
+.star-delete-confirm { padding: 1.2rem 1.25rem 1.4rem; border-top: 1px solid #f1f5f9; }
+.star-delete-confirm__text { margin: 0 0 1rem; color: #b91c1c; font-weight: 600; }
+.star-delete-confirm__actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin: 0; }
+
+/* ----- Estados vazios ----- */
+.star-empty, .star-empty-state__hint { margin: 0.6rem 0 0; color: #64748b; font-size: 0.9rem; }
+.star-empty-state { padding: 2.5rem 1rem; text-align: center; }
+.star-empty-state__title { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+
+.is-hidden { display: none !important; }
+
+@media (max-width: 640px) {
+    .star-form-grid { grid-template-columns: 1fr; }
+    .star-field { grid-template-columns: 1fr; gap: 0.15rem; }
+    .star-field dt { color: #94a3b8; }
+}

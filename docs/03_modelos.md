@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e dois modelos persistidos:
+O projeto possui trinta e tres modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -71,6 +71,10 @@ Modulo Futura Digital:
 Modulo Dicas:
 
 - `Dica`
+
+Modulo Starlinks:
+
+- `Starlink`
 
 ## Modelos implementados
 
@@ -565,6 +569,20 @@ Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem dicas (validado no backend; usuario comum e redirecionado; download do anexo retorna `404`).
 - O anexo pode ser substituido ou removido na edicao; excluir a dica apaga o arquivo do disco. O download/abertura do anexo usa rota protegida (imagens abrem inline).
+
+### Starlink
+
+Antena/conta Starlink da empresa (modulo Starlinks), migrada do banco antigo. Seed inicial via migration de dados `0027`, que le `seed/starlinks_seed.json` (local, ignorado pelo Git). No sistema antigo a senha era guardada cifrada (Fernet); na migracao ela foi decifrada com a chave do `.env` antigo e re-armazenada em texto no campo `senha` (o arquivo de seed com as credenciais NAO e versionado).
+
+- `nome`, `local`, `email`, `senha`
+- `ativo` (boolean), `forma_pagamento` (choices: `pix`, `cartao`; default `cartao`), `final_cartao`
+- `identificador`, `versao_software`, `numero_serie`, `numero_kit` (dados do kit)
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `starlinks_criados`), `criado_em`, `atualizado_em`. Migration `0026`.
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem Starlinks (validado no backend; usuario comum e redirecionado).
+- Na edicao, deixar o campo senha em branco mantem a senha atual. A senha aparece mascarada na tela, com botoes para mostrar/ocultar e copiar.
 
 ## Modelos previstos para proximas fases
 

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/starlinks.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app star-app"
+    data-update-url="{% url 'starlink_update' starlink_id=0 %}"
+    data-delete-url="{% url 'starlink_delete' starlink_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="starlinks" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Starlinks</h2>
+                <p class="contratos-topbar__subtitle">Antenas e contas Starlink da empresa</p>
+                <p class="topbar-subtitle">Local, conta, credenciais e dados do kit. Pesquise ou filtre por status.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createStarButton" title="Cadastrar nova Starlink">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Nova Starlink</span>
+            </button>
+        </header>
+
+        <section class="star-stats">
+            <article class="star-stat star-stat--blue">
+                <span class="star-stat__label">Total</span>
+                <strong class="star-stat__value">{{ total_starlinks }}</strong>
+            </article>
+            <article class="star-stat star-stat--green">
+                <span class="star-stat__label">Ativas</span>
+                <strong class="star-stat__value">{{ ativas }}</strong>
+            </article>
+            <article class="star-stat star-stat--slate">
+                <span class="star-stat__label">Inativas</span>
+                <strong class="star-stat__value">{{ inativas }}</strong>
+            </article>
+        </section>
+
+        <section class="star-panel">
+            <div class="star-search">
+                <span class="star-search__icon" aria-hidden="true">&#128269;</span>
+                <input type="search" id="starSearch" class="star-search__input" placeholder="Pesquisar por nome, local, e-mail, serial ou kit..." autocomplete="off">
+            </div>
+
+            <div class="star-chips" role="tablist" aria-label="Filtrar por status">
+                <button type="button" class="star-chip is-active" data-status="" role="tab" aria-selected="true">Todas <span class="star-chip__count">{{ total_starlinks }}</span></button>
+                <button type="button" class="star-chip" data-status="1" role="tab" aria-selected="false">Ativas <span class="star-chip__count">{{ ativas }}</span></button>
+                <button type="button" class="star-chip" data-status="0" role="tab" aria-selected="false">Inativas <span class="star-chip__count">{{ inativas }}</span></button>
+            </div>
+
+            <p class="star-search__status" id="starSearchStatus"></p>
+
+            {% if starlinks %}
+            <div class="star-grid" id="starGrid">
+                {% for s in starlinks %}
+                <article class="star-card"
+                    data-id="{{ s.id }}"
+                    data-nome="{{ s.nome }}"
+                    data-local="{{ s.local }}"
+                    data-email="{{ s.email }}"
+                    data-senha="{{ s.senha }}"
+                    data-ativo="{% if s.ativo %}1{% else %}0{% endif %}"
+                    data-forma="{{ s.forma_pagamento }}"
+                    data-cartao="{{ s.final_cartao }}"
+                    data-identificador="{{ s.identificador }}"
+                    data-versao="{{ s.versao_software }}"
+                    data-serie="{{ s.numero_serie }}"
+                    data-kit="{{ s.numero_kit }}"
+                    data-status="{% if s.ativo %}1{% else %}0{% endif %}"
+                    data-search="{{ s.nome|lower }} {{ s.local|lower }} {{ s.email|lower }} {{ s.numero_serie|lower }} {{ s.numero_kit|lower }} {{ s.identificador|lower }}">
+                    <header class="star-card__head">
+                        <div>
+                            <h3 class="star-card__title">{{ s.nome }}</h3>
+                            {% if s.local %}<p class="star-card__local">&#128205; {{ s.local }}</p>{% endif %}
+                        </div>
+                        <span class="star-badge {% if s.ativo %}star-badge--on{% else %}star-badge--off{% endif %}">{% if s.ativo %}Ativa{% else %}Inativa{% endif %}</span>
+                    </header>
+
+                    <dl class="star-fields">
+                        <div class="star-field">
+                            <dt>E-mail</dt>
+                            <dd class="star-field--copy">
+                                {% if s.email %}<a href="mailto:{{ s.email }}">{{ s.email }}</a>{% else %}-{% endif %}
+                            </dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Senha</dt>
+                            <dd class="star-pass">
+                                {% if s.senha %}
+                                <span class="star-pass__value" data-real="{{ s.senha }}">••••••••</span>
+                                <button type="button" class="star-mini js-toggle-pass" title="Mostrar/ocultar" aria-label="Mostrar/ocultar senha">&#128065;</button>
+                                <button type="button" class="star-mini js-copy-pass" title="Copiar" aria-label="Copiar senha">&#128203;</button>
+                                {% else %}-{% endif %}
+                            </dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Pagamento</dt>
+                            <dd>{{ s.get_forma_pagamento_display }}{% if s.final_cartao %} · final {{ s.final_cartao }}{% endif %}</dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Identificador</dt>
+                            <dd class="star-mono">{{ s.identificador|default:"-" }}</dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Nº de série</dt>
+                            <dd class="star-mono">{{ s.numero_serie|default:"-" }}</dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Nº do kit</dt>
+                            <dd class="star-mono">{{ s.numero_kit|default:"-" }}</dd>
+                        </div>
+                        <div class="star-field">
+                            <dt>Versão do software</dt>
+                            <dd class="star-mono">{{ s.versao_software|default:"-" }}</dd>
+                        </div>
+                    </dl>
+
+                    <div class="star-card__actions">
+                        <button type="button" class="star-edit js-edit-star">Editar</button>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            <p class="star-empty is-hidden" id="starNoResults">Nenhuma Starlink encontrada para o filtro atual.</p>
+            {% else %}
+            <div class="star-empty-state">
+                <p class="star-empty-state__title">Nenhuma Starlink cadastrada ainda.</p>
+                <p class="star-empty-state__hint">Clique em "Nova Starlink" para adicionar a primeira.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/starlink_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/starlinks.js' %}"></script>
+{% endblock %}

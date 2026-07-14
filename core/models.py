@@ -1346,3 +1346,45 @@ class Dica(models.Model):
 
     def __str__(self) -> str:
         return self.titulo
+
+
+class Starlink(models.Model):
+    """Antena/plano Starlink da empresa: local, conta, credenciais e dados do
+    kit (identificador, serial, versao). Migrado do modulo Starlinks antigo."""
+
+    class FormaPagamento(models.TextChoices):
+        PIX = "pix", "Pix"
+        CARTAO = "cartao", "Cartao"
+
+    nome = models.CharField(max_length=160)
+    local = models.CharField(max_length=180, blank=True, default="")
+    email = models.EmailField(max_length=254, blank=True, default="")
+    senha = models.CharField(max_length=255, blank=True, default="")
+    ativo = models.BooleanField(default=True)
+    forma_pagamento = models.CharField(
+        max_length=12,
+        choices=FormaPagamento.choices,
+        default=FormaPagamento.CARTAO,
+    )
+    final_cartao = models.CharField(max_length=4, blank=True, default="")
+    identificador = models.CharField(max_length=80, blank=True, default="")
+    versao_software = models.CharField(max_length=80, blank=True, default="")
+    numero_serie = models.CharField(max_length=120, blank=True, default="")
+    numero_kit = models.CharField(max_length=120, blank=True, default="")
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="starlinks_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        verbose_name = "Starlink"
+        verbose_name_plural = "Starlinks"
+
+    def __str__(self) -> str:
+        return self.nome

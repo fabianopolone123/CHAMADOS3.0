@@ -24,6 +24,7 @@ from .models import (
     RetiradaInsumoTI,
     ServicoFeito,
     ServicoFeitoAnexo,
+    Starlink,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -244,3 +245,10 @@ class DicaAdmin(admin.ModelAdmin):
     list_display = ("titulo", "categoria", "criado_por", "atualizado_em")
     list_filter = ("categoria",)
     search_fields = ("titulo", "conteudo")
+
+
+@admin.register(Starlink)
+class StarlinkAdmin(admin.ModelAdmin):
+    list_display = ("nome", "local", "email", "ativo", "forma_pagamento", "numero_serie", "atualizado_em")
+    list_filter = ("ativo", "forma_pagamento")
+    search_fields = ("nome", "local", "email", "numero_serie", "numero_kit", "identificador")

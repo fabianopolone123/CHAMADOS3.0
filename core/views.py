@@ -54,6 +54,7 @@ from .models import (
     RetiradaInsumoTI,
     ServicoFeito,
     ServicoFeitoAnexo,
+    Starlink,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
@@ -3740,3 +3741,118 @@ def dica_anexo_view(request, dica_id: int):
         return FileResponse(dica.anexo.open("rb"), filename=dica.anexo.name.split("/")[-1])
     except FileNotFoundError:
         raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+# ==========================================================================
+# Modulo Starlinks (antenas/planos Starlink) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def starlinks_dashboard_view(request):
+    """Lista as Starlinks em cards, com cartoes de resumo, busca e filtro."""
+    starlinks = list(Starlink.objects.select_related("criado_por").all())
+    ativas = sum(1 for s in starlinks if s.ativo)
+    context = {
+        "page_title": "Starlinks",
+        "starlinks": starlinks,
+        "total_starlinks": len(starlinks),
+        "ativas": ativas,
+        "inativas": len(starlinks) - ativas,
+        "formas_pagamento": Starlink.FormaPagamento.choices,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/starlinks.html", context)
+
+
+def _ler_dados_starlink(request):
+    """Le e valida os campos do formulario de Starlink (create/update)."""
+    nome = (request.POST.get("nome") or "").strip()
+    if len(nome) < 2:
+        return None, "Informe o nome da Starlink (minimo 2 caracteres)."
+
+    forma = (request.POST.get("forma_pagamento") or "").strip()
+    if forma not in dict(Starlink.FormaPagamento.choices):
+        forma = Starlink.FormaPagamento.CARTAO
+
+    dados = {
+        "nome": nome,
+        "local": (request.POST.get("local") or "").strip(),
+        "email": (request.POST.get("email") or "").strip(),
+        "senha": (request.POST.get("senha") or "").strip(),
+        "ativo": request.POST.get("ativo") == "1",
+        "forma_pagamento": forma,
+        "final_cartao": (request.POST.get("final_cartao") or "").strip()[:4],
+        "identificador": (request.POST.get("identificador") or "").strip(),
+        "versao_software": (request.POST.get("versao_software") or "").strip(),
+        "numero_serie": (request.POST.get("numero_serie") or "").strip(),
+        "numero_kit": (request.POST.get("numero_kit") or "").strip(),
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def starlink_create_view(request):
+    """Cadastra uma nova Starlink (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar Starlinks.")
+        return redirect("starlinks_dashboard")
+
+    dados, erro = _ler_dados_starlink(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("starlinks_dashboard")
+
+    starlink = Starlink.objects.create(criado_por=request.user, **dados)
+    messages.success(request, f'Starlink "{starlink.nome}" cadastrada com sucesso.')
+    return redirect("starlinks_dashboard")
+
+
+@login_required
+@require_POST
+def starlink_update_view(request, starlink_id: int):
+    """Edita uma Starlink existente (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar Starlinks.")
+        return redirect("starlinks_dashboard")
+
+    starlink = Starlink.objects.filter(pk=starlink_id).first()
+    if not starlink:
+        messages.error(request, "Starlink nao encontrada.")
+        return redirect("starlinks_dashboard")
+
+    dados, erro = _ler_dados_starlink(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("starlinks_dashboard")
+
+    # Mantem a senha atual se o campo vier vazio na edicao.
+    if not dados["senha"]:
+        dados["senha"] = starlink.senha
+
+    for campo, valor in dados.items():
+        setattr(starlink, campo, valor)
+    starlink.save()
+    messages.success(request, f'Starlink "{starlink.nome}" atualizada com sucesso.')
+    return redirect("starlinks_dashboard")
+
+
+@login_required
+@require_POST
+def starlink_delete_view(request, starlink_id: int):
+    """Exclui uma Starlink (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir Starlinks.")
+        return redirect("starlinks_dashboard")
+
+    starlink = Starlink.objects.filter(pk=starlink_id).first()
+    if not starlink:
+        messages.error(request, "Starlink nao encontrada.")
+        return redirect("starlinks_dashboard")
+
+    nome = starlink.nome
+    starlink.delete()
+    messages.success(request, f'Starlink "{nome}" excluida com sucesso.')
+    return redirect("starlinks_dashboard")
