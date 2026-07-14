@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/dicas.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app dicas-app"
+    data-update-url="{% url 'dica_update' dica_id=0 %}"
+    data-delete-url="{% url 'dica_delete' dica_id=0 %}"
+    data-anexo-url="{% url 'dica_anexo' dica_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="dicas" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Dicas</h2>
+                <p class="contratos-topbar__subtitle">Base de conhecimento da equipe de TI</p>
+                <p class="topbar-subtitle">Resolucoes, configuracoes e procedimentos. Pesquise ou filtre por categoria.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createDicaButton" title="Cadastrar nova dica">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Nova dica</span>
+            </button>
+        </header>
+
+        <section class="dicas-panel">
+            <div class="dicas-search">
+                <span class="dicas-search__icon" aria-hidden="true">&#128269;</span>
+                <input type="search" id="dicaSearch" class="dicas-search__input" placeholder="Pesquisar por titulo ou conteudo..." autocomplete="off">
+            </div>
+
+            <div class="dicas-chips" id="dicaChips" role="tablist" aria-label="Filtrar por categoria">
+                <button type="button" class="dicas-chip is-active" data-category="" role="tab" aria-selected="true">
+                    Todas <span class="dicas-chip__count">{{ total_dicas }}</span>
+                </button>
+                {% for c in categorias %}
+                <button type="button" class="dicas-chip dicas-chip--{{ c.value }}" data-category="{{ c.value }}" role="tab" aria-selected="false">
+                    {{ c.label }} <span class="dicas-chip__count">{{ c.count }}</span>
+                </button>
+                {% endfor %}
+            </div>
+
+            <p class="dicas-search__status" id="dicaSearchStatus"></p>
+
+            {% if dicas %}
+            <div class="dicas-grid" id="dicasGrid">
+                {% for d in dicas %}
+                <article class="dica-card"
+                    data-id="{{ d.id }}"
+                    data-categoria="{{ d.categoria }}"
+                    data-categoria-label="{{ d.get_categoria_display }}"
+                    data-titulo="{{ d.titulo }}"
+                    data-tem-anexo="{% if d.anexo %}1{% else %}0{% endif %}"
+                    data-search="{{ d.titulo|lower }} {{ d.conteudo|lower }} {{ d.get_categoria_display|lower }}"
+                    tabindex="0" role="button" aria-label="Abrir dica {{ d.titulo }}">
+                    <div class="dica-card__head">
+                        <span class="dica-badge dica-badge--{{ d.categoria }}">{{ d.get_categoria_display }}</span>
+                        {% if d.anexo %}<span class="dica-card__clip" title="Possui anexo" aria-label="Possui anexo">&#128206;</span>{% endif %}
+                    </div>
+                    <h3 class="dica-card__title">{{ d.titulo }}</h3>
+                    <p class="dica-card__preview">{{ d.conteudo|truncatechars:140 }}</p>
+                    <span class="dica-card__more">Ver dica &rarr;</span>
+                    <div class="dica-content-full" hidden>{{ d.conteudo }}</div>
+                    <button type="button" class="dica-card__edit js-edit-dica" title="Editar" aria-label="Editar">&#9998;</button>
+                </article>
+                {% endfor %}
+            </div>
+            <p class="dicas-empty is-hidden" id="dicasNoResults">Nenhuma dica encontrada para o filtro atual.</p>
+            {% else %}
+            <div class="dicas-empty-state">
+                <p class="dicas-empty-state__title">Nenhuma dica cadastrada ainda.</p>
+                <p class="dicas-empty-state__hint">Clique em "Nova dica" para registrar a primeira.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/dica_modal.html" %}
+{% include "partials/dica_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/dicas.js' %}"></script>
+{% endblock %}

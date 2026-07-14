@@ -86,6 +86,11 @@
 | `/futura-digital/<id>/editar/` | POST | Edita uma fatura e recalcula excedentes/valor (apenas TI/admin) | Implementada |
 | `/futura-digital/<id>/excluir/` | POST | Exclui uma fatura (apenas TI/admin) | Implementada |
 | `/futura-digital/<id>/documento/` | GET | Download protegido do documento da fatura (apenas TI/admin) | Implementada |
+| `/dicas/` | GET | Modulo Dicas: base de conhecimento em cards com filtro por categoria e busca (apenas TI/admin) | Implementada |
+| `/dicas/criar/` | POST | Cadastra uma dica (categoria, titulo, conteudo) com anexo opcional (apenas TI/admin) | Implementada |
+| `/dicas/<id>/editar/` | POST | Edita uma dica; pode substituir ou remover o anexo (apenas TI/admin) | Implementada |
+| `/dicas/<id>/excluir/` | POST | Exclui uma dica (e seu anexo do disco) (apenas TI/admin) | Implementada |
+| `/dicas/<id>/anexo/` | GET | Abre/baixa o anexo da dica por rota protegida (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -235,6 +240,13 @@
 - A tela tem cartoes de resumo (meses registrados, total pago, media por mes, total de copias), um grafico de barras mes a mes com alternancia entre "Valor pago", "Copias" e "Excedentes" (renderizado no cliente a partir de uma serie JSON via `json_script`, sem biblioteca externa) e uma tabela responsiva (cards no celular) com mes, copias, cor, excedentes, valor pago e link do documento. Busca client-side (mes/nota) e ordenacao por cabecalho (numeros e mes por valor real).
 - O cadastro/edicao acontece em um modal com calculo AO VIVO: ao digitar copias/cor/franquia/taxas, o formulario mostra os excedentes e o valor a pagar. O backend recalcula e grava `copias_excedentes` e `valor_pago` (nao confia no cliente). O mes aceita `AAAA-MM` (input `month`) e e normalizado para o 1o dia. As taxas e a franquia tem defaults (0,07 / 0,75 / 23000 / 1.610,00) editaveis por fatura.
 - Excluir uma fatura remove tambem o documento do disco. O download do documento e restrito a TI/admin (`404` para comum), sem expor a URL direta de `MEDIA`.
+
+## Regras do modulo Dicas
+
+- `/dicas/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Dicas" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend.
+- A tela mostra as dicas em uma grade de cards (categoria com badge colorido, titulo, previa do conteudo e indicador de anexo). Chips de categoria (Todas, Geral, Configuracao, Resolucao) com contagem filtram a grade, combinando com a busca client-side (titulo/conteudo/categoria). Clicar no card abre um modal de detalhe com o conteudo completo (quebras de linha preservadas, URLs viram links clicaveis) e o anexo; o icone de lapis abre a edicao.
+- As rotas de escrita usam `POST` (com CSRF); cadastro/edicao aceitam um anexo (`multipart/form-data`) e seguem o padrao classico (valida, grava, Django messages, redireciona). Na edicao e possivel substituir o anexo (novo upload) ou marcar para remover o atual.
+- Excluir uma dica apaga tambem o anexo do disco. A abertura/download do anexo e restrita a TI/admin (`404` para comum), servida por rota protegida (imagens abrem inline), sem expor a URL direta de `MEDIA`.
 
 ## Regras das rotas de historico
 

@@ -5,6 +5,7 @@ from .models import (
     ContaEmail,
     Contrato,
     ContratoAnexo,
+    Dica,
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
@@ -236,3 +237,10 @@ class FuturaDigitalAdmin(admin.ModelAdmin):
     list_filter = ("mes_referencia",)
     search_fields = ("nota_fiscal",)
     date_hierarchy = "mes_referencia"
+
+
+@admin.register(Dica)
+class DicaAdmin(admin.ModelAdmin):
+    list_display = ("titulo", "categoria", "criado_por", "atualizado_em")
+    list_filter = ("categoria",)
+    search_fields = ("titulo", "conteudo")

@@ -18,6 +18,7 @@ from .models import (
     ContaEmail,
     Contrato,
     ContratoAnexo,
+    Dica,
     EnderecoIP,
     FuturaDigital,
     Licenca,
@@ -1071,3 +1072,89 @@ class FuturaDigitalTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "fdSerie")
         self.assertContains(resp, "fd-chart")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DicaTests(TestCase):
+    """Modulo Dicas: CRUD, categorias, anexo e permissoes.
+
+    Obs.: o banco de teste ja vem com as dicas do seed (migration 0025).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _img(self, nome="print.png"):
+        return SimpleUploadedFile(nome, b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+
+    def test_ti_creates_dica(self):
+        self.client.force_login(self.ti)
+        antes = Dica.objects.count()
+        resp = self.client.post(
+            reverse("dica_create"),
+            {"categoria": "resolucao", "titulo": "Reset do servidor X", "conteudo": "Passo 1\nPasso 2", "anexo": self._img()},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Dica.objects.count(), antes + 1)
+        d = Dica.objects.get(titulo="Reset do servidor X")
+        self.assertEqual(d.categoria, "resolucao")
+        self.assertTrue(d.anexo)
+        self.assertEqual(d.criado_por, self.ti)
+
+    def test_create_requires_title(self):
+        self.client.force_login(self.ti)
+        antes = Dica.objects.count()
+        self.client.post(reverse("dica_create"), {"categoria": "geral", "titulo": ""})
+        self.assertEqual(Dica.objects.count(), antes)
+
+    def test_invalid_category_falls_back_to_geral(self):
+        self.client.force_login(self.ti)
+        self.client.post(reverse("dica_create"), {"categoria": "xpto", "titulo": "Dica Z"})
+        self.assertEqual(Dica.objects.get(titulo="Dica Z").categoria, "geral")
+
+    def test_update_and_remove_attachment(self):
+        self.client.force_login(self.ti)
+        d = Dica.objects.create(categoria="geral", titulo="Antes", conteudo="x", anexo=self._img())
+        self.assertTrue(d.anexo)
+        self.client.post(
+            reverse("dica_update", args=[d.id]),
+            {"categoria": "configuracao", "titulo": "Depois", "conteudo": "y", "remover_anexo": "1"},
+        )
+        d.refresh_from_db()
+        self.assertEqual(d.titulo, "Depois")
+        self.assertEqual(d.categoria, "configuracao")
+        self.assertFalse(d.anexo)
+
+    def test_delete(self):
+        self.client.force_login(self.ti)
+        d = Dica.objects.create(categoria="geral", titulo="Apagar")
+        resp = self.client.post(reverse("dica_delete", args=[d.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Dica.objects.filter(id=d.id).exists())
+
+    def test_anexo_download_protected(self):
+        d = Dica.objects.create(categoria="geral", titulo="Com anexo", anexo=self._img())
+        self.client.force_login(self.ti)
+        self.assertEqual(self.client.get(reverse("dica_anexo", args=[d.id])).status_code, 200)
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("dica_anexo", args=[d.id])).status_code, 404)
+
+    def test_common_user_blocked(self):
+        d = Dica.objects.create(categoria="geral", titulo="Protegida")
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("dicas_dashboard")).status_code, 302)
+        antes = Dica.objects.count()
+        self.client.post(reverse("dica_create"), {"categoria": "geral", "titulo": "Hack"})
+        self.assertEqual(Dica.objects.count(), antes)
+        self.client.post(reverse("dica_delete", args=[d.id]))
+        self.assertTrue(Dica.objects.filter(id=d.id).exists())
+
+    def test_dashboard_renders_seeded(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("dicas_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "dica-card")

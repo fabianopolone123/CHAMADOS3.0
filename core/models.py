@@ -1310,3 +1310,39 @@ class FuturaDigital(models.Model):
     @property
     def franquia_valor_display(self) -> str:
         return self._brl(self.franquia_valor)
+
+
+class Dica(models.Model):
+    """Dica / base de conhecimento da TI: resolucoes, configuracoes e
+    procedimentos gerais, com conteudo livre e anexo opcional."""
+
+    class Categoria(models.TextChoices):
+        GERAL = "geral", "Geral"
+        CONFIGURACAO = "configuracao", "Configuracao"
+        RESOLUCAO = "resolucao", "Resolucao"
+
+    categoria = models.CharField(
+        max_length=20,
+        choices=Categoria.choices,
+        default=Categoria.GERAL,
+    )
+    titulo = models.CharField(max_length=200)
+    conteudo = models.TextField(blank=True, default="")
+    anexo = models.FileField(upload_to="dicas/", null=True, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dicas_criadas",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["categoria", "titulo", "id"]
+        verbose_name = "Dica"
+        verbose_name_plural = "Dicas"
+
+    def __str__(self) -> str:
+        return self.titulo

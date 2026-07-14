@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e um modelos persistidos:
+O projeto possui trinta e dois modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -67,6 +67,10 @@ Modulo Contratos:
 Modulo Futura Digital:
 
 - `FuturaDigital`
+
+Modulo Dicas:
+
+- `Dica`
 
 ## Modelos implementados
 
@@ -547,6 +551,20 @@ Regra de cobranca (aplicada no cadastro/edicao):
 - `valor_pago = franquia_valor + copias_excedentes * valor_copia_excedente + copias_cor * valor_copia_cor`.
 - As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
 - So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb`, `*_display`.
+
+### Dica
+
+Item da base de conhecimento da TI (modulo Dicas), migrado do banco antigo. Seed inicial via migration de dados `0025`, que le `seed/dicas_seed.json` (local, ignorado pelo Git); os anexos ficam em `media/dicas/` (tambem fora do Git).
+
+- `categoria` (choices: `geral` Geral, `configuracao` Configuracao, `resolucao` Resolucao; default `geral`)
+- `titulo`, `conteudo` (texto livre; quebras de linha preservadas na exibicao)
+- `anexo` (`FileField`, salvo em `MEDIA_ROOT/dicas/`, opcional)
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `dicas_criadas`), `criado_em`, `atualizado_em`. Migration `0024`.
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem dicas (validado no backend; usuario comum e redirecionado; download do anexo retorna `404`).
+- O anexo pode ser substituido ou removido na edicao; excluir a dica apaga o arquivo do disco. O download/abertura do anexo usa rota protegida (imagens abrem inline).
 
 ## Modelos previstos para proximas fases
 

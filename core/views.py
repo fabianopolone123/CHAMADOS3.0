@@ -34,6 +34,7 @@ from .models import (
     ChamadoMensagemAnexo,
     Contrato,
     ContratoAnexo,
+    Dica,
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
@@ -3606,5 +3607,136 @@ def futura_digital_documento_view(request, fatura_id: int):
             as_attachment=True,
             filename=fatura.documento.name.split("/")[-1],
         )
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+# ==========================================================================
+# Modulo Dicas (base de conhecimento da TI) - apenas TI/admin.
+# ==========================================================================
+
+
+@ti_required
+def dicas_dashboard_view(request):
+    """Lista as dicas em cards, com filtro por categoria e busca."""
+    dicas = list(Dica.objects.select_related("criado_por").all())
+    contagem = {}
+    for d in dicas:
+        contagem[d.categoria] = contagem.get(d.categoria, 0) + 1
+    categorias = [
+        {"value": v, "label": l, "count": contagem.get(v, 0)}
+        for v, l in Dica.Categoria.choices
+    ]
+    context = {
+        "page_title": "Dicas",
+        "dicas": dicas,
+        "total_dicas": len(dicas),
+        "categorias": categorias,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/dicas.html", context)
+
+
+def _ler_dados_dica(request):
+    """Le e valida os campos do formulario de dica (create/update)."""
+    titulo = (request.POST.get("titulo") or "").strip()
+    if len(titulo) < 2:
+        return None, "Informe o titulo da dica (minimo 2 caracteres)."
+
+    categoria = (request.POST.get("categoria") or "").strip()
+    if categoria not in dict(Dica.Categoria.choices):
+        categoria = Dica.Categoria.GERAL
+
+    dados = {
+        "categoria": categoria,
+        "titulo": titulo,
+        "conteudo": (request.POST.get("conteudo") or "").strip(),
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def dica_create_view(request):
+    """Cadastra uma nova dica, com anexo opcional (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar dicas.")
+        return redirect("dicas_dashboard")
+
+    dados, erro = _ler_dados_dica(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("dicas_dashboard")
+
+    dica = Dica(criado_por=request.user, **dados)
+    if request.FILES.get("anexo"):
+        dica.anexo = request.FILES["anexo"]
+    dica.save()
+    messages.success(request, f'Dica "{dica.titulo}" cadastrada com sucesso.')
+    return redirect("dicas_dashboard")
+
+
+@login_required
+@require_POST
+def dica_update_view(request, dica_id: int):
+    """Edita uma dica (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar dicas.")
+        return redirect("dicas_dashboard")
+
+    dica = Dica.objects.filter(pk=dica_id).first()
+    if not dica:
+        messages.error(request, "Dica nao encontrada.")
+        return redirect("dicas_dashboard")
+
+    dados, erro = _ler_dados_dica(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("dicas_dashboard")
+
+    for campo, valor in dados.items():
+        setattr(dica, campo, valor)
+    if request.FILES.get("anexo"):
+        dica.anexo = request.FILES["anexo"]
+    elif request.POST.get("remover_anexo") == "1" and dica.anexo:
+        dica.anexo.delete(save=False)
+        dica.anexo = None
+    dica.save()
+    messages.success(request, f'Dica "{dica.titulo}" atualizada com sucesso.')
+    return redirect("dicas_dashboard")
+
+
+@login_required
+@require_POST
+def dica_delete_view(request, dica_id: int):
+    """Exclui uma dica (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir dicas.")
+        return redirect("dicas_dashboard")
+
+    dica = Dica.objects.filter(pk=dica_id).first()
+    if not dica:
+        messages.error(request, "Dica nao encontrada.")
+        return redirect("dicas_dashboard")
+
+    titulo = dica.titulo
+    if dica.anexo:
+        dica.anexo.delete(save=False)
+    dica.delete()
+    messages.success(request, f'Dica "{titulo}" excluida com sucesso.')
+    return redirect("dicas_dashboard")
+
+
+@login_required
+def dica_anexo_view(request, dica_id: int):
+    """Abre/baixa o anexo de uma dica por rota protegida (TI/admin)."""
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    dica = get_object_or_404(Dica, pk=dica_id)
+    if not dica.anexo:
+        raise Http404("Sem anexo.")
+    try:
+        return FileResponse(dica.anexo.open("rb"), filename=dica.anexo.name.split("/")[-1])
     except FileNotFoundError:
         raise Http404("Arquivo nao encontrado no armazenamento.")

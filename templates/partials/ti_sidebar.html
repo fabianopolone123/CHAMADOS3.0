@@ -1,7 +1,7 @@
 {% comment %}
 Menu lateral padrao da area de TI (Atendente TI / Admin).
 Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
-Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "servicos_feitos", "contratos_ti", "futura_digital", "permissoes".
+Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "servicos_feitos", "contratos_ti", "futura_digital", "dicas", "permissoes".
 {% endcomment %}
 <aside class="tickets-sidebar">
     <div class="sidebar-brand sidebar-brand--compact">
@@ -108,6 +108,14 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimo
                 <rect x="6" y="14" width="12" height="8" rx="1"></rect>
             </svg>
             <span>Futura Digital</span>
+        </a>
+        <a href="{% url 'dicas_dashboard' %}" class="menu-link{% if active == 'dicas' %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 18h6"></path>
+                <path d="M10 22h4"></path>
+                <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1v.2h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"></path>
+            </svg>
+            <span>Dicas</span>
         </a>
         <a href="{% url 'permissions' %}" class="menu-link{% if active == 'permissoes' %} active{% endif %}">
             <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -28,6 +28,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Modulo Servicos feitos (apenas TI/admin): registro de servicos de TI executados (empresa, data, valor e anexos de NF/orcamento), com cartoes de resumo, busca, ordenacao, modal de detalhe com download e CRUD
 - Modulo Contratos (apenas TI/admin): contratos/assinaturas recorrentes de TI (valor, forma de pagamento, periodicidade, vigencia, status e anexos), com cartoes de resumo, busca, ordenacao, modal de detalhe com download e CRUD (distinto do modulo Requisicoes)
 - Modulo Futura Digital (apenas TI/admin): faturas mensais de impressao (locacao) com franquia, excedentes e copias coloridas, regra de cobranca com calculo automatico, grafico de consumo mes a mes e CRUD
+- Modulo Dicas (apenas TI/admin): base de conhecimento (resolucoes, configuracoes, procedimentos) em cards com filtro por categoria, busca, detalhe com conteudo formatado + anexo e CRUD
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional
 - Documentacao tecnica e funcional do projeto

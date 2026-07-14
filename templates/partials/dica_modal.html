@@ -1,0 +1,61 @@
+{% load static %}
+<div class="modal fade" id="dicaModal" tabindex="-1" aria-labelledby="dicaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Dicas</span>
+                    <h5 class="modal-title" id="dicaModalLabel">Nova dica</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'dica_create' %}" enctype="multipart/form-data" class="create-ticket-form" id="dicaForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <label class="contrato-field">
+                        <span>Categoria</span>
+                        <select class="form-select" name="categoria" id="dicaCategoria">
+                            {% for c in categorias %}
+                            <option value="{{ c.value }}">{{ c.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Titulo</span>
+                        <input type="text" class="form-control" name="titulo" id="dicaTitulo" maxlength="200" placeholder="Ex.: Power Fab nao conecta" required>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Conteudo</span>
+                        <textarea class="form-control dica-textarea" name="conteudo" id="dicaConteudo" rows="8" placeholder="Passo a passo, comandos, links..."></textarea>
+                        <small class="contrato-field__help">As quebras de linha sao preservadas. Links viram clicaveis na visualizacao.</small>
+                    </label>
+                    <label class="contrato-field">
+                        <span>Anexo (opcional)</span>
+                        <input type="file" class="form-control" name="anexo" id="dicaAnexo">
+                        <small class="contrato-field__help" id="dicaAnexoAtual"></small>
+                    </label>
+                    <label class="dica-remove-anexo is-hidden" id="dicaRemoveAnexoWrap">
+                        <input type="checkbox" name="remover_anexo" value="1" id="dicaRemoveAnexo"> Remover o anexo atual
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="dicaDeleteBtn">Excluir dica</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="dicaSubmit">Cadastrar dica</button>
+                </div>
+            </form>
+
+            <div class="dica-delete-confirm is-hidden" id="dicaDeleteConfirm">
+                <p class="dica-delete-confirm__text">
+                    Tem certeza que deseja excluir esta dica? Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="dicaDeleteForm" class="dica-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="dicaDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

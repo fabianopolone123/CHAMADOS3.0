@@ -1,0 +1,24 @@
+{% load static %}
+<div class="modal fade" id="dicaDetailModal" tabindex="-1" aria-labelledby="dicaDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="dica-badge" id="dicaDetailBadge">Dica</span>
+                    <h5 class="modal-title" id="dicaDetailLabel">Detalhe da dica</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="dica-detail__content" id="dicaDetailContent"></div>
+                <div class="dica-detail__anexo is-hidden" id="dicaDetailAnexoWrap">
+                    <a href="#" target="_blank" rel="noopener" id="dicaDetailAnexo" class="dica-detail__anexo-link">&#128206; Abrir anexo</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="dicaDetailEditBtn">Editar</button>
+            </div>
+        </div>
+    </div>
+</div>
