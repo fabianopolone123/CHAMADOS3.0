@@ -16,6 +16,8 @@ from .models import (
     ChamadoMensagem,
     ChamadoMensagemAnexo,
     ContaEmail,
+    Contrato,
+    ContratoAnexo,
     EnderecoIP,
     Licenca,
     LicencaSoftware,
@@ -858,3 +860,113 @@ class ServicoFeitoTests(TestCase):
         self.assertEqual(ServicoFeito.objects.count(), antes)
         self.client.post(reverse("servico_feito_delete", args=[s.id]))
         self.assertTrue(ServicoFeito.objects.filter(id=s.id).exists())
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ContratoTests(TestCase):
+    """Modulo Contratos: CRUD, anexos, valor BR, periodicidade e permissoes.
+
+    Obs.: o banco de teste ja vem com os contratos do seed (migration 0021).
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _arquivo(self, nome="contrato.pdf"):
+        return SimpleUploadedFile(nome, b"%PDF-1.4 x", content_type="application/pdf")
+
+    def test_ti_creates_contract_with_attachments(self):
+        self.client.force_login(self.ti)
+        antes = Contrato.objects.count()
+        resp = self.client.post(
+            reverse("contrato_ti_create"),
+            {
+                "nome": "Contrato Teste Unico",
+                "valor": "4.798,03",
+                "periodicidade": "mensal",
+                "forma_pagamento": "Boleto",
+                "inicio": "2026-02-28",
+                "fim": "2029-02-28",
+                "anexos": [self._arquivo("nf.pdf")],
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Contrato.objects.count(), antes + 1)
+        ctr = Contrato.objects.get(nome="Contrato Teste Unico")
+        self.assertEqual(str(ctr.valor), "4798.03")
+        self.assertEqual(ctr.periodicidade, "mensal")
+        self.assertEqual(ctr.anexos.count(), 1)
+        self.assertTrue(ctr.esta_ativo)
+        self.assertEqual(ctr.criado_por, self.ti)
+
+    def test_create_requires_name(self):
+        self.client.force_login(self.ti)
+        antes = Contrato.objects.count()
+        self.client.post(reverse("contrato_ti_create"), {"nome": "", "valor": "10"})
+        self.assertEqual(Contrato.objects.count(), antes)
+
+    def test_valor_display_and_optional_value(self):
+        c1 = Contrato.objects.create(nome="Com valor", valor="1716.20", criado_por=self.ti)
+        self.assertEqual(c1.valor_display, "1.716,20")
+        c2 = Contrato.objects.create(nome="Sem valor", criado_por=self.ti)
+        self.assertEqual(c2.valor_display, "-")
+
+    def test_encerrado_marks_inactive(self):
+        self.client.force_login(self.ti)
+        c = Contrato.objects.create(nome="Ativo", valor="1", criado_por=self.ti)
+        self.assertTrue(c.esta_ativo)
+        self.client.post(
+            reverse("contrato_ti_update", args=[c.id]),
+            {"nome": "Ativo", "valor": "1", "periodicidade": "mensal", "encerrado_em": "2026-05-26"},
+        )
+        c.refresh_from_db()
+        self.assertFalse(c.esta_ativo)
+
+    def test_delete_cascades_attachments(self):
+        self.client.force_login(self.ti)
+        c = Contrato.objects.create(nome="Apagar", valor="1", criado_por=self.ti)
+        a = ContratoAnexo.objects.create(contrato=c, arquivo=self._arquivo(), nome_original="x.pdf")
+        resp = self.client.post(reverse("contrato_ti_delete", args=[c.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Contrato.objects.filter(id=c.id).exists())
+        self.assertFalse(ContratoAnexo.objects.filter(id=a.id).exists())
+
+    def test_delete_single_attachment(self):
+        self.client.force_login(self.ti)
+        c = Contrato.objects.create(nome="Com anexo", valor="1", criado_por=self.ti)
+        a = ContratoAnexo.objects.create(contrato=c, arquivo=self._arquivo(), nome_original="x.pdf")
+        resp = self.client.post(reverse("contrato_ti_anexo_delete", args=[a.id]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(ContratoAnexo.objects.filter(id=a.id).exists())
+        self.assertTrue(Contrato.objects.filter(id=c.id).exists())
+
+    def test_detail_json_and_download(self):
+        self.client.force_login(self.ti)
+        c = Contrato.objects.create(nome="Detalhe", valor="50", periodicidade="anual", criado_por=self.ti)
+        a = ContratoAnexo.objects.create(contrato=c, arquivo=self._arquivo(), nome_original="doc.pdf")
+        resp = self.client.get(reverse("contrato_ti_detail", args=[c.id]))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["valor_display"], "50,00")
+        self.assertEqual(data["periodicidade"], "Anual")
+        self.assertEqual(len(data["anexos"]), 1)
+        dl = self.client.get(reverse("contrato_ti_anexo_download", args=[a.id]))
+        self.assertEqual(dl.status_code, 200)
+
+    def test_common_user_blocked(self):
+        c = Contrato.objects.create(nome="Protegido", valor="1", criado_por=self.ti)
+        a = ContratoAnexo.objects.create(contrato=c, arquivo=self._arquivo(), nome_original="x.pdf")
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("contratos_ti_dashboard")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("contrato_ti_detail", args=[c.id])).status_code, 403)
+        self.assertEqual(self.client.get(reverse("contrato_ti_anexo_download", args=[a.id])).status_code, 404)
+        antes = Contrato.objects.count()
+        self.client.post(reverse("contrato_ti_create"), {"nome": "Hack", "valor": "1"})
+        self.assertEqual(Contrato.objects.count(), antes)
+        self.client.post(reverse("contrato_ti_delete", args=[c.id]))
+        self.assertTrue(Contrato.objects.filter(id=c.id).exists())

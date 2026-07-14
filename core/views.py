@@ -32,6 +32,8 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    Contrato,
+    ContratoAnexo,
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
@@ -3193,6 +3195,231 @@ def servico_feito_anexo_download_view(request, anexo_id: int):
     if not _is_ti(request.user):
         raise Http404("Nao encontrado.")
     anexo = get_object_or_404(ServicoFeitoAnexo, pk=anexo_id)
+    try:
+        return FileResponse(
+            anexo.arquivo.open("rb"),
+            as_attachment=True,
+            filename=anexo.nome_original or anexo.arquivo.name.split("/")[-1],
+        )
+    except FileNotFoundError:
+        raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+# ==========================================================================
+# Modulo Contratos (contratos de TI + anexos) - apenas TI/admin.
+# Nao confundir com Requisicoes (RequisicaoContrato).
+# ==========================================================================
+
+
+@ti_required
+def contratos_ti_dashboard_view(request):
+    """Lista os contratos, com cartoes de resumo e busca/ordenacao."""
+    contratos = list(
+        Contrato.objects.prefetch_related("anexos").select_related("criado_por").all()
+    )
+    ativos = sum(1 for c in contratos if c.esta_ativo)
+    total_mensal = sum(
+        (c.valor for c in contratos if c.esta_ativo and c.valor and c.periodicidade == Contrato.Periodicidade.MENSAL),
+        Decimal("0"),
+    )
+    inteiro, decimal = f"{total_mensal:.2f}".split(".")
+    total_mensal_display = f"{int(inteiro):,}".replace(",", ".") + f",{decimal}"
+
+    context = {
+        "page_title": "Contratos",
+        "contratos": contratos,
+        "total_contratos": len(contratos),
+        "contratos_ativos": ativos,
+        "total_mensal_display": total_mensal_display,
+        "periodicidades": Contrato.Periodicidade.choices,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/contratos_ti.html", context)
+
+
+def _ler_dados_contrato(request):
+    """Le e valida os campos do formulario de contrato (create/update)."""
+    nome = (request.POST.get("nome") or "").strip()
+    if len(nome) < 2:
+        return None, "Informe o nome do contrato (minimo 2 caracteres)."
+
+    valor_raw = (request.POST.get("valor") or "").strip()
+    valor = None
+    if valor_raw:
+        valor = _parse_valor_brl(valor_raw)
+        if valor < 0:
+            return None, "O valor nao pode ser negativo."
+
+    periodicidade = (request.POST.get("periodicidade") or "").strip()
+    if periodicidade not in dict(Contrato.Periodicidade.choices):
+        periodicidade = Contrato.Periodicidade.MENSAL
+
+    dados = {
+        "nome": nome,
+        "observacoes": (request.POST.get("observacoes") or "").strip(),
+        "valor": valor,
+        "forma_pagamento": (request.POST.get("forma_pagamento") or "").strip(),
+        "final_cartao": (request.POST.get("final_cartao") or "").strip()[:4],
+        "periodicidade": periodicidade,
+        "inicio": parse_date((request.POST.get("inicio") or "").strip()) or None,
+        "fim": parse_date((request.POST.get("fim") or "").strip()) or None,
+        "encerrado_em": parse_date((request.POST.get("encerrado_em") or "").strip()) or None,
+    }
+    return dados, None
+
+
+@login_required
+@require_POST
+def contrato_ti_create_view(request):
+    """Cadastra um novo contrato, com anexos opcionais (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para cadastrar contratos.")
+        return redirect("contratos_ti_dashboard")
+
+    dados, erro = _ler_dados_contrato(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("contratos_ti_dashboard")
+
+    anexos = request.FILES.getlist("anexos")
+    with transaction.atomic():
+        contrato = Contrato.objects.create(criado_por=request.user, **dados)
+        for arquivo in anexos:
+            ContratoAnexo.objects.create(
+                contrato=contrato, arquivo=arquivo, nome_original=arquivo.name
+            )
+
+    messages.success(request, f'Contrato "{contrato.nome}" cadastrado com sucesso.')
+    return redirect("contratos_ti_dashboard")
+
+
+@login_required
+@require_POST
+def contrato_ti_update_view(request, contrato_id: int):
+    """Edita um contrato; pode adicionar novos anexos (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar contratos.")
+        return redirect("contratos_ti_dashboard")
+
+    contrato = Contrato.objects.filter(pk=contrato_id).first()
+    if not contrato:
+        messages.error(request, "Contrato nao encontrado.")
+        return redirect("contratos_ti_dashboard")
+
+    dados, erro = _ler_dados_contrato(request)
+    if erro:
+        messages.error(request, erro)
+        return redirect("contratos_ti_dashboard")
+
+    anexos = request.FILES.getlist("anexos")
+    with transaction.atomic():
+        for campo, valor in dados.items():
+            setattr(contrato, campo, valor)
+        contrato.save()
+        for arquivo in anexos:
+            ContratoAnexo.objects.create(
+                contrato=contrato, arquivo=arquivo, nome_original=arquivo.name
+            )
+
+    messages.success(request, f'Contrato "{contrato.nome}" atualizado com sucesso.')
+    return redirect("contratos_ti_dashboard")
+
+
+@login_required
+@require_POST
+def contrato_ti_delete_view(request, contrato_id: int):
+    """Exclui um contrato e seus anexos (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir contratos.")
+        return redirect("contratos_ti_dashboard")
+
+    contrato = Contrato.objects.filter(pk=contrato_id).first()
+    if not contrato:
+        messages.error(request, "Contrato nao encontrado.")
+        return redirect("contratos_ti_dashboard")
+
+    nome = contrato.nome
+    with transaction.atomic():
+        for anexo in contrato.anexos.all():
+            anexo.arquivo.delete(save=False)
+        contrato.delete()
+
+    messages.success(request, f'Contrato "{nome}" excluido com sucesso.')
+    return redirect("contratos_ti_dashboard")
+
+
+@login_required
+@require_POST
+def contrato_ti_anexo_delete_view(request, anexo_id: int):
+    """Exclui um anexo isolado de um contrato (TI/admin)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir anexos.")
+        return redirect("contratos_ti_dashboard")
+
+    anexo = ContratoAnexo.objects.filter(pk=anexo_id).first()
+    if not anexo:
+        messages.error(request, "Anexo nao encontrado.")
+        return redirect("contratos_ti_dashboard")
+
+    anexo.arquivo.delete(save=False)
+    anexo.delete()
+    messages.success(request, "Anexo excluido com sucesso.")
+    return redirect("contratos_ti_dashboard")
+
+
+@login_required
+def contrato_ti_detail_view(request, contrato_id: int):
+    """Detalhe (JSON) de um contrato, usado pelo modal de visualizacao."""
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver contratos.", status=403)
+
+    contrato = (
+        Contrato.objects.select_related("criado_por")
+        .prefetch_related("anexos")
+        .filter(pk=contrato_id)
+        .first()
+    )
+    if not contrato:
+        return _json_error("Contrato nao encontrado.", status=404)
+
+    def _data(d):
+        return d.strftime("%d/%m/%Y") if d else "-"
+
+    anexos = [
+        {
+            "id": a.id,
+            "nome": a.nome_original or a.arquivo.name.split("/")[-1],
+            "url": reverse("contrato_ti_anexo_download", args=[a.id]),
+        }
+        for a in contrato.anexos.all()
+    ]
+    return JsonResponse(
+        {
+            "ok": True,
+            "id": contrato.id,
+            "nome": contrato.nome,
+            "observacoes": contrato.observacoes or "",
+            "valor_display": contrato.valor_display,
+            "forma_pagamento": contrato.forma_pagamento or "-",
+            "final_cartao": contrato.final_cartao or "",
+            "periodicidade": contrato.get_periodicidade_display(),
+            "inicio": _data(contrato.inicio),
+            "fim": _data(contrato.fim),
+            "encerrado_em": _data(contrato.encerrado_em),
+            "esta_ativo": contrato.esta_ativo,
+            "criado_por": _attendant_display(contrato.criado_por) or "-",
+            "anexos": anexos,
+        }
+    )
+
+
+@login_required
+def contrato_ti_anexo_download_view(request, anexo_id: int):
+    """Download protegido de um anexo de contrato (TI/admin)."""
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    anexo = get_object_or_404(ContratoAnexo, pk=anexo_id)
     try:
         return FileResponse(
             anexo.arquivo.open("rb"),

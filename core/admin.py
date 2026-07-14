@@ -3,6 +3,8 @@ from django.contrib import admin
 from .models import (
     AssinaturaResponsavelTI,
     ContaEmail,
+    Contrato,
+    ContratoAnexo,
     DocumentoTI,
     DocumentoTIAnexo,
     EnderecoIP,
@@ -210,3 +212,18 @@ class ServicoFeitoAdmin(admin.ModelAdmin):
     search_fields = ("nome_servico", "empresa", "descricao")
     date_hierarchy = "data_servico"
     inlines = [ServicoFeitoAnexoInline]
+
+
+class ContratoAnexoInline(admin.TabularInline):
+    model = ContratoAnexo
+    extra = 0
+    fields = ("arquivo", "nome_original", "enviado_em")
+    readonly_fields = ("enviado_em",)
+
+
+@admin.register(Contrato)
+class ContratoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "valor", "periodicidade", "forma_pagamento", "inicio", "fim", "encerrado_em", "anexos_total")
+    list_filter = ("periodicidade", "forma_pagamento")
+    search_fields = ("nome", "observacoes", "forma_pagamento")
+    inlines = [ContratoAnexoInline]

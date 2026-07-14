@@ -1,0 +1,60 @@
+{% load static %}
+<div class="modal fade" id="contratoDetailModal" tabindex="-1" aria-labelledby="contratoDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Contratos</span>
+                    <h5 class="modal-title" id="contratoDetailLabel">Detalhe do contrato</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <h4 class="ctr-detail__name" id="ctrDetailNome">-</h4>
+                <span class="ctr-badge" id="ctrDetailStatus"></span>
+
+                <div class="ctr-detail__meta">
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Valor</span>
+                        <strong class="ctr-detail__valor" id="ctrDetailValor">-</strong>
+                    </div>
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Periodicidade</span>
+                        <strong id="ctrDetailPeriodicidade">-</strong>
+                    </div>
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Pagamento</span>
+                        <strong id="ctrDetailPagamento">-</strong>
+                    </div>
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Inicio</span>
+                        <strong id="ctrDetailInicio">-</strong>
+                    </div>
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Fim</span>
+                        <strong id="ctrDetailFim">-</strong>
+                    </div>
+                    <div class="ctr-detail__meta-item">
+                        <span class="ctr-detail__label">Encerrado em</span>
+                        <strong id="ctrDetailEncerrado">-</strong>
+                    </div>
+                </div>
+
+                <div class="ctr-detail__block">
+                    <span class="ctr-detail__label">Observacoes</span>
+                    <p class="ctr-detail__desc" id="ctrDetailObs">-</p>
+                </div>
+
+                <div class="ctr-detail__block">
+                    <span class="ctr-detail__label">Anexos</span>
+                    <ul class="ctr-detail__files" id="ctrDetailAnexos"></ul>
+                    <p class="ctr-detail__empty is-hidden" id="ctrDetailAnexosEmpty">Nenhum anexo cadastrado.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" id="ctrDetailEditBtn">Editar</button>
+            </div>
+        </div>
+    </div>
+</div>

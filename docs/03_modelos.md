@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui vinte e oito modelos persistidos:
+O projeto possui trinta modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -58,6 +58,11 @@ Modulo Servicos feitos:
 
 - `ServicoFeito`
 - `ServicoFeitoAnexo`
+
+Modulo Contratos:
+
+- `Contrato`
+- `ContratoAnexo`
 
 ## Modelos implementados
 
@@ -494,6 +499,30 @@ Regras atuais:
 
 - So Atendente TI/Admin acessam, cadastram, editam e excluem servicos e anexos (validado no backend; usuario comum e redirecionado, e endpoints de detalhe/download retornam `403`/`404`).
 - O valor aceita formato brasileiro (1.234,56) ou com ponto decimal; e convertido para Decimal no backend. Excluir um servico remove seus anexos em cascata e apaga os arquivos fisicos; e possivel remover um anexo isolado. O download dos anexos usa rota protegida (nao expoe a URL direta de `MEDIA`).
+
+### Contrato
+
+Contrato/assinatura recorrente ou unico de TI (modulo Contratos), migrado do banco antigo. NAO confundir com o modulo Requisicoes (`RequisicaoContrato`), que trata de requisicoes de compra. Seed inicial via migration de dados `0021`, que le `seed/contratos_seed.json` (local, ignorado pelo Git); os anexos ficam em `media/contratos_ti/` (tambem fora do Git).
+
+- `nome`, `observacoes`
+- `valor` (Decimal, opcional; formato brasileiro na exibicao)
+- `forma_pagamento`, `final_cartao`
+- `periodicidade` (choices: `mensal`, `anual`, `pagamento_unico`; default `mensal`)
+- `inicio`, `fim` (vigencia), `encerrado_em` (quando preenchido, o contrato e considerado encerrado)
+- `criado_por` (FK `on_delete=SET_NULL`, related_name `contratos_criados`), `criado_em`, `atualizado_em`. Migration `0020`.
+- Propriedades `anexos_total`, `esta_ativo` (True se `encerrado_em` vazio) e `valor_display` (1.234,56 ou "-").
+
+### ContratoAnexo
+
+Arquivo anexado a um contrato (NF, termo, invoice, comprovante). Um contrato 1--N anexos.
+
+- `contrato` (FK `on_delete=CASCADE`, related_name `anexos`)
+- `arquivo` (`FileField`, salvo em `MEDIA_ROOT/contratos_ti/`), `nome_original`, `enviado_em`
+
+Regras atuais:
+
+- So Atendente TI/Admin acessam, cadastram, editam e excluem contratos e anexos (validado no backend; usuario comum e redirecionado, e detalhe/download retornam `403`/`404`).
+- O valor e opcional e aceita formato brasileiro; a periodicidade e validada. Excluir um contrato remove seus anexos em cascata e apaga os arquivos fisicos; e possivel remover um anexo isolado. O download usa rota protegida.
 
 ## Modelos previstos para proximas fases
 

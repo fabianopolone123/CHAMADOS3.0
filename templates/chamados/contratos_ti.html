@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos_ti.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app contratosti-app"
+    data-detail-url="{% url 'contrato_ti_detail' contrato_id=0 %}"
+    data-update-url="{% url 'contrato_ti_update' contrato_id=0 %}"
+    data-delete-url="{% url 'contrato_ti_delete' contrato_id=0 %}"
+    data-anexo-delete-url="{% url 'contrato_ti_anexo_delete' anexo_id=0 %}"
+    data-csrf="{{ csrf_token }}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="contratos_ti" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Contratos</h2>
+                <p class="contratos-topbar__subtitle">Contratos, assinaturas e servicos recorrentes de TI</p>
+                <p class="topbar-subtitle">Valor, forma de pagamento, vigencia e anexos. Pesquise ou ordene clicando no cabecalho.</p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="createContratoButton" title="Cadastrar novo contrato">
+                <span class="contratos-add-btn__icon" aria-hidden="true">+</span>
+                <span class="contratos-add-btn__label">Novo contrato</span>
+            </button>
+        </header>
+
+        <section class="ctr-stats">
+            <article class="ctr-stat ctr-stat--blue">
+                <span class="ctr-stat__label">Contratos</span>
+                <strong class="ctr-stat__value">{{ total_contratos }}</strong>
+            </article>
+            <article class="ctr-stat ctr-stat--green">
+                <span class="ctr-stat__label">Ativos</span>
+                <strong class="ctr-stat__value">{{ contratos_ativos }}</strong>
+            </article>
+            <article class="ctr-stat ctr-stat--indigo">
+                <span class="ctr-stat__label">Total mensal (ativos)</span>
+                <strong class="ctr-stat__value">R$ {{ total_mensal_display }}</strong>
+            </article>
+        </section>
+
+        <section class="ctr-panel">
+            <div class="ctr-search">
+                <span class="ctr-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="contratoSearch"
+                    class="ctr-search__input"
+                    placeholder="Pesquisar por nome, forma de pagamento ou observacoes..."
+                    autocomplete="off"
+                >
+            </div>
+            <p class="ctr-search__status" id="contratoSearchStatus"></p>
+
+            {% if contratos %}
+            <div class="ctr-table-wrap">
+                <table class="ctr-table" id="contratosTable">
+                    <thead>
+                        <tr>
+                            <th class="ctr-th" data-sort-index="0" aria-sort="none">Contrato <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th ctr-th--num" data-sort-index="1" data-sort-type="num" aria-sort="none">Valor <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th ctr-col--hide-sm" data-sort-index="2" aria-sort="none">Periodicidade <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th ctr-col--hide-md" data-sort-index="3" aria-sort="none">Pagamento <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th ctr-col--hide-md" data-sort-index="4" data-sort-type="date" aria-sort="none">Vigencia <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th" data-sort-index="5" aria-sort="none">Status <span class="ctr-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ctr-th--actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contratosTableBody">
+                        {% for c in contratos %}
+                        <tr class="ctr-row"
+                            data-id="{{ c.id }}"
+                            data-nome="{{ c.nome }}"
+                            data-valor="{{ c.valor|default:'' }}"
+                            data-forma="{{ c.forma_pagamento }}"
+                            data-cartao="{{ c.final_cartao }}"
+                            data-periodicidade="{{ c.periodicidade }}"
+                            data-inicio="{{ c.inicio|date:'Y-m-d' }}"
+                            data-fim="{{ c.fim|date:'Y-m-d' }}"
+                            data-encerrado="{{ c.encerrado_em|date:'Y-m-d' }}"
+                            data-observacoes="{{ c.observacoes }}"
+                            data-search="{{ c.nome|lower }} {{ c.forma_pagamento|lower }} {{ c.observacoes|lower }} {{ c.get_periodicidade_display|lower }}"
+                            tabindex="0" role="button" aria-label="Ver contrato {{ c.nome }}">
+                            <td data-label="Contrato" class="ctr-cell--name">{{ c.nome }}</td>
+                            <td data-label="Valor" class="ctr-th--num ctr-cell--valor" data-sort-value="{{ c.valor|default:'0' }}">
+                                {% if c.valor is not None %}R$ {{ c.valor_display }}{% else %}-{% endif %}
+                            </td>
+                            <td data-label="Periodicidade" class="ctr-col--hide-sm">{{ c.get_periodicidade_display }}</td>
+                            <td data-label="Pagamento" class="ctr-col--hide-md">
+                                {{ c.forma_pagamento|default:"-" }}{% if c.final_cartao %} <span class="ctr-card">final {{ c.final_cartao }}</span>{% endif %}
+                            </td>
+                            <td data-label="Vigencia" class="ctr-col--hide-md" data-sort-value="{{ c.inicio|date:'Y-m-d' }}">
+                                {% if c.inicio %}{{ c.inicio|date:"d/m/Y" }}{% else %}-{% endif %}
+                                {% if c.fim %}<span class="ctr-ate">ate {{ c.fim|date:"d/m/Y" }}</span>{% endif %}
+                            </td>
+                            <td data-label="Status">
+                                {% if c.esta_ativo %}<span class="ctr-badge ctr-badge--ativo">Ativo</span>{% else %}<span class="ctr-badge ctr-badge--encerrado">Encerrado</span>{% endif %}
+                            </td>
+                            <td data-label="Acoes" class="ctr-cell--actions">
+                                <button type="button" class="ctr-icon-btn js-view-contrato" title="Ver detalhes" aria-label="Ver detalhes">&#128065;</button>
+                                <button type="button" class="ctr-icon-btn js-edit-contrato" title="Editar" aria-label="Editar">&#9998;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="ctr-empty is-hidden" id="contratosNoResults">Nenhum contrato encontrado para a pesquisa.</p>
+            {% else %}
+            <div class="ctr-empty-state">
+                <p class="ctr-empty-state__title">Nenhum contrato cadastrado ainda.</p>
+                <p class="ctr-empty-state__hint">Clique em "Novo contrato" para registrar o primeiro.</p>
+            </div>
+            {% endif %}
+        </section>
+    </section>
+</main>
+
+{% include "partials/contrato_ti_modal.html" %}
+{% include "partials/contrato_ti_detail_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/contratos_ti.js' %}"></script>
+{% endblock %}

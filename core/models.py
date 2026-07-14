@@ -1133,3 +1133,84 @@ class ServicoFeitoAnexo(models.Model):
 
     def __str__(self) -> str:
         return self.nome_original or self.arquivo.name
+
+
+class Contrato(models.Model):
+    """Contrato de TI (recorrente ou unico): assinaturas, links, licencas anuais,
+    etc., com valor, forma de pagamento, vigencia e anexos. Migrado do modulo
+    'Contratos' antigo. Nao confundir com o modulo Requisicoes (RequisicaoContrato)."""
+
+    class Periodicidade(models.TextChoices):
+        MENSAL = "mensal", "Mensal"
+        ANUAL = "anual", "Anual"
+        PAGAMENTO_UNICO = "pagamento_unico", "Pagamento unico"
+
+    nome = models.CharField(max_length=180)
+    observacoes = models.TextField(blank=True, default="")
+    valor = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    forma_pagamento = models.CharField(max_length=80, blank=True, default="")
+    final_cartao = models.CharField(max_length=4, blank=True, default="")
+    periodicidade = models.CharField(
+        max_length=20,
+        choices=Periodicidade.choices,
+        default=Periodicidade.MENSAL,
+    )
+    inicio = models.DateField(null=True, blank=True)
+    fim = models.DateField(null=True, blank=True)
+    encerrado_em = models.DateField(null=True, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="contratos_criados",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome", "id"]
+        verbose_name = "Contrato"
+        verbose_name_plural = "Contratos"
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @property
+    def anexos_total(self) -> int:
+        return self.anexos.count()
+
+    @property
+    def esta_ativo(self) -> bool:
+        return self.encerrado_em is None
+
+    @property
+    def valor_display(self) -> str:
+        """Valor formatado no padrao brasileiro (1.234,56); '-' se sem valor."""
+        if self.valor is None:
+            return "-"
+        valor = self.valor if isinstance(self.valor, Decimal) else Decimal(str(self.valor))
+        inteiro, decimal = f"{valor:.2f}".split(".")
+        inteiro = f"{int(inteiro):,}".replace(",", ".")
+        return f"{inteiro},{decimal}"
+
+
+class ContratoAnexo(models.Model):
+    """Arquivo anexado a um contrato (NF, termo, invoice, comprovante)."""
+
+    contrato = models.ForeignKey(
+        Contrato,
+        on_delete=models.CASCADE,
+        related_name="anexos",
+    )
+    arquivo = models.FileField(upload_to="contratos_ti/")
+    nome_original = models.CharField(max_length=255, blank=True, default="")
+    enviado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "Anexo de contrato"
+        verbose_name_plural = "Anexos de contratos"
+
+    def __str__(self) -> str:
+        return self.nome_original or self.arquivo.name

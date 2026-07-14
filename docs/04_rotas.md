@@ -74,6 +74,13 @@
 | `/servicos-feitos/<id>/excluir/` | POST | Exclui um servico e seus anexos (arquivos removidos do disco) (apenas TI/admin) | Implementada |
 | `/servicos-feitos/anexos/<id>/` | GET | Download protegido de um anexo de servico (apenas TI/admin) | Implementada |
 | `/servicos-feitos/anexos/<id>/excluir/` | POST | Exclui um anexo isolado de um servico (apenas TI/admin) | Implementada |
+| `/contratos-ti/` | GET | Modulo Contratos: lista de contratos/assinaturas de TI (tabela responsiva + busca + ordenacao) e botao "Novo contrato" (apenas TI/admin) | Implementada |
+| `/contratos-ti/criar/` | POST | Cadastra um contrato (nome, valor, periodicidade, pagamento, vigencia) com anexos opcionais (multipart) (apenas TI/admin) | Implementada |
+| `/contratos-ti/<id>/` | GET | Detalhe (JSON) de um contrato com anexos, usado pelo modal (apenas TI/admin) | Implementada |
+| `/contratos-ti/<id>/editar/` | POST | Edita um contrato e permite adicionar novos anexos (apenas TI/admin) | Implementada |
+| `/contratos-ti/<id>/excluir/` | POST | Exclui um contrato e seus anexos (arquivos removidos do disco) (apenas TI/admin) | Implementada |
+| `/contratos-ti/anexos/<id>/` | GET | Download protegido de um anexo de contrato (apenas TI/admin) | Implementada |
+| `/contratos-ti/anexos/<id>/excluir/` | POST | Exclui um anexo isolado de um contrato (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -209,6 +216,13 @@
 - A tela lista os servicos em uma tabela responsiva (cards no celular) com nome, empresa, data, valor (destacado) e contagem de anexos; cartoes de resumo no topo (servicos, valor total, anexos). Busca client-side (nome/empresa/descricao) e ordenacao clicando nos cabecalhos (data e valor ordenam corretamente por valor/data, nao como texto). Clicar na linha (ou no icone de olho) abre um modal de detalhe com a descricao e os anexos para download; o icone de lapis abre o modal de edicao.
 - As rotas de escrita usam `POST` (com CSRF); o cadastro/edicao aceita upload de multiplos anexos (`multipart/form-data`) e segue o padrao classico: valida, grava, notifica via Django messages (toast) e redireciona. O valor aceita o formato brasileiro (1.234,56).
 - Excluir um servico remove seus anexos em cascata e apaga os arquivos do disco; ha rota para remover um anexo isolado. O detalhe e o download dos anexos sao restritos a TI/admin (`403`/`404` para usuario comum), sem expor a URL direta de `MEDIA`.
+
+## Regras do modulo Contratos
+
+- `/contratos-ti/` usa `ti_required` (admin e Atendente TI; usuario comum e redirecionado). O botao "Contratos" no menu lateral so aparece para TI/admin e todas as rotas validam a permissao no backend. Nao confundir com o modulo Requisicoes (menu "Requisicoes", em `/contratos/`), que e outra coisa.
+- A tela lista os contratos em uma tabela responsiva (cards no celular) com nome, valor (destacado, formato brasileiro), periodicidade, forma de pagamento (com "final XXXX"), vigencia (inicio/fim) e status (badge Ativo/Encerrado); cartoes de resumo no topo (contratos, ativos, total mensal dos ativos). Busca client-side (nome/pagamento/observacoes) e ordenacao clicando nos cabecalhos (Valor por numero, Vigencia por data). Clicar na linha (ou no icone de olho) abre um modal de detalhe com observacoes e anexos para download; o icone de lapis abre a edicao.
+- As rotas de escrita usam `POST` (com CSRF); cadastro/edicao aceitam upload de multiplos anexos (`multipart/form-data`) e seguem o padrao classico (valida, grava, Django messages, redireciona). O valor e opcional e aceita formato brasileiro; preencher "encerrado em" marca o contrato como encerrado.
+- Excluir um contrato remove seus anexos em cascata e apaga os arquivos do disco; ha rota para remover um anexo isolado. Detalhe e download sao restritos a TI/admin (`403`/`404` para comum), sem expor a URL direta de `MEDIA`.
 
 ## Regras das rotas de historico
 

@@ -1,0 +1,89 @@
+{% load static %}
+<div class="modal fade" id="contratoModal" tabindex="-1" aria-labelledby="contratoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Contratos</span>
+                    <h5 class="modal-title" id="contratoModalLabel">Cadastrar novo contrato</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form method="post" action="{% url 'contrato_ti_create' %}" enctype="multipart/form-data" class="create-ticket-form" id="contratoForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="ctr-form-grid">
+                        <label class="contrato-field ctr-field--full">
+                            <span>Nome do contrato</span>
+                            <input type="text" class="form-control" name="nome" id="contratoNome" maxlength="180" placeholder="Ex.: Google Workspace" required>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Valor (R$)</span>
+                            <input type="text" class="form-control" name="valor" id="contratoValor" inputmode="decimal" placeholder="Ex.: 4.798,03">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Periodicidade</span>
+                            <select class="form-select" name="periodicidade" id="contratoPeriodicidade">
+                                {% for value, label in periodicidades %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="contrato-field">
+                            <span>Forma de pagamento</span>
+                            <input type="text" class="form-control" name="forma_pagamento" id="contratoForma" maxlength="80" placeholder="Ex.: Cartao / Boleto">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Final do cartao</span>
+                            <input type="text" class="form-control" name="final_cartao" id="contratoCartao" maxlength="4" inputmode="numeric" placeholder="Ex.: 8380">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Inicio da vigencia</span>
+                            <input type="date" class="form-control" name="inicio" id="contratoInicio">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Fim da vigencia</span>
+                            <input type="date" class="form-control" name="fim" id="contratoFim">
+                        </label>
+                        <label class="contrato-field">
+                            <span>Encerrado em (se aplicavel)</span>
+                            <input type="date" class="form-control" name="encerrado_em" id="contratoEncerrado">
+                            <small class="contrato-field__help">Preencha para marcar o contrato como encerrado.</small>
+                        </label>
+                        <label class="contrato-field ctr-field--full">
+                            <span>Observacoes</span>
+                            <textarea class="form-control" name="observacoes" id="contratoObservacoes" rows="3" placeholder="Detalhes, contas, condicoes"></textarea>
+                        </label>
+                        <label class="contrato-field ctr-field--full">
+                            <span>Anexos (NFs, termos, invoices)</span>
+                            <input type="file" class="form-control" name="anexos" id="contratoAnexos" multiple>
+                            <small class="contrato-field__help">Pode selecionar varios arquivos. Na edicao, os novos sao adicionados aos existentes.</small>
+                        </label>
+                    </div>
+
+                    <div class="ctr-existing is-hidden" id="contratoExistingWrap">
+                        <span class="ctr-existing__title">Anexos ja cadastrados</span>
+                        <ul class="ctr-existing__list" id="contratoExistingList"></ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto is-hidden" id="contratoDeleteBtn">Excluir contrato</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="contratoSubmit">Cadastrar contrato</button>
+                </div>
+            </form>
+
+            <div class="ctr-delete-confirm is-hidden" id="contratoDeleteConfirm">
+                <p class="ctr-delete-confirm__text">
+                    Tem certeza que deseja excluir este contrato? Os anexos vinculados tambem serao removidos. Esta acao nao pode ser desfeita.
+                </p>
+                <form method="post" id="contratoDeleteForm" class="ctr-delete-confirm__actions">
+                    {% csrf_token %}
+                    <button type="button" class="btn btn-light" id="contratoDeleteCancel">Voltar</button>
+                    <button type="submit" class="btn btn-danger">Excluir definitivamente</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
