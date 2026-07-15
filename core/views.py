@@ -579,6 +579,19 @@ def pendencia_detail_view(request, pendencia_id: int):
 
 @login_required
 @require_POST
+def pendencia_delete_view(request, pendencia_id: int):
+    """Exclui uma pendencia do quadro (apenas TI/admin)."""
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para excluir pendencias.", status=403)
+
+    pendencia = get_object_or_404(PendenciaTI, pk=pendencia_id)
+    titulo = pendencia.titulo
+    pendencia.delete()
+    return JsonResponse({"ok": True, "message": f'Pendencia "{titulo}" excluida.', "pendencia_id": pendencia_id})
+
+
+@login_required
+@require_POST
 def pendencia_convert_view(request, pendencia_id: int):
     if not (is_admin_user(request.user) or is_attendant_user(request.user)):
         return _json_error("Voce nao tem permissao para converter pendencias.", status=403)

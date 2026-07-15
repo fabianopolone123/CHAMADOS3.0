@@ -413,6 +413,22 @@
     overflow-y: auto;
 }
 
+/* Confirmacao inline de exclusao de pendencia (no modal de detalhe). */
+.pendencia-detail__confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.pendencia-detail__confirm[hidden] {
+    display: none;
+}
+.pendencia-detail__confirm-text {
+    font-size: 0.85rem;
+    color: #b91c1c;
+    font-weight: 600;
+}
+
 /* Coluna "Chamados fechados": resumo (consulta pelo modal), sem lista de cards. */
 .closed-column-body {
     flex: 1 1 auto;

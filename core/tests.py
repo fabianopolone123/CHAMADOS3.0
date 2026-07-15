@@ -340,6 +340,26 @@ class PendenciaTITests(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
+    def test_attendant_deletes_pendencia(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.post(reverse("pendencia_delete", args=[pend.id]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(PendenciaTI.objects.filter(id=pend.id).exists())
+
+    def test_common_user_cannot_delete_pendencia(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.common)
+        resp = self.client.post(reverse("pendencia_delete", args=[pend.id]))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(PendenciaTI.objects.filter(id=pend.id).exists())
+
+    def test_delete_pendencia_requires_post(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("pendencia_delete", args=[pend.id]))
+        self.assertEqual(resp.status_code, 405)
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class RequisicaoDeleteFilesTests(TestCase):

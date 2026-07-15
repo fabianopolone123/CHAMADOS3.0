@@ -664,6 +664,8 @@
         ? bootstrap.Modal.getOrCreateInstance(pendenciaDetailModalElement)
         : null;
 
+    let currentPendenciaCard = null;
+
     function setPendenciaDetailField(key, value) {
         if (!pendenciaDetailModalElement) {
             return;
@@ -671,6 +673,20 @@
         const el = pendenciaDetailModalElement.querySelector(`[data-pendencia-detail="${key}"]`);
         if (el) {
             el.textContent = value || "-";
+        }
+    }
+
+    function resetPendenciaDeleteConfirm() {
+        if (!pendenciaDetailModalElement) {
+            return;
+        }
+        const trigger = pendenciaDetailModalElement.querySelector("[data-pendencia-delete]");
+        const confirm = pendenciaDetailModalElement.querySelector("[data-pendencia-delete-confirm]");
+        if (trigger) {
+            trigger.hidden = false;
+        }
+        if (confirm) {
+            confirm.hidden = true;
         }
     }
 
@@ -686,6 +702,8 @@
             if (!response.ok || data.ok === false) {
                 throw data;
             }
+            currentPendenciaCard = card;
+            resetPendenciaDeleteConfirm();
             setPendenciaDetailField("titulo", data.titulo);
             setPendenciaDetailField("descricao", data.descricao);
             setPendenciaDetailField("criado_por", data.criado_por);
@@ -693,6 +711,45 @@
             pendenciaDetailModal.show();
         } catch (error) {
             showToast(error.message || "Nao foi possivel abrir a pendencia.", "error");
+        }
+    }
+
+    async function deleteCurrentPendencia() {
+        const card = currentPendenciaCard;
+        if (!card) {
+            return;
+        }
+        try {
+            const result = await sendJson(card.dataset.deleteUrl, {});
+            card.remove();
+            currentPendenciaCard = null;
+            if (pendenciaDetailModal) {
+                pendenciaDetailModal.hide();
+            }
+            updateColumnCounts();
+            refreshEmptyStates();
+            showToast(result.message || "Pendencia excluida.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel excluir a pendencia.", "error");
+        }
+    }
+
+    if (pendenciaDetailModalElement) {
+        const deleteTrigger = pendenciaDetailModalElement.querySelector("[data-pendencia-delete]");
+        const deleteConfirm = pendenciaDetailModalElement.querySelector("[data-pendencia-delete-confirm]");
+        const deleteCancel = pendenciaDetailModalElement.querySelector("[data-pendencia-delete-cancel]");
+        const deleteYes = pendenciaDetailModalElement.querySelector("[data-pendencia-delete-yes]");
+        if (deleteTrigger && deleteConfirm) {
+            deleteTrigger.addEventListener("click", () => {
+                deleteTrigger.hidden = true;
+                deleteConfirm.hidden = false;
+            });
+        }
+        if (deleteCancel) {
+            deleteCancel.addEventListener("click", resetPendenciaDeleteConfirm);
+        }
+        if (deleteYes) {
+            deleteYes.addEventListener("click", deleteCurrentPendencia);
         }
     }
 
