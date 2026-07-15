@@ -762,11 +762,23 @@ def start_attendance_view(request):
                 status=409,
                 active_ticket_number=existing_active.chamado.numero,
             )
-        return _json_error(
-            "Voce ja possui outro atendimento em andamento. Pause ou finalize antes de iniciar um novo.",
-            status=409,
-            active_ticket_number=existing_active.chamado.numero,
-        )
+        # Se o atendimento ativo ficou "preso" em um chamado que nao da mais para
+        # finalizar pela tela (encerrado ou fora de uma coluna de atendente), ele
+        # e encerrado automaticamente para nao travar o atendente. Se o chamado
+        # ativo ainda e finalizavel na tela, mantem a regra de um Play por vez.
+        outro = existing_active.chamado
+        if outro.status in Chamado.STATUS_ENCERRADOS or not _is_ticket_in_attendant_column(outro):
+            existing_active.finalizar(
+                tipo_encerramento=AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE,
+                descricao_atividade="Encerrado automaticamente ao iniciar outro atendimento.",
+            )
+            existing_active.save()
+        else:
+            return _json_error(
+                "Voce ja possui outro atendimento em andamento. Pause ou finalize antes de iniciar um novo.",
+                status=409,
+                active_ticket_number=existing_active.chamado.numero,
+            )
 
     try:
         with transaction.atomic():
