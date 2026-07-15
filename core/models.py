@@ -330,7 +330,7 @@ class RequisicaoContrato(models.Model):
     STATUS_CANCELADA = "cancelada"
     STATUS_CHOICES = [
         (STATUS_ABERTA, "Aberta"),
-        (STATUS_EM_COTACAO, "Em cotacao"),
+        (STATUS_EM_COTACAO, "Esperando aprovacao"),
         (STATUS_FINALIZADA, "Finalizada"),
         (STATUS_CANCELADA, "Cancelada"),
     ]
