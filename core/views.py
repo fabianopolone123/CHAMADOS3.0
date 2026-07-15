@@ -293,7 +293,7 @@ def tickets_dashboard_view(request):
     by_attendant = {user.id: [] for user in attendants}
     abertos = []
 
-    # A coluna "Chamados fechados" mostra apenas os 5 encerrados mais recentes
+    # A coluna "Chamados fechados" mostra apenas os 10 encerrados mais recentes
     # (cards de consulta, nao arrastaveis) + a contagem e a busca no modal. Assim
     # o quadro nao carrega milhares de cards nem trava ao arrastar.
     closed_qs = Chamado.objects.filter(status__in=Chamado.STATUS_ENCERRADOS)
@@ -305,7 +305,7 @@ def tickets_dashboard_view(request):
             "status_label": c.status_label,
             "status_class": _STATUS_BADGE_CLASS.get(c.status, "status-neutral"),
         }
-        for c in closed_qs.order_by("-fechado_em", "-criado_em")[:5]
+        for c in closed_qs.order_by("-fechado_em", "-criado_em")[:10]
     ]
 
     chamados = (
