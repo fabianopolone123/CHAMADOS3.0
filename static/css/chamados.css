@@ -432,16 +432,21 @@
 /* Coluna "Chamados fechados": resumo (consulta pelo modal), sem lista de cards. */
 .closed-column-body {
     flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
     padding: clamp(0.75rem, 1vw, 1.15rem);
+    overflow: hidden;
 }
 .closed-column-body .kanban-empty {
     margin: 0;
 }
 .closed-recent {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
