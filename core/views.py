@@ -326,6 +326,11 @@ def tickets_dashboard_view(request):
         else:
             abertos.append(card)
 
+    # Chamados com atendimento (Play) ativo aparecem primeiro na coluna; o resto
+    # mantem a ordem por data (sort estavel).
+    for lista in by_attendant.values():
+        lista.sort(key=lambda c: not c["attendance"]["is_active"])
+
     attendant_columns = [
         {
             "attendant_id": user.id,
