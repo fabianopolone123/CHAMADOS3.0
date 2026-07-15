@@ -33,6 +33,18 @@
         submit: document.getElementById("attendanceModalSubmit"),
     };
 
+    // Enter salva direto (Shift+Enter quebra linha): clica, digita, Enter e pronto.
+    attendanceFields.description?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            if (typeof attendanceForm.requestSubmit === "function") {
+                attendanceForm.requestSubmit();
+            } else {
+                attendanceForm.dispatchEvent(new Event("submit", { cancelable: true }));
+            }
+        }
+    });
+
     function showToast(message, type) {
         if (typeof window.showAppToast === "function") {
             window.showAppToast(message, type);

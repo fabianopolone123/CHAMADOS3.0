@@ -1143,6 +1143,11 @@
     font-weight: 700;
 }
 
+.attendance-modal__hint {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
 .attendance-modal__field textarea {
     width: 100%;
     min-height: 150px;
