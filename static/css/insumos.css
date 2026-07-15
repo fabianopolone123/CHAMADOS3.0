@@ -4,7 +4,7 @@
 
 .insumos-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.25rem;
     align-items: start;
 }
@@ -19,6 +19,22 @@
     border: 1px solid rgba(148, 163, 184, 0.18);
     box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
     padding: clamp(0.9rem, 1.4vw, 1.35rem);
+}
+
+.insumos-retiradas-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+}
+.insumos-retiradas-head .insumos-section__title {
+    margin: 0;
+}
+.insumos-search {
+    max-width: 340px;
+    width: 100%;
 }
 
 .insumos-section__title {

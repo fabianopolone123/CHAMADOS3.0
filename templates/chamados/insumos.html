@@ -17,6 +17,7 @@
     data-insumo-entrada-url="{% url 'insumo_entrada' insumo_id=0 %}"
     data-insumo-delete-url="{% url 'insumo_delete' insumo_id=0 %}"
     data-retirada-create-url="{% url 'retirada_create' insumo_id=0 %}"
+    data-retiradas-search-url="{% url 'retiradas_search' %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="insumos" %}
@@ -63,7 +64,11 @@
             </section>
 
             <section class="insumos-section">
-                <h3 class="insumos-section__title">Ultimas retiradas</h3>
+                <div class="insumos-retiradas-head">
+                    <h3 class="insumos-section__title">Historico de retiradas</h3>
+                    <input type="search" id="retiradasSearch" class="form-control insumos-search"
+                           placeholder="Pesquisar (item, quem recebeu, motivo, quem registrou)..." autocomplete="off">
+                </div>
                 <div class="insumos-table-wrap">
                     <table class="insumos-table">
                         <thead>

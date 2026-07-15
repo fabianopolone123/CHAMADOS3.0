@@ -311,9 +311,7 @@
         retiradaModal?.show();
     }
 
-    function prependRetiradaRow(retirada) {
-        const emptyRow = retiradasBody.querySelector("[data-retiradas-empty]");
-        if (emptyRow) emptyRow.remove();
+    function buildRetiradaRow(retirada) {
         const tr = document.createElement("tr");
         const cells = [
             retirada.insumo,
@@ -329,8 +327,62 @@
             td.textContent = value;
             tr.appendChild(td);
         });
-        retiradasBody.insertBefore(tr, retiradasBody.firstChild);
+        return tr;
     }
+
+    function prependRetiradaRow(retirada) {
+        const emptyRow = retiradasBody.querySelector("[data-retiradas-empty]");
+        if (emptyRow) emptyRow.remove();
+        retiradasBody.insertBefore(buildRetiradaRow(retirada), retiradasBody.firstChild);
+    }
+
+    function renderRetiradas(lista) {
+        retiradasBody.innerHTML = "";
+        if (!lista.length) {
+            const tr = document.createElement("tr");
+            tr.dataset.retiradasEmpty = "";
+            const td = document.createElement("td");
+            td.colSpan = 6;
+            td.className = "insumos-empty";
+            td.textContent = "Nenhuma retirada encontrada.";
+            tr.appendChild(td);
+            retiradasBody.appendChild(tr);
+            return;
+        }
+        const frag = document.createDocumentFragment();
+        lista.forEach((r) => frag.appendChild(buildRetiradaRow(r)));
+        retiradasBody.appendChild(frag);
+    }
+
+    // ---------------- Busca no historico de retiradas ----------------
+    const retiradasSearchUrl = appElement.dataset.retiradasSearchUrl;
+    const searchInput = document.getElementById("retiradasSearch");
+    let searchTimer = null;
+    let searchController = null;
+
+    async function runRetiradasSearch(q) {
+        if (!retiradasSearchUrl) return;
+        if (searchController) searchController.abort();
+        searchController = new AbortController();
+        try {
+            const resp = await fetch(`${retiradasSearchUrl}?q=${encodeURIComponent(q || "")}`, {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                signal: searchController.signal,
+            });
+            const data = await resp.json();
+            if (!resp.ok || data.ok === false) throw data;
+            renderRetiradas(data.resultados || []);
+        } catch (error) {
+            if (error.name === "AbortError") return;
+            showToast(error.message || "Nao foi possivel pesquisar as retiradas.", "error");
+        }
+    }
+
+    searchInput?.addEventListener("input", () => {
+        if (searchTimer) window.clearTimeout(searchTimer);
+        const value = searchInput.value.trim();
+        searchTimer = window.setTimeout(() => runRetiradasSearch(value), 300);
+    });
 
     retiradaForm?.addEventListener("submit", async (event) => {
         event.preventDefault();

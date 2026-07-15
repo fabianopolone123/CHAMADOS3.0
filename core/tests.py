@@ -1715,3 +1715,21 @@ class InsumoUpdateTests(TestCase):
         self.assertEqual(self._post("insumo_update", {"nome": "X"}).status_code, 403)
         self.assertEqual(self._post("insumo_entrada", {"quantidade": 5}).status_code, 403)
         self.assertEqual(self._post("insumo_delete", {}).status_code, 403)
+
+    def test_busca_retiradas(self):
+        from .models import RetiradaInsumoTI
+
+        RetiradaInsumoTI.objects.create(
+            insumo=self.insumo, quantidade=1, entregue_para="Joao Silva", motivo="Departamento: RH")
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("retiradas_search"), {"q": "joao"})
+        self.assertEqual(resp.status_code, 200)
+        res = resp.json()["resultados"]
+        self.assertTrue(any("Joao" in x["entregue_para"] for x in res))
+        # termo sem correspondencia
+        vazio = self.client.get(reverse("retiradas_search"), {"q": "zzznaoexiste"})
+        self.assertEqual(len(vazio.json()["resultados"]), 0)
+
+    def test_busca_retiradas_comum_bloqueado(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("retiradas_search")).status_code, 403)

@@ -2462,6 +2462,28 @@ def retirada_create_view(request, insumo_id: int):
 
 
 @login_required
+def retiradas_search_view(request):
+    """Busca no historico completo de retiradas (item, quem recebeu, motivo,
+    quem registrou). Retorna JSON; sem `q` devolve as mais recentes."""
+    if not _is_ti(request.user):
+        return _json_error("Sem permissao.", status=403)
+
+    q = (request.GET.get("q") or "").strip()
+    qs = RetiradaInsumoTI.objects.select_related("insumo", "registrado_por")
+    if q:
+        qs = qs.filter(
+            Q(insumo__nome__icontains=q)
+            | Q(entregue_para__icontains=q)
+            | Q(motivo__icontains=q)
+            | Q(registrado_por__username__icontains=q)
+            | Q(registrado_por__first_name__icontains=q)
+            | Q(registrado_por__last_name__icontains=q)
+        )
+    resultados = [_serialize_retirada(r) for r in qs[:200]]
+    return JsonResponse({"ok": True, "resultados": resultados})
+
+
+@login_required
 def dashboard_redirect_view(request):
     return redirect(_landing_route_for_user(request.user))
 
