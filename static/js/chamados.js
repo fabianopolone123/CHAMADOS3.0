@@ -251,18 +251,21 @@
     }
 
     async function handlePlay(ticketNumber) {
-        if (activeTicketNumber && activeTicketNumber !== ticketNumber) {
-            showToast("Ja existe um atendimento em andamento. Pause ou finalize antes de iniciar outro.", "warning");
-            return;
-        }
-
         const card = getTicketCard(ticketNumber);
         if (!card) {
             return;
         }
 
+        const previous = activeTicketNumber;
         try {
             const result = await sendJson(startAttendanceUrl, { ticket_number: ticketNumber });
+            // Troca de atendimento: o card anterior foi pausado no backend; reflete na tela.
+            if (previous && previous !== ticketNumber) {
+                const prevCard = getTicketCard(previous);
+                if (prevCard) {
+                    setCardInactiveState(prevCard, "Pausado");
+                }
+            }
             activeTicketNumber = ticketNumber;
             setCardActiveState(card, result.attendance.started_at_iso);
             startTimerLoop();

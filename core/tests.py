@@ -238,6 +238,31 @@ class EncerramentoChamadoTests(TestCase):
         self.chamado.refresh_from_db()
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
 
+    def test_play_troca_pausa_o_atendimento_anterior(self):
+        # Dar Play em outro chamado nao trava: pausa o atendimento ativo anterior
+        # e ativa o novo (um Play por vez, mas alternar deve ser fluido).
+        self.client.force_login(self.attendant)
+        ch2 = Chamado.objects.create(
+            numero="CH-000011", titulo="Outro chamado", solicitante=self.owner,
+            status=Chamado.STATUS_EM_ATENDIMENTO, atendente_atual=self.attendant,
+        )
+
+        def _play(numero):
+            return self.client.post(
+                reverse("start_attendance"),
+                data=json.dumps({"ticket_number": numero}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(_play(self.chamado.numero).status_code, 200)
+        self.assertEqual(_play(ch2.numero).status_code, 200)  # nao bloqueia
+
+        ativos = AtendimentoHistorico.objects.filter(
+            atendente=self.attendant, finalizado_em__isnull=True
+        )
+        self.assertEqual(ativos.count(), 1)
+        self.assertEqual(ativos.first().chamado, ch2)
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class PendenciaTITests(TestCase):

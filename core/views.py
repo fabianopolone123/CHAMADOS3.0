@@ -755,6 +755,7 @@ def start_attendance_view(request):
         .filter(atendente=request.user, finalizado_em__isnull=True)
         .first()
     )
+    paused_ticket_number = ""
     if existing_active:
         if existing_active.chamado.numero == ticket_number:
             return _json_error(
@@ -762,23 +763,15 @@ def start_attendance_view(request):
                 status=409,
                 active_ticket_number=existing_active.chamado.numero,
             )
-        # Se o atendimento ativo ficou "preso" em um chamado que nao da mais para
-        # finalizar pela tela (encerrado ou fora de uma coluna de atendente), ele
-        # e encerrado automaticamente para nao travar o atendente. Se o chamado
-        # ativo ainda e finalizavel na tela, mantem a regra de um Play por vez.
-        outro = existing_active.chamado
-        if outro.status in Chamado.STATUS_ENCERRADOS or not _is_ticket_in_attendant_column(outro):
-            existing_active.finalizar(
-                tipo_encerramento=AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE,
-                descricao_atividade="Encerrado automaticamente ao iniciar outro atendimento.",
-            )
-            existing_active.save()
-        else:
-            return _json_error(
-                "Voce ja possui outro atendimento em andamento. Pause ou finalize antes de iniciar um novo.",
-                status=409,
-                active_ticket_number=existing_active.chamado.numero,
-            )
+        # Troca de atendimento: o atendimento ativo anterior e pausado
+        # automaticamente. Um atendente trabalha um chamado por vez, mas alternar
+        # entre chamados deve ser fluido (sem travar pedindo pause/stop manual).
+        paused_ticket_number = existing_active.chamado.numero
+        existing_active.finalizar(
+            tipo_encerramento=AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE,
+            descricao_atividade="Pausado automaticamente ao iniciar outro atendimento.",
+        )
+        existing_active.save()
 
     try:
         with transaction.atomic():
@@ -794,11 +787,15 @@ def start_attendance_view(request):
         )
 
     active_state = _serialize_attendance_state(attendance)
+    mensagem = f"Atendimento iniciado no chamado {ticket_number}."
+    if paused_ticket_number:
+        mensagem = f"Atendimento iniciado no chamado {ticket_number} (o {paused_ticket_number} foi pausado)."
     return JsonResponse(
         {
             "ok": True,
-            "message": f"Atendimento iniciado no chamado {ticket_number}.",
+            "message": mensagem,
             "attendance": active_state,
+            "paused_ticket_number": paused_ticket_number,
         }
     )
 
