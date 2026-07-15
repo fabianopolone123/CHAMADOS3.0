@@ -1670,31 +1670,48 @@ class InsumoUpdateTests(TestCase):
         self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
         self.insumo = InsumoTI.objects.create(nome="Bateria", quantidade_atual=0)
 
-    def _edit(self, data):
+    def _post(self, name, data):
         return self.client.post(
-            reverse("insumo_update", args=[self.insumo.id]),
+            reverse(name, args=[self.insumo.id]),
             data=json.dumps(data),
             content_type="application/json",
         )
 
-    def test_ti_edita_estoque(self):
+    def test_editar_nao_altera_quantidade(self):
+        self.insumo.quantidade_atual = 10
+        self.insumo.save()
+        self.client.force_login(self.ti)
+        resp = self._post("insumo_update", {"nome": "Bateria AA", "descricao": "recarregavel", "observacao": ""})
+        self.assertEqual(resp.status_code, 200)
+        self.insumo.refresh_from_db()
+        self.assertEqual(self.insumo.nome, "Bateria AA")
+        self.assertEqual(self.insumo.descricao, "recarregavel")
+        self.assertEqual(self.insumo.quantidade_atual, 10)  # inalterada pela edicao
+
+    def test_entrada_soma_ao_estoque(self):
+        self.insumo.quantidade_atual = 5
+        self.insumo.save()
+        self.client.force_login(self.ti)
+        resp = self._post("insumo_entrada", {"quantidade": 8})
+        self.assertEqual(resp.status_code, 200)
+        self.insumo.refresh_from_db()
+        self.assertEqual(self.insumo.quantidade_atual, 13)
+
+    def test_entrada_invalida_rejeitada(self):
+        self.client.force_login(self.ti)
+        self.assertEqual(self._post("insumo_entrada", {"quantidade": 0}).status_code, 400)
+        self.assertEqual(self._post("insumo_entrada", {"quantidade": -3}).status_code, 400)
+
+    def test_excluir_insumo(self):
         from .models import InsumoTI
 
         self.client.force_login(self.ti)
-        resp = self._edit({"nome": "Bateria", "descricao": "AA", "quantidade_atual": 25, "observacao": ""})
+        resp = self._post("insumo_delete", {})
         self.assertEqual(resp.status_code, 200)
-        self.insumo.refresh_from_db()
-        self.assertEqual(self.insumo.quantidade_atual, 25)
-        self.assertEqual(self.insumo.descricao, "AA")
+        self.assertFalse(InsumoTI.objects.filter(id=self.insumo.id).exists())
 
-    def test_quantidade_negativa_rejeitada(self):
-        self.client.force_login(self.ti)
-        resp = self._edit({"nome": "Bateria", "quantidade_atual": -5})
-        self.assertEqual(resp.status_code, 400)
-        self.insumo.refresh_from_db()
-        self.assertEqual(self.insumo.quantidade_atual, 0)
-
-    def test_comum_nao_edita(self):
+    def test_comum_nao_edita_nem_entrada_nem_exclui(self):
         self.client.force_login(self.common)
-        resp = self._edit({"nome": "Bateria", "quantidade_atual": 99})
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(self._post("insumo_update", {"nome": "X"}).status_code, 403)
+        self.assertEqual(self._post("insumo_entrada", {"quantidade": 5}).status_code, 403)
+        self.assertEqual(self._post("insumo_delete", {}).status_code, 403)

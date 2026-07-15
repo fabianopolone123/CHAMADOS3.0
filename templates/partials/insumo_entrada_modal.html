@@ -1,0 +1,27 @@
+<div class="modal fade" id="entradaInsumoModal" tabindex="-1" aria-labelledby="entradaInsumoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content create-ticket-modal">
+            <div class="modal-header">
+                <div>
+                    <span class="create-ticket-kicker">Entrada de estoque</span>
+                    <h5 class="modal-title" id="entradaInsumoModalLabel" data-entrada-insumo>Insumo</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="entradaInsumoForm" class="create-ticket-form">
+                <div class="modal-body">
+                    <p class="insumo-edit-hint">Estoque atual: <strong data-entrada-atual>0</strong></p>
+                    <label class="contrato-field">
+                        <span>Quantidade a adicionar</span>
+                        <input type="number" class="form-control" id="entradaQuantidade" min="1" step="1" value="1" required>
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="entradaSubmit">Adicionar ao estoque</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

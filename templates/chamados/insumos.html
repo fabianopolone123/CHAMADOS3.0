@@ -14,6 +14,8 @@
     class="tickets-app insumos-app"
     data-insumo-create-url="{% url 'insumo_create' %}"
     data-insumo-update-url="{% url 'insumo_update' insumo_id=0 %}"
+    data-insumo-entrada-url="{% url 'insumo_entrada' insumo_id=0 %}"
+    data-insumo-delete-url="{% url 'insumo_delete' insumo_id=0 %}"
     data-retirada-create-url="{% url 'retirada_create' insumo_id=0 %}"
 >
     {% csrf_token %}
@@ -46,8 +48,11 @@
                             <div class="insumo-card__foot">
                                 <span class="insumo-card__qty">Em estoque: <strong data-insumo-qty>{{ insumo.quantidade_atual }}</strong></span>
                                 <span class="insumo-card__actions">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary insumo-editar-btn" data-editar aria-label="Editar insumo">Editar</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary insumo-retirar-btn" data-retirar aria-label="Retirar insumo">Retirar</button>
+                                    <button type="button" class="insumo-icon-btn" data-editar title="Editar insumo" aria-label="Editar insumo">
+                                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                                    </button>
+                                    <button type="button" class="insumo-step-btn insumo-step-btn--minus" data-retirar title="Retirar (baixa de estoque)" aria-label="Retirar">&minus;</button>
+                                    <button type="button" class="insumo-step-btn insumo-step-btn--plus" data-entrada title="Entrada (adicionar ao estoque)" aria-label="Adicionar">+</button>
                                 </span>
                             </div>
                         </article>
@@ -96,6 +101,7 @@
 
 {% include "partials/insumo_create_modal.html" %}
 {% include "partials/insumo_edit_modal.html" %}
+{% include "partials/insumo_entrada_modal.html" %}
 {% include "partials/retirada_create_modal.html" %}
 {% endblock %}
 

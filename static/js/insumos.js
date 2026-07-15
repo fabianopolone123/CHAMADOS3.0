@@ -6,7 +6,11 @@
 
     const insumoCreateUrl = appElement.dataset.insumoCreateUrl;
     const insumoUpdateTpl = appElement.dataset.insumoUpdateUrl;
+    const insumoEntradaTpl = appElement.dataset.insumoEntradaUrl;
+    const insumoDeleteTpl = appElement.dataset.insumoDeleteUrl;
     const retiradaCreateTpl = appElement.dataset.retiradaCreateUrl;
+
+    const EDIT_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
 
     const grid = document.getElementById("insumosGrid");
     const retiradasBody = document.getElementById("retiradasBody");
@@ -117,18 +121,31 @@
         actions.className = "insumo-card__actions";
         const editarBtn = document.createElement("button");
         editarBtn.type = "button";
-        editarBtn.className = "btn btn-sm btn-outline-secondary insumo-editar-btn";
+        editarBtn.className = "insumo-icon-btn";
         editarBtn.dataset.editar = "";
-        editarBtn.textContent = "Editar";
+        editarBtn.title = "Editar insumo";
+        editarBtn.setAttribute("aria-label", "Editar insumo");
+        editarBtn.innerHTML = EDIT_ICON;
         editarBtn.addEventListener("click", () => openEditModal(card));
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "btn btn-sm btn-outline-primary insumo-retirar-btn";
-        btn.dataset.retirar = "";
-        btn.textContent = "Retirar";
-        btn.addEventListener("click", () => openRetiradaModal(card));
+        const minusBtn = document.createElement("button");
+        minusBtn.type = "button";
+        minusBtn.className = "insumo-step-btn insumo-step-btn--minus";
+        minusBtn.dataset.retirar = "";
+        minusBtn.title = "Retirar (baixa de estoque)";
+        minusBtn.setAttribute("aria-label", "Retirar");
+        minusBtn.innerHTML = "&minus;";
+        minusBtn.addEventListener("click", () => openRetiradaModal(card));
+        const plusBtn = document.createElement("button");
+        plusBtn.type = "button";
+        plusBtn.className = "insumo-step-btn insumo-step-btn--plus";
+        plusBtn.dataset.entrada = "";
+        plusBtn.title = "Entrada (adicionar ao estoque)";
+        plusBtn.setAttribute("aria-label", "Adicionar");
+        plusBtn.textContent = "+";
+        plusBtn.addEventListener("click", () => openEntradaModal(card));
         actions.appendChild(editarBtn);
-        actions.appendChild(btn);
+        actions.appendChild(minusBtn);
+        actions.appendChild(plusBtn);
         foot.appendChild(qtyWrap);
         foot.appendChild(actions);
 
@@ -141,6 +158,7 @@
     function bindCard(card) {
         card.querySelector("[data-retirar]")?.addEventListener("click", () => openRetiradaModal(card));
         card.querySelector("[data-editar]")?.addEventListener("click", () => openEditModal(card));
+        card.querySelector("[data-entrada]")?.addEventListener("click", () => openEntradaModal(card));
     }
 
     // ---------------- Modal de cadastro ----------------
@@ -183,13 +201,20 @@
     const editForm = document.getElementById("editInsumoForm");
     let editingCard = null;
 
+    const delTrigger = editModalEl?.querySelector("[data-insumo-delete]");
+    const delConfirm = editModalEl?.querySelector("[data-insumo-delete-confirm]");
+
+    function resetDeleteConfirm() {
+        if (delTrigger) delTrigger.hidden = false;
+        if (delConfirm) delConfirm.hidden = true;
+    }
+
     function openEditModal(card) {
         editingCard = card;
         document.getElementById("editInsumoNome").value = card.dataset.insumoNome || "";
         document.getElementById("editInsumoDescricao").value = card.dataset.insumoDescricao || "";
         document.getElementById("editInsumoObservacao").value = card.dataset.insumoObservacao || "";
-        document.getElementById("editInsumoQuantidade").value =
-            card.querySelector("[data-insumo-qty]")?.textContent || "0";
+        resetDeleteConfirm();
         editModal?.show();
     }
 
@@ -203,7 +228,6 @@
             const data = await sendJson(url, {
                 nome: document.getElementById("editInsumoNome").value.trim(),
                 descricao: document.getElementById("editInsumoDescricao").value.trim(),
-                quantidade_atual: document.getElementById("editInsumoQuantidade").value,
                 observacao: document.getElementById("editInsumoObservacao").value.trim(),
             });
             applyCardFull(editingCard, data.insumo);
@@ -211,6 +235,59 @@
             showToast(data.message || "Insumo atualizado.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel atualizar o insumo.", "error");
+        } finally {
+            if (submit) submit.disabled = false;
+        }
+    });
+
+    delTrigger?.addEventListener("click", () => {
+        delTrigger.hidden = true;
+        if (delConfirm) delConfirm.hidden = false;
+    });
+    editModalEl?.querySelector("[data-insumo-delete-cancel]")?.addEventListener("click", resetDeleteConfirm);
+    editModalEl?.querySelector("[data-insumo-delete-yes]")?.addEventListener("click", async () => {
+        if (!editingCard) return;
+        try {
+            const url = buildUrl(insumoDeleteTpl, editingCard.dataset.insumoId);
+            const data = await sendJson(url, {});
+            editingCard.remove();
+            editingCard = null;
+            editModal?.hide();
+            showToast(data.message || "Insumo excluido.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel excluir o insumo.", "error");
+        }
+    });
+
+    // ---------------- Modal de entrada (+) ----------------
+    const entradaModalEl = document.getElementById("entradaInsumoModal");
+    const entradaModal = entradaModalEl ? bootstrap.Modal.getOrCreateInstance(entradaModalEl) : null;
+    const entradaForm = document.getElementById("entradaInsumoForm");
+    let entradaCard = null;
+
+    function openEntradaModal(card) {
+        entradaCard = card;
+        entradaModalEl.querySelector("[data-entrada-insumo]").textContent = card.dataset.insumoNome || "Insumo";
+        entradaModalEl.querySelector("[data-entrada-atual]").textContent =
+            card.querySelector("[data-insumo-qty]")?.textContent || "0";
+        entradaForm.reset();
+        document.getElementById("entradaQuantidade").value = 1;
+        entradaModal?.show();
+    }
+
+    entradaForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!entradaCard) return;
+        const submit = document.getElementById("entradaSubmit");
+        if (submit) submit.disabled = true;
+        try {
+            const url = buildUrl(insumoEntradaTpl, entradaCard.dataset.insumoId);
+            const data = await sendJson(url, { quantidade: document.getElementById("entradaQuantidade").value });
+            applyCardStatus(entradaCard, data.insumo);
+            entradaModal?.hide();
+            showToast(data.message || "Entrada registrada.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel registrar a entrada.", "error");
         } finally {
             if (submit) submit.disabled = false;
         }

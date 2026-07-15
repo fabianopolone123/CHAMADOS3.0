@@ -98,7 +98,83 @@
 
 .insumo-card__actions {
     display: inline-flex;
+    align-items: center;
     gap: 0.4rem;
+}
+
+/* Icone discreto de editar */
+.insumo-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.insumo-icon-btn:hover {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #e2e8f0;
+}
+
+/* Botoes redondos - (retirar) e + (entrada) */
+.insumo-step-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid;
+    background: #fff;
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
+}
+.insumo-step-btn:hover {
+    transform: translateY(-1px);
+}
+.insumo-step-btn--minus {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+.insumo-step-btn--minus:hover {
+    background: #fee2e2;
+}
+.insumo-step-btn--plus {
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+.insumo-step-btn--plus:hover {
+    background: #dcfce7;
+}
+
+.insumo-edit-hint {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin: 0.25rem 0 0;
+}
+
+.insumo-delete-confirm {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.insumo-delete-confirm[hidden] {
+    display: none;
+}
+.insumo-delete-confirm__text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #b91c1c;
 }
 
 .insumo-card__qty {

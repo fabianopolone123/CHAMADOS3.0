@@ -20,15 +20,18 @@
                         <input type="text" class="form-control" id="editInsumoDescricao" maxlength="255" placeholder="Descricao curta (opcional)">
                     </label>
                     <label class="contrato-field">
-                        <span>Quantidade em estoque</span>
-                        <input type="number" class="form-control" id="editInsumoQuantidade" min="0" step="1" value="0" required>
-                    </label>
-                    <label class="contrato-field">
                         <span>Observacao</span>
                         <textarea class="form-control" id="editInsumoObservacao" rows="3" placeholder="Observacoes (opcional)"></textarea>
                     </label>
+                    <p class="insumo-edit-hint">A quantidade em estoque e ajustada pelos botoes + (entrada) e &minus; (retirada) no card.</p>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger me-auto" data-insumo-delete>Excluir</button>
+                    <span class="insumo-delete-confirm" data-insumo-delete-confirm hidden>
+                        <span class="insumo-delete-confirm__text">Excluir este insumo?</span>
+                        <button type="button" class="btn btn-light btn-sm" data-insumo-delete-cancel>Cancelar</button>
+                        <button type="button" class="btn btn-danger btn-sm" data-insumo-delete-yes>Excluir definitivamente</button>
+                    </span>
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="editInsumoSubmit">Salvar alteracoes</button>
                 </div>
