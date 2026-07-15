@@ -429,6 +429,45 @@
     font-weight: 600;
 }
 
+/* Sino discreto de permissao de notificacao (coluna Chamados abertos). */
+.notif-perm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.notif-perm-btn--on {
+    color: #15803d;
+}
+.notif-perm-btn--on:hover {
+    background: #dcfce7;
+}
+.notif-perm-btn--ask {
+    color: #b45309;
+    animation: notif-perm-pulse 1.8s ease-in-out infinite;
+}
+.notif-perm-btn--ask:hover {
+    background: #fef3c7;
+}
+.notif-perm-btn--off {
+    color: #94a3b8;
+}
+.notif-perm-btn--off:hover {
+    background: #f1f5f9;
+    color: #475569;
+}
+@keyframes notif-perm-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
 /* Coluna "Chamados fechados": resumo (consulta pelo modal), sem lista de cards. */
 .closed-column-body {
     flex: 1 1 auto;
