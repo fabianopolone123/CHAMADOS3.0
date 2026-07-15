@@ -89,11 +89,36 @@
         return window.__kanbanDragging === true || document.querySelector(".modal.show") !== null;
     }
 
-    function maybeReloadBoard() {
-        if (pendingBoardReload && onKanban() && !boardBusy()) {
-            pendingBoardReload = false;
-            window.location.reload();
+    // Atraso antes de atualizar o quadro, para o popup ficar visivel primeiro.
+    const RELOAD_DELAY_MS = 6000;
+    let reloadTimer = null;
+
+    function attemptReload() {
+        if (!pendingBoardReload) {
+            return;
         }
+        if (!onKanban()) {
+            pendingBoardReload = false;
+            return;
+        }
+        if (boardBusy()) {
+            // Tenta de novo em breve, sem interromper arrasto/modal.
+            reloadTimer = window.setTimeout(attemptReload, 2000);
+            return;
+        }
+        pendingBoardReload = false;
+        window.location.reload();
+    }
+
+    function scheduleBoardReload() {
+        if (!onKanban()) {
+            return;
+        }
+        pendingBoardReload = true;
+        if (reloadTimer) {
+            window.clearTimeout(reloadTimer);
+        }
+        reloadTimer = window.setTimeout(attemptReload, RELOAD_DELAY_MS);
     }
 
     function handleEvent(ev) {
@@ -103,10 +128,9 @@
             window.showAppToast(msg, "info", { title: ev.titulo || "Atualizacao de chamado", timeout: 9000 });
         }
         notifyNative(`${numero} - ${ev.titulo || "Chamado"}`, ev.descricao || "", numero);
-        if (ev.board && onKanban()) {
-            pendingBoardReload = true;
+        if (ev.board) {
+            scheduleBoardReload();
         }
-        maybeReloadBoard();
     }
 
     function connect() {
@@ -129,7 +153,6 @@
     bindPermBtn();
     connect();
 
-    // Aplica um reload pendente assim que a pessoa parar de interagir.
-    document.addEventListener("mouseup", () => window.setTimeout(maybeReloadBoard, 300));
-    window.setInterval(maybeReloadBoard, 3000);
+    // Rede de seguranca: aplica um reload pendente quando a tela ficar ociosa.
+    window.setInterval(attemptReload, 4000);
 })();
