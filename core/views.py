@@ -293,10 +293,20 @@ def tickets_dashboard_view(request):
     by_attendant = {user.id: [] for user in attendants}
     abertos = []
 
-    # A coluna "Chamados fechados" e apenas um resumo (contagem + busca no modal):
-    # nao renderiza os cards, que podem ser milhares. Isso evita carregar tudo no
-    # Kanban e o travamento ao arrastar um card para uma lista enorme.
-    closed_count = Chamado.objects.filter(status__in=Chamado.STATUS_ENCERRADOS).count()
+    # A coluna "Chamados fechados" mostra apenas os 5 encerrados mais recentes
+    # (cards de consulta, nao arrastaveis) + a contagem e a busca no modal. Assim
+    # o quadro nao carrega milhares de cards nem trava ao arrastar.
+    closed_qs = Chamado.objects.filter(status__in=Chamado.STATUS_ENCERRADOS)
+    closed_count = closed_qs.count()
+    closed_recent = [
+        {
+            "numero": c.numero,
+            "titulo": c.titulo,
+            "status_label": c.status_label,
+            "status_class": _STATUS_BADGE_CLASS.get(c.status, "status-neutral"),
+        }
+        for c in closed_qs.order_by("-fechado_em", "-criado_em")[:5]
+    ]
 
     chamados = (
         Chamado.objects.select_related("solicitante", "atendente_atual")
@@ -330,7 +340,7 @@ def tickets_dashboard_view(request):
         "open_column": {"tickets": abertos, "count": len(abertos)},
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "attendant_columns": attendant_columns,
-        "closed_column": {"count": closed_count},
+        "closed_column": {"count": closed_count, "recent": closed_recent},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
         "can_view_history": True,

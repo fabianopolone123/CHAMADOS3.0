@@ -97,7 +97,22 @@
                         <span class="column-count" data-closed-count>{{ closed_column.count }}</span>
                     </div>
                     <div class="closed-column-body">
-                        <p class="kanban-empty">Os chamados fechados nao ficam no quadro. Use a busca para consultar.</p>
+                        {% if closed_column.recent %}
+                            <div class="closed-recent">
+                                {% for t in closed_column.recent %}
+                                    <button type="button" class="closed-recent__item js-open-closed-modal" data-closed-number="{{ t.numero }}" title="{{ t.titulo }}">
+                                        <span class="closed-recent__top">
+                                            <span class="closed-recent__number">{{ t.numero }}</span>
+                                            <span class="status-badge {{ t.status_class }}">{{ t.status_label }}</span>
+                                        </span>
+                                        <span class="closed-recent__title">{{ t.titulo }}</span>
+                                    </button>
+                                {% endfor %}
+                            </div>
+                            <p class="closed-column-hint">Ultimos {{ closed_column.recent|length }} encerrados. Use a busca para ver todos.</p>
+                        {% else %}
+                            <p class="kanban-empty">Nenhum chamado fechado.</p>
+                        {% endif %}
                         <button type="button" class="btn btn-light js-open-closed-modal">Pesquisar chamados fechados</button>
                     </div>
                 </article>

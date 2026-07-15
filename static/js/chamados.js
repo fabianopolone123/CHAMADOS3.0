@@ -1105,7 +1105,17 @@
         }
 
         triggers.forEach((trigger) => {
-            trigger.addEventListener("click", openModal);
+            trigger.addEventListener("click", () => {
+                const number = trigger.dataset.closedNumber;
+                if (number) {
+                    // Card de um encerrado recente: abre direto no detalhe.
+                    setView("detail");
+                    closedModal.show();
+                    openDetail(number);
+                } else {
+                    openModal();
+                }
+            });
         });
 
         if (searchInput) {
