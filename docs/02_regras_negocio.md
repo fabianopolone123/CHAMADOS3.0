@@ -157,6 +157,17 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 7. O termo assinado devolvido pelo colaborador pode ser anexado no detalhe (registrando data e usuario). Ao marcar a documentacao como OK, o status muda para "Documentacao assinada / OK" (exige o termo assinado ja anexado). Status disponiveis: Aguardando documentacao assinada, Documentacao assinada / OK, Em andamento, Devolvido, Cancelado.
 8. Toda a validacao (permissao, senha da assinatura, obrigatoriedade de equipamento e datas) e feita no backend.
 
+## Regras atuais do modulo E-mail (notificacoes)
+
+1. As notificacoes por e-mail sao configuradas em `/email-config/`, acessivel a Administrador e Atendente TI (o botao "E-mail" no menu lateral so aparece para esses perfis; as rotas validam a permissao no backend). O envio so acontece com a chave "Ativar notificacoes" ligada.
+2. A configuracao (servidor SMTP, conta de envio, senha de app, remetente, e-mails da TI e quais eventos disparam) fica no banco em um registro unico (`EmailConfig`). Os defaults ja vem prontos para o Google/Gmail (`smtp.gmail.com`, porta 587, TLS). A **senha de app do Google e guardada cifrada** (Fernet, mesmo esquema do Cofre) — nunca em texto no banco, no codigo ou na doc.
+3. Eventos que disparam e-mail (cada um com liga/desliga proprio):
+   - **Novo chamado**: enviado ao **solicitante** (confirmacao de abertura) e aos **e-mails da TI**. Vale para chamados abertos pelo portal, criados no Kanban e gerados a partir de uma pendencia.
+   - **Nova mensagem** na conversa: notifica a **outra parte** (se o solicitante escreveu, avisa a TI; se a TI escreveu, avisa o solicitante) mais os e-mails da TI, sem enviar copia para quem escreveu.
+   - **Mudanca de status** do chamado (movimentacao no Kanban): notifica solicitante e TI.
+   - **Fechamento** do chamado (acao Stop): notifica solicitante e TI, incluindo o "o que foi feito".
+4. O envio e **tolerante a falhas**: se o SMTP estiver mal configurado ou fora do ar, o erro e apenas registrado em log e **nunca impede** abrir, mover, responder ou fechar o chamado. Ha um botao de **enviar e-mail de teste** que, ao contrario, mostra o erro real do servidor para ajudar a configurar.
+
 ## Regras previstas para o sistema de chamados
 
 1. Cada chamado deve ter status de acompanhamento com transicoes controladas.

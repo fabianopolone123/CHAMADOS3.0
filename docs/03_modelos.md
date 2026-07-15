@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e seis modelos persistidos:
+O projeto possui trinta e sete modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -81,6 +81,10 @@ Modulo Cofre:
 - `CofreConfig`
 - `CofreCredencial`
 - `CofreAuditoria`
+
+Modulo E-mail (notificacoes):
+
+- `EmailConfig`
 
 ## Modelos implementados
 
@@ -602,6 +606,18 @@ Regras atuais:
 
 - Acesso = **Atendente TI/Admin** **+** senha-mestra (destrava a sessao por `VAULT_UNLOCK_SECONDS`, padrao 15 min, com auto-lock). So **admin** define/altera a senha-mestra (no 1o acesso e para trocar, exigindo a atual).
 - As senhas ficam **cifradas em repouso**; sao **reveladas uma a uma sob demanda** (endpoint `revelar`, JSON), nunca todas no HTML. Cada revelacao/cópia e auditada. Operacoes com credenciais exigem o cofre destravado (senao `403`).
+
+### EmailConfig
+
+Configuracao unica (singleton, `load()`) das notificacoes por e-mail (modulo E-mail), migration `0031`. Guarda os dados do servidor SMTP e para onde enviar. Os defaults ja vem prontos para o Google/Gmail (`smtp.gmail.com` / `587` / TLS).
+
+- Campos SMTP: `ativo` (liga/desliga o envio), `host`, `porta`, `usar_tls`, `usar_ssl`, `timeout`.
+- Conta de envio: `usuario` (autentica no SMTP), `senha_cifrada` (a senha de app do Google, **cifrada em repouso** com Fernet — `core/crypto.py`, mesma `VAULT_ENCRYPTION_KEY`; NUNCA em claro), `remetente` (De; em branco usa `usuario`), `remetente_nome`.
+- Destino da TI: `emails_ti` (um ou varios e-mails, separados por virgula/;/quebra de linha; `destinatarios_ti()` normaliza e dedup).
+- Flags por evento: `notif_novo_chamado`, `notif_nova_mensagem`, `notif_mudanca_status`, `notif_fechamento`.
+- Metodos: `definir_senha`/`obter_senha` (cifra/decifra), `tem_senha`, `remetente_efetivo`, `destinatarios_ti`.
+
+O envio real fica em `core/emails.py` (funcoes `notificar_novo_chamado`, `notificar_nova_mensagem`, `notificar_mudanca_status`, `notificar_fechamento` e `enviar_email_teste`), sempre **fail-safe**: qualquer falha de SMTP e apenas logada e nunca interrompe o fluxo do chamado. A conexao e montada a partir da `EmailConfig`; em testes, `settings.EMAIL_BACKEND_OVERRIDE` forca o backend em memoria.
 
 ## Modelos previstos para proximas fases
 

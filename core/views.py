@@ -23,6 +23,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from . import emails as notificacoes
 from .forms import AberturaChamadoForm, LoginForm, MensagemChamadoForm
 from .models import (
     AssinaturaResponsavelTI,
@@ -41,6 +42,7 @@ from .models import (
     Dica,
     DocumentoTI,
     DocumentoTIAnexo,
+    EmailConfig,
     EnderecoIP,
     FuturaDigital,
     EmprestimoTI,
@@ -431,6 +433,9 @@ def move_ticket_view(request):
                 descricao=f"Atendente atual removido por {autor}; chamado devolvido para a fila de abertos.",
             )
 
+    if status_changed:
+        notificacoes.notificar_mudanca_status(chamado, previous_status_label, autor, request)
+
     return JsonResponse(
         {
             "ok": True,
@@ -496,6 +501,8 @@ def create_ticket_kanban_view(request):
         .filter(atendente=request.user, finalizado_em__isnull=True)
         .first()
     )
+    notificacoes.notificar_novo_chamado(chamado, request)
+
     card = _serialize_kanban_card(chamado, _serialize_attendance_state(active_attendance))
     card_html = render_to_string("partials/kanban_card.html", {"ticket": card}, request=request)
 
@@ -637,6 +644,8 @@ def pendencia_convert_view(request, pendencia_id: int):
             continue
     else:
         return _json_error("Nao foi possivel gerar o numero do chamado. Tente novamente.")
+
+    notificacoes.notificar_novo_chamado(chamado, request)
 
     active_attendance = (
         AtendimentoHistorico.objects.select_related("chamado")
@@ -846,6 +855,10 @@ def finish_attendance_view(request):
         return _json_error(message)
 
     chamado = attendance.chamado
+    if ticket_closed:
+        autor_nome = request.user.get_full_name() or request.user.username
+        notificacoes.notificar_fechamento(chamado, autor_nome, description, request)
+
     duration_display = _format_duration(attendance.duracao)
     action_label = "pausado" if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE else "finalizado"
 
@@ -1001,6 +1014,7 @@ def open_ticket_view(request):
             }
             return render(request, "chamados/abrir_chamado.html", context)
 
+        notificacoes.notificar_novo_chamado(chamado, request)
         messages.success(request, f"Chamado {chamado.numero} aberto com sucesso.")
         return redirect("ticket_detail", numero=chamado.numero)
 
@@ -1280,6 +1294,7 @@ def ticket_message_create_view(request, numero: str):
             descricao=resumo,
         )
 
+    notificacoes.notificar_nova_mensagem(chamado, mensagem, request)
     messages.success(request, "Mensagem enviada com sucesso.")
     return redirect("ticket_detail", numero=chamado.numero)
 
@@ -4122,3 +4137,91 @@ def cofre_credencial_reveal_view(request, credencial_id: int):
 
     _cofre_audit(request, CofreAuditoria.ACAO_CRED_REVELADA, credencial=cred)
     return JsonResponse({"ok": True, "senha": cred.obter_senha()})
+
+
+# ---------------------------------------------------------------------------
+# Configuracao de e-mail (notificacoes SMTP)
+# ---------------------------------------------------------------------------
+def _email_config_context(request, config: EmailConfig) -> dict:
+    return {
+        "page_title": "Configuracao de E-mail",
+        "config": config,
+        "tem_senha": config.tem_senha,
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+
+
+@ti_required
+def email_config_view(request):
+    """Tela de configuracao das notificacoes por e-mail (SMTP). Acesso TI/admin."""
+    config = EmailConfig.load()
+    return render(request, "chamados/email_config.html", _email_config_context(request, config))
+
+
+@login_required
+@require_POST
+def email_config_save_view(request):
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para configurar o e-mail.")
+        return redirect("my_tickets")
+
+    config = EmailConfig.load()
+    config.ativo = (request.POST.get("ativo") == "on")
+    config.host = (request.POST.get("host") or "").strip() or "smtp.gmail.com"
+
+    try:
+        config.porta = int((request.POST.get("porta") or "").strip() or 587)
+    except ValueError:
+        messages.error(request, "Porta invalida.")
+        return redirect("email_config")
+
+    config.usar_tls = (request.POST.get("usar_tls") == "on")
+    config.usar_ssl = (request.POST.get("usar_ssl") == "on")
+    if config.usar_tls and config.usar_ssl:
+        messages.error(request, "Use TLS ou SSL, nao os dois ao mesmo tempo.")
+        return redirect("email_config")
+
+    try:
+        config.timeout = int((request.POST.get("timeout") or "").strip() or 15)
+    except ValueError:
+        config.timeout = 15
+
+    config.usuario = (request.POST.get("usuario") or "").strip()
+    config.remetente = (request.POST.get("remetente") or "").strip()
+    config.remetente_nome = (request.POST.get("remetente_nome") or "").strip() or "Chamados TI"
+    config.emails_ti = (request.POST.get("emails_ti") or "").strip()
+
+    config.notif_novo_chamado = (request.POST.get("notif_novo_chamado") == "on")
+    config.notif_nova_mensagem = (request.POST.get("notif_nova_mensagem") == "on")
+    config.notif_mudanca_status = (request.POST.get("notif_mudanca_status") == "on")
+    config.notif_fechamento = (request.POST.get("notif_fechamento") == "on")
+
+    if request.POST.get("remover_senha") == "on":
+        config.senha_cifrada = ""
+    else:
+        nova_senha = request.POST.get("senha") or ""
+        if nova_senha.strip():
+            # Remove espacos (a senha de app do Google e mostrada em blocos de 4).
+            config.definir_senha(nova_senha.replace(" ", ""))
+
+    config.save()
+    messages.success(request, "Configuracao de e-mail salva com sucesso.")
+    return redirect("email_config")
+
+
+@login_required
+@require_POST
+def email_config_test_view(request):
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para testar o e-mail.")
+        return redirect("my_tickets")
+
+    config = EmailConfig.load()
+    destino = (request.POST.get("email_teste") or "").strip() or request.user.email or ""
+    ok, mensagem = notificacoes.enviar_email_teste(config, destino)
+    if ok:
+        messages.success(request, mensagem)
+    else:
+        messages.error(request, mensagem)
+    return redirect("email_config")

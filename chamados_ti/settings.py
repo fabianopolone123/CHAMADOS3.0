@@ -204,6 +204,17 @@ VAULT_LOCKOUT_SECONDS = _env_int("VAULT_LOCKOUT_SECONDS", 300)
 # quando o servidor estiver atras de HTTPS (nginx + TLS). Em dev fica desligado
 # para nao quebrar o acesso por http.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Notificacoes por e-mail (modulo E-mail)
+# ---------------------------------------------------------------------------
+# A configuracao SMTP fica no banco (EmailConfig, tela /email-config/), com a
+# senha (senha de app do Google) cifrada em repouso. Estas settings sao apenas
+# de suporte: EMAIL_BACKEND_OVERRIDE forca um backend (usado nos testes para
+# capturar em memoria); em branco, o envio monta a conexao SMTP a partir da
+# EmailConfig.
+EMAIL_BACKEND_OVERRIDE = (os.environ.get("EMAIL_BACKEND_OVERRIDE", "") or "").strip()
+
+# ---------------------------------------------------------------------------
 _secure_cookies = _env_bool("SECURE_COOKIES", False)
 SESSION_COOKIE_SECURE = _secure_cookies
 CSRF_COOKIE_SECURE = _secure_cookies

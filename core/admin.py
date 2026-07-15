@@ -11,6 +11,7 @@ from .models import (
     Dica,
     DocumentoTI,
     DocumentoTIAnexo,
+    EmailConfig,
     EnderecoIP,
     FuturaDigital,
     Licenca,
@@ -281,3 +282,11 @@ class CofreAuditoriaAdmin(admin.ModelAdmin):
 class CofreConfigAdmin(admin.ModelAdmin):
     list_display = ("__str__", "tentativas_falhas", "bloqueado_ate", "atualizado_em")
     readonly_fields = ("senha_mestra_hash", "atualizado_em")
+
+
+@admin.register(EmailConfig)
+class EmailConfigAdmin(admin.ModelAdmin):
+    # NAO expoe a senha cifrada; a configuracao e feita pela tela /email-config/.
+    list_display = ("__str__", "ativo", "host", "porta", "usuario", "atualizado_em")
+    exclude = ("senha_cifrada",)
+    readonly_fields = ("atualizado_em",)

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/email_config.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="tickets-app mailcfg-app">
+    {% include "partials/ti_sidebar.html" with active="email_config" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar">
+            <div>
+                <h2 class="topbar-title">Configuracao de E-mail</h2>
+                <p class="topbar-subtitle">
+                    Notificacoes automaticas de chamados por e-mail. Os padroes ja vem prontos para o Google (Gmail).
+                </p>
+            </div>
+            <span class="mailcfg-status {% if config.ativo %}mailcfg-status--on{% else %}mailcfg-status--off{% endif %}">
+                {% if config.ativo %}Notificacoes ligadas{% else %}Notificacoes desligadas{% endif %}
+            </span>
+        </header>
+
+        <div class="mailcfg-grid">
+            <form method="post" action="{% url 'email_config_save' %}" class="mailcfg-card" autocomplete="off">
+                {% csrf_token %}
+
+                <label class="mailcfg-switch">
+                    <input type="checkbox" name="ativo" {% if config.ativo %}checked{% endif %}>
+                    <span><strong>Ativar notificacoes por e-mail</strong><small>Desligado, nenhum e-mail e enviado.</small></span>
+                </label>
+
+                <h3 class="mailcfg-section">Servidor SMTP</h3>
+                <div class="mailcfg-row">
+                    <div class="mailcfg-field mailcfg-field--wide">
+                        <label for="host">Servidor (host)</label>
+                        <input type="text" id="host" name="host" value="{{ config.host }}" placeholder="smtp.gmail.com">
+                    </div>
+                    <div class="mailcfg-field">
+                        <label for="porta">Porta</label>
+                        <input type="number" id="porta" name="porta" value="{{ config.porta }}" min="1" max="65535">
+                    </div>
+                    <div class="mailcfg-field">
+                        <label for="timeout">Timeout (s)</label>
+                        <input type="number" id="timeout" name="timeout" value="{{ config.timeout }}" min="1" max="120">
+                    </div>
+                </div>
+                <div class="mailcfg-row mailcfg-row--checks">
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="usar_tls" {% if config.usar_tls %}checked{% endif %}>
+                        <span>Usar TLS (porta 587 - padrao Google)</span>
+                    </label>
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="usar_ssl" {% if config.usar_ssl %}checked{% endif %}>
+                        <span>Usar SSL (porta 465)</span>
+                    </label>
+                </div>
+
+                <h3 class="mailcfg-section">Conta de envio</h3>
+                <div class="mailcfg-row">
+                    <div class="mailcfg-field mailcfg-field--wide">
+                        <label for="usuario">Conta que autentica (usuario SMTP)</label>
+                        <input type="email" id="usuario" name="usuario" value="{{ config.usuario }}" placeholder="seu-email@gmail.com">
+                    </div>
+                </div>
+                <div class="mailcfg-row">
+                    <div class="mailcfg-field mailcfg-field--wide">
+                        <label for="senha">Senha de app do Google
+                            {% if tem_senha %}<span class="mailcfg-badge">Ja cadastrada</span>{% endif %}
+                        </label>
+                        <input type="password" id="senha" name="senha"
+                               placeholder="{% if tem_senha %}Deixe em branco para manter a atual{% else %}Cole a senha de app (16 caracteres){% endif %}">
+                        <small class="mailcfg-help">A senha e guardada cifrada. Pode colar com espacos; eles sao removidos.</small>
+                    </div>
+                </div>
+                {% if tem_senha %}
+                <label class="mailcfg-check mailcfg-check--danger">
+                    <input type="checkbox" name="remover_senha">
+                    <span>Remover a senha cadastrada</span>
+                </label>
+                {% endif %}
+                <div class="mailcfg-row">
+                    <div class="mailcfg-field">
+                        <label for="remetente">Remetente (De)</label>
+                        <input type="email" id="remetente" name="remetente" value="{{ config.remetente }}" placeholder="Em branco = usa a conta acima">
+                    </div>
+                    <div class="mailcfg-field">
+                        <label for="remetente_nome">Nome do remetente</label>
+                        <input type="text" id="remetente_nome" name="remetente_nome" value="{{ config.remetente_nome }}" placeholder="Chamados TI">
+                    </div>
+                </div>
+
+                <h3 class="mailcfg-section">Destino da equipe de TI</h3>
+                <div class="mailcfg-row">
+                    <div class="mailcfg-field mailcfg-field--wide">
+                        <label for="emails_ti">E-mail(s) da TI</label>
+                        <textarea id="emails_ti" name="emails_ti" rows="2" placeholder="ti@empresa.com, suporte@empresa.com">{{ config.emails_ti }}</textarea>
+                        <small class="mailcfg-help">Varios e-mails separados por virgula. Recebem copia das notificacoes.</small>
+                    </div>
+                </div>
+
+                <h3 class="mailcfg-section">Quais eventos disparam e-mail</h3>
+                <div class="mailcfg-events">
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="notif_novo_chamado" {% if config.notif_novo_chamado %}checked{% endif %}>
+                        <span>Novo chamado (solicitante + TI)</span>
+                    </label>
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="notif_nova_mensagem" {% if config.notif_nova_mensagem %}checked{% endif %}>
+                        <span>Nova mensagem na conversa</span>
+                    </label>
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="notif_mudanca_status" {% if config.notif_mudanca_status %}checked{% endif %}>
+                        <span>Mudanca de status</span>
+                    </label>
+                    <label class="mailcfg-check">
+                        <input type="checkbox" name="notif_fechamento" {% if config.notif_fechamento %}checked{% endif %}>
+                        <span>Fechamento do chamado</span>
+                    </label>
+                </div>
+
+                <div class="mailcfg-actions">
+                    <button type="submit" class="btn btn-primary">Salvar configuracao</button>
+                </div>
+            </form>
+
+            <aside class="mailcfg-card mailcfg-side">
+                <h3 class="mailcfg-section">Enviar e-mail de teste</h3>
+                <p class="mailcfg-help">Salve a configuracao primeiro. O teste usa os dados atuais do servidor.</p>
+                <form method="post" action="{% url 'email_config_test' %}" autocomplete="off">
+                    {% csrf_token %}
+                    <div class="mailcfg-field mailcfg-field--wide">
+                        <label for="email_teste">Enviar teste para</label>
+                        <input type="email" id="email_teste" name="email_teste"
+                               value="{{ request.user.email }}" placeholder="voce@empresa.com" required>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary mailcfg-test-btn">Enviar teste</button>
+                </form>
+
+                <div class="mailcfg-tip">
+                    <h4>Como usar com o Google</h4>
+                    <ol>
+                        <li>Ative a verificacao em duas etapas na conta Google.</li>
+                        <li>Gere uma <strong>senha de app</strong> em myaccount.google.com/apppasswords.</li>
+                        <li>Servidor <code>smtp.gmail.com</code>, porta <code>587</code>, TLS ligado (ja e o padrao).</li>
+                        <li>Conta de envio = seu Gmail; cole a senha de app no campo acima.</li>
+                    </ol>
+                </div>
+            </aside>
+        </div>
+    </section>
+</main>
+{% endblock %}

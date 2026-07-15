@@ -103,6 +103,9 @@
 | `/cofre/credenciais/<id>/editar/` | POST | Edita uma credencial (senha em branco mantem a atual) — exige destravado | Implementada |
 | `/cofre/credenciais/<id>/excluir/` | POST | Exclui uma credencial — exige destravado | Implementada |
 | `/cofre/credenciais/<id>/revelar/` | POST | Devolve (JSON) a senha decifrada de UMA credencial — exige destravado; auditado | Implementada |
+| `/email-config/` | GET | Modulo E-mail: tela de configuracao das notificacoes SMTP (apenas TI/admin) | Implementada |
+| `/email-config/salvar/` | POST | Salva a configuracao SMTP (senha cifrada; em branco mantem a atual) (apenas TI/admin) | Implementada |
+| `/email-config/testar/` | POST | Envia um e-mail de teste com a configuracao atual (apenas TI/admin) | Implementada |
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
@@ -273,6 +276,17 @@
 - `/cofre/senha-mestra/` e restrita a **admin**; para alterar uma senha-mestra existente, exige a atual. A senha-mestra e guardada apenas como hash.
 - `/cofre/destravar/` valida a senha-mestra; erros incrementam o contador e, ao atingir `VAULT_MAX_FAILED_ATTEMPTS`, aplicam bloqueio por `VAULT_LOCKOUT_SECONDS`. Sucesso reseta o contador e abre a sessao.
 - As senhas sao **cifradas em repouso** (Fernet, `core/crypto.py`) e **reveladas sob demanda** por `/cofre/credenciais/<id>/revelar/` (POST, JSON) — nunca renderizadas no HTML inicial. Toda revelacao/cópia, destrave, falha e alteracao e registrada em `CofreAuditoria` (com IP). As operacoes de credencial exigem o cofre destravado (`403` caso contrario). Ver o guia de deploy seguro em `docs/08_deploy_seguro.md`.
+
+## Regras do modulo E-mail (notificacoes)
+
+- As tres rotas usam `ti_required`/guard de TI (Atendente TI/Admin; usuario comum e redirecionado). A tela `/email-config/` mostra o formulario SMTP com os defaults do Google e um formulario a parte para enviar e-mail de teste.
+- `/email-config/salvar/` grava a `EmailConfig` (singleton). A senha de app e **cifrada em repouso** (Fernet); enviar o campo em branco **mantem** a senha atual, e ha um checkbox para remove-la. Espacos na senha sao removidos (o Google mostra a senha de app em blocos de 4). TLS e SSL nao podem ser ligados juntos.
+- `/email-config/testar/` envia um e-mail de teste com a configuracao atual e retorna o erro real do SMTP na tela (nao e fail-safe, ao contrario das notificacoes automaticas).
+- **Disparo automatico** (fail-safe, nunca quebra o chamado), quando `ativo` e o flag do evento estao ligados:
+  - **Novo chamado** (portal `/meus-chamados/novo/`, Kanban `/chamados/criar/` e conversao de pendencia): e-mail para o **solicitante** (confirmacao) e para os **e-mails da TI**.
+  - **Nova mensagem** (`/meus-chamados/<numero>/mensagens/`): notifica a **outra parte** + TI, sem copiar quem escreveu.
+  - **Mudanca de status** (`/chamados/mover/`, quando o status muda): notifica solicitante + TI.
+  - **Fechamento** (Stop em `/chamados/atendimento/encerrar/`): notifica solicitante + TI, com o "o que foi feito".
 
 ## Regras das rotas de historico
 

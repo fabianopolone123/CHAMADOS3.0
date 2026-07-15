@@ -1545,3 +1545,97 @@ class CofreAuditoria(models.Model):
     def __str__(self) -> str:
         ator = self.ator.username if self.ator else "?"
         return f"{self.criado_em:%d/%m/%Y %H:%M} - {self.acao} - {ator}"
+
+
+class EmailConfig(models.Model):
+    """Configuracao unica (singleton) das notificacoes por e-mail (SMTP).
+
+    Guarda os dados do servidor SMTP e para onde enviar as notificacoes de
+    chamado. A senha (senha de app do Google, por padrao) e cifrada em repouso
+    com Fernet (mesmo esquema do Cofre, `core/crypto.py`) — no banco so ha texto
+    cifrado. Os defaults ja vem prontos para o Google (smtp.gmail.com / 587 / TLS).
+    """
+
+    ativo = models.BooleanField(
+        default=False,
+        help_text="Liga/desliga o envio de e-mails de notificacao.",
+    )
+
+    # Servidor SMTP (defaults do Google/Gmail).
+    host = models.CharField(max_length=255, blank=True, default="smtp.gmail.com")
+    porta = models.PositiveIntegerField(default=587)
+    usar_tls = models.BooleanField(default=True)
+    usar_ssl = models.BooleanField(default=False)
+    timeout = models.PositiveIntegerField(default=15, help_text="Tempo limite (segundos) da conexao SMTP.")
+
+    # Conta de envio.
+    usuario = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Conta que autentica no SMTP (ex.: seu-email@gmail.com).",
+    )
+    senha_cifrada = models.TextField(blank=True, default="")
+    remetente = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="E-mail que aparece como remetente. Em branco usa a conta de envio.",
+    )
+    remetente_nome = models.CharField(max_length=160, blank=True, default="Chamados TI")
+
+    # Destino das notificacoes para a equipe de TI (aceita varios, separados por
+    # virgula, ponto-e-virgula ou quebra de linha).
+    emails_ti = models.TextField(
+        blank=True,
+        default="",
+        help_text="E-mail(s) da equipe de TI que recebem as notificacoes.",
+    )
+
+    # Quais eventos disparam e-mail.
+    notif_novo_chamado = models.BooleanField(default=True)
+    notif_nova_mensagem = models.BooleanField(default=True)
+    notif_mudanca_status = models.BooleanField(default=True)
+    notif_fechamento = models.BooleanField(default=True)
+
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuracao de E-mail"
+        verbose_name_plural = "Configuracao de E-mail"
+
+    def __str__(self) -> str:
+        return "Configuracao de E-mail (SMTP)"
+
+    @classmethod
+    def load(cls) -> "EmailConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def tem_senha(self) -> bool:
+        return bool(self.senha_cifrada)
+
+    def definir_senha(self, raw_password: str) -> None:
+        from .crypto import encrypt_text
+
+        self.senha_cifrada = encrypt_text(raw_password or "")
+
+    def obter_senha(self) -> str:
+        from .crypto import decrypt_text
+
+        return decrypt_text(self.senha_cifrada)
+
+    @property
+    def remetente_efetivo(self) -> str:
+        return (self.remetente or self.usuario or "").strip()
+
+    def destinatarios_ti(self) -> list[str]:
+        """Lista de e-mails da TI (normalizada e sem duplicados)."""
+        bruto = (self.emails_ti or "").replace(";", ",").replace("\n", ",")
+        vistos: list[str] = []
+        for parte in bruto.split(","):
+            email = parte.strip()
+            if email and email.lower() not in {v.lower() for v in vistos}:
+                vistos.append(email)
+        return vistos

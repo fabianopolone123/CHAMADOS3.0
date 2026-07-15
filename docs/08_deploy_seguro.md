@@ -102,6 +102,18 @@ redireciona HTTP->HTTPS (assumindo o header `X-Forwarded-Proto` do nginx).
    comunique de forma segura a quem for usar o cofre.
 3. A partir dai, qualquer Atendente TI/Admin destrava com a senha-mestra.
 
+## 5b. Notificacoes por e-mail (modulo E-mail)
+
+- A configuracao SMTP e feita pela tela `/email-config/` (TI/admin), nao por env.
+  A **senha de app do Google** e cifrada em repouso com a **mesma**
+  `VAULT_ENCRYPTION_KEY` do cofre — portanto ela ja fica protegida pelos passos
+  1-2 e pelas mesmas regras de backup abaixo.
+- Recomendado: use uma **senha de app** dedicada (Google, com verificacao em duas
+  etapas ligada), servidor `smtp.gmail.com`, porta `587`, TLS. Use o botao
+  **"Enviar teste"** apos salvar para validar a configuracao.
+- Se a chave for perdida/trocada, a senha de e-mail (como as do cofre) deixa de
+  ser decifravel; basta cadastra-la de novo na tela.
+
 ## 6. Backups
 
 - O backup do banco contem as senhas **cifradas** (inuteis sem a chave), mas

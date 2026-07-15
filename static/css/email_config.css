@@ -1,0 +1,197 @@
+/* Tela de configuracao de e-mail (notificacoes SMTP). */
+
+.mailcfg-status {
+    align-self: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.mailcfg-status--on {
+    background: #dcfce7;
+    color: #166534;
+}
+.mailcfg-status--off {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.mailcfg-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 0 1.5rem 2rem;
+}
+@media (max-width: 992px) {
+    .mailcfg-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.mailcfg-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.mailcfg-section {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 1.5rem 0 0.85rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #eef2f7;
+}
+.mailcfg-section:first-of-type {
+    margin-top: 1rem;
+}
+
+.mailcfg-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.35rem;
+}
+.mailcfg-row--checks {
+    gap: 1.5rem;
+    margin: 0.5rem 0 0.25rem;
+}
+.mailcfg-field {
+    flex: 1 1 160px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+.mailcfg-field--wide {
+    flex: 1 1 100%;
+}
+.mailcfg-field label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+}
+.mailcfg-field input,
+.mailcfg-field textarea {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.mailcfg-field input:focus,
+.mailcfg-field textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.mailcfg-help {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+.mailcfg-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.mailcfg-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+}
+.mailcfg-switch input {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: none;
+}
+.mailcfg-switch span {
+    display: flex;
+    flex-direction: column;
+}
+.mailcfg-switch small {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.mailcfg-check,
+.mailcfg-events .mailcfg-check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.87rem;
+    color: #334155;
+    cursor: pointer;
+}
+.mailcfg-check input {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex: none;
+}
+.mailcfg-check--danger {
+    color: #b91c1c;
+    margin: 0.5rem 0;
+}
+.mailcfg-events {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    gap: 0.75rem;
+}
+
+.mailcfg-actions {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #eef2f7;
+}
+
+.mailcfg-side .mailcfg-section:first-of-type {
+    margin-top: 0;
+}
+.mailcfg-test-btn {
+    margin-top: 0.75rem;
+    width: 100%;
+}
+.mailcfg-tip {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 10px;
+}
+.mailcfg-tip h4 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #075985;
+    margin-bottom: 0.6rem;
+}
+.mailcfg-tip ol {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #0c4a6e;
+}
+.mailcfg-tip code {
+    background: #e0f2fe;
+    padding: 0.05rem 0.35rem;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    color: #075985;
+}

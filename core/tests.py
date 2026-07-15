@@ -1369,3 +1369,218 @@ class CofreTests(TestCase):
         self.assertEqual(self.client.post(reverse("cofre_credencial_reveal", args=[cred.id])).status_code, 200)
         self.client.post(reverse("cofre_lock"))
         self.assertEqual(self.client.post(reverse("cofre_credencial_reveal", args=[cred.id])).status_code, 403)
+
+
+_LOCMEM = "django.core.mail.backends.locmem.EmailBackend"
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(), EMAIL_BACKEND_OVERRIDE=_LOCMEM)
+class EmailNotificacaoTests(TestCase):
+    """Notificacoes por e-mail: disparo nos eventos e configuracao (SMTP)."""
+
+    def setUp(self):
+        from .models import EmailConfig
+
+        User = get_user_model()
+        self.owner = User.objects.create_user(username="joao", password="x", email="joao@empresa.com")
+        self.attendant = User.objects.create_user(username="ti", password="x", email="atendente@empresa.com")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.attendant.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+        self.config = EmailConfig.load()
+        self.config.ativo = True
+        self.config.usuario = "chamados@empresa.com"
+        self.config.remetente = "chamados@empresa.com"
+        self.config.emails_ti = "suporte@empresa.com, ti@empresa.com"
+        self.config.save()
+
+    # --- Disparo dos eventos ---------------------------------------------
+    def test_novo_chamado_portal_notifica_solicitante_e_ti(self):
+        from django.core import mail
+
+        mail.outbox = []
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("open_ticket"), {"titulo": "PC nao liga", "descricao": "O computador nao liga de jeito nenhum"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        destinos = {d for m in mail.outbox for d in m.to}
+        self.assertIn("joao@empresa.com", destinos)
+        self.assertIn("suporte@empresa.com", destinos)
+        self.assertIn("ti@empresa.com", destinos)
+
+    def test_notificacoes_desligadas_nao_enviam(self):
+        from django.core import mail
+
+        self.config.ativo = False
+        self.config.save()
+        mail.outbox = []
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("open_ticket"),
+            {"titulo": "Sem rede", "descricao": "Nao tenho acesso a internet aqui"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_mensagem_do_solicitante_notifica_so_ti(self):
+        from django.core import mail
+
+        chamado = Chamado.objects.create(
+            numero="CH-000201", titulo="T", solicitante=self.owner,
+            solicitante_email="joao@empresa.com", status=Chamado.STATUS_ABERTO,
+        )
+        mail.outbox = []
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("ticket_message_create", args=[chamado.numero]), {"texto": "Ola"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        destinos = {d for m in mail.outbox for d in m.to}
+        # O proprio autor (solicitante) nao recebe copia.
+        self.assertNotIn("joao@empresa.com", destinos)
+        self.assertIn("suporte@empresa.com", destinos)
+
+    def test_mensagem_da_ti_notifica_solicitante(self):
+        from django.core import mail
+
+        chamado = Chamado.objects.create(
+            numero="CH-000202", titulo="T", solicitante=self.owner,
+            solicitante_email="joao@empresa.com", status=Chamado.STATUS_EM_ATENDIMENTO,
+        )
+        mail.outbox = []
+        self.client.force_login(self.attendant)
+        self.client.post(reverse("ticket_message_create", args=[chamado.numero]), {"texto": "resolvendo"})
+        destinos = {d for m in mail.outbox for d in m.to}
+        self.assertIn("joao@empresa.com", destinos)
+        self.assertNotIn("atendente@empresa.com", destinos)
+
+    def test_mudanca_status_notifica(self):
+        from django.core import mail
+
+        chamado = Chamado.objects.create(
+            numero="CH-000203", titulo="T", solicitante=self.owner,
+            solicitante_email="joao@empresa.com", status=Chamado.STATUS_ABERTO,
+        )
+        mail.outbox = []
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps(
+                {"ticket_number": chamado.numero, "target": "atendente", "attendant_id": self.attendant.id}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        assunto = " ".join(m.subject for m in mail.outbox)
+        self.assertIn(chamado.numero, assunto)
+
+    def test_fechamento_stop_notifica(self):
+        from django.core import mail
+
+        chamado = Chamado.objects.create(
+            numero="CH-000204", titulo="T", solicitante=self.owner,
+            solicitante_email="joao@empresa.com", status=Chamado.STATUS_EM_ATENDIMENTO,
+            atendente_atual=self.attendant,
+        )
+        AtendimentoHistorico.objects.create(
+            chamado=chamado, atendente=self.attendant, iniciado_em=timezone.now()
+        )
+        mail.outbox = []
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("finish_attendance"),
+            data=json.dumps({"ticket_number": chamado.numero, "action": "stop", "description": "trocado o cabo"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        corpos = " ".join(m.body for m in mail.outbox)
+        self.assertIn("trocado o cabo", corpos)
+        self.assertIn("joao@empresa.com", {d for m in mail.outbox for d in m.to})
+
+    def test_falha_de_envio_nao_quebra_o_chamado(self):
+        # Sem remetente configurado, o envio e ignorado silenciosamente.
+        self.config.usuario = ""
+        self.config.remetente = ""
+        self.config.save()
+        self.client.force_login(self.owner)
+        resp = self.client.post(
+            reverse("open_ticket"),
+            {"titulo": "Teste sem remetente", "descricao": "Deve abrir mesmo sem e-mail"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Chamado.objects.filter(titulo="Teste sem remetente").exists())
+
+    # --- Tela de configuracao --------------------------------------------
+    def test_config_screen_ti_ok_comum_bloqueado(self):
+        self.client.force_login(self.attendant)
+        self.assertEqual(self.client.get(reverse("email_config")).status_code, 200)
+
+        comum = get_user_model().objects.create_user(username="c", password="x")
+        self.client.force_login(comum)
+        resp = self.client.get(reverse("email_config"))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_salvar_config_cifra_a_senha(self):
+        from .models import EmailConfig
+
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("email_config_save"),
+            {
+                "ativo": "on", "host": "smtp.gmail.com", "porta": "587", "usar_tls": "on",
+                "timeout": "15", "usuario": "conta@gmail.com", "remetente_nome": "Chamados TI",
+                "emails_ti": "ti@empresa.com", "senha": "abcd efgh ijkl mnop",
+                "notif_novo_chamado": "on",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        cfg = EmailConfig.load()
+        self.assertTrue(cfg.tem_senha)
+        # Espacos removidos e senha recuperavel (cifrada em repouso).
+        self.assertEqual(cfg.obter_senha(), "abcdefghijklmnop")
+        # A senha em texto nao aparece no campo cifrado do banco.
+        self.assertNotIn("abcdefghijklmnop", cfg.senha_cifrada)
+
+    def test_salvar_sem_senha_mantem_a_atual(self):
+        from .models import EmailConfig
+
+        self.config.definir_senha("segredo123")
+        self.config.save()
+        self.client.force_login(self.attendant)
+        self.client.post(
+            reverse("email_config_save"),
+            {"ativo": "on", "host": "smtp.gmail.com", "porta": "587", "usar_tls": "on",
+             "usuario": "conta@gmail.com", "emails_ti": "ti@empresa.com", "senha": ""},
+        )
+        self.assertEqual(EmailConfig.load().obter_senha(), "segredo123")
+
+    def test_comum_nao_salva_config(self):
+        comum = get_user_model().objects.create_user(username="c2", password="x")
+        self.client.force_login(comum)
+        resp = self.client.post(reverse("email_config_save"), {"host": "x"})
+        self.assertEqual(resp.status_code, 302)  # redirecionado, sem salvar
+
+    def test_email_de_teste(self):
+        from django.core import mail
+
+        mail.outbox = []
+        self.client.force_login(self.attendant)
+        resp = self.client.post(reverse("email_config_test"), {"email_teste": "quem@empresa.com"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("quem@empresa.com", mail.outbox[0].to)
+
+    def test_tls_e_ssl_juntos_sao_rejeitados(self):
+        from .models import EmailConfig
+
+        self.client.force_login(self.attendant)
+        self.client.post(
+            reverse("email_config_save"),
+            {"host": "smtp.gmail.com", "porta": "587", "usar_tls": "on", "usar_ssl": "on",
+             "usuario": "c@g.com", "emails_ti": "ti@e.com"},
+        )
+        # Nao deve ter ligado ssl junto com tls (rejeitado).
+        cfg = EmailConfig.load()
+        self.assertFalse(cfg.usar_tls and cfg.usar_ssl)
