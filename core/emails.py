@@ -13,6 +13,7 @@ capturar as mensagens em `django.core.mail.outbox` sem tocar o SMTP real.
 from __future__ import annotations
 
 import logging
+import threading
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
@@ -23,10 +24,15 @@ from .models import Chamado, EmailConfig
 logger = logging.getLogger(__name__)
 
 
+def _test_backend() -> str:
+    """Backend forcado em testes (locmem). Vazio em producao (usa SMTP real)."""
+    return (getattr(settings, "EMAIL_BACKEND_OVERRIDE", "") or "").strip()
+
+
 def _get_connection(config: EmailConfig):
     """Abre a conexao de e-mail. Em testes usa o backend de override; senao,
     monta uma conexao SMTP a partir da `EmailConfig`."""
-    override = (getattr(settings, "EMAIL_BACKEND_OVERRIDE", "") or "").strip()
+    override = _test_backend()
     if override:
         return get_connection(backend=override)
 
@@ -62,7 +68,14 @@ def _absolute_url(request, chamado: Chamado) -> str:
 
 
 def _enviar(config: EmailConfig, destinatarios, assunto: str, corpo: str) -> bool:
-    """Envio central, fail-safe. Retorna True se ao menos tentou enviar."""
+    """Envio central, fail-safe e NAO bloqueante.
+
+    O envio SMTP real acontece em uma thread em background para nao travar a
+    requisicao do chamado (arrastar/fechar/responder retornam na hora). Em testes
+    (com EMAIL_BACKEND_OVERRIDE) o envio e sincrono para manter `mail.outbox`
+    deterministico. As leituras de config/senha ocorrem AQUI (sem tocar o banco na
+    thread); a thread so faz a I/O de rede.
+    """
     remetente = config.remetente_efetivo
     destinatarios = [d for d in dict.fromkeys(d.strip() for d in destinatarios if d and d.strip())]
 
@@ -71,17 +84,39 @@ def _enviar(config: EmailConfig, destinatarios, assunto: str, corpo: str) -> boo
 
     corpo_txt = corpo.strip() + "\n"
     corpo_html = "<p>" + corpo_txt.replace("\n\n", "</p><p>").replace("\n", "<br>") + "</p>"
+    de = f"{config.remetente_nome} <{remetente}>" if config.remetente_nome else remetente
 
-    try:
-        conexao = _get_connection(config)
-        de = f"{config.remetente_nome} <{remetente}>" if config.remetente_nome else remetente
-        msg = EmailMultiAlternatives(assunto, corpo_txt, de, destinatarios, connection=conexao)
-        msg.attach_alternative(corpo_html, "text/html")
-        msg.send(fail_silently=False)
-        return True
-    except Exception:
-        logger.warning("Falha ao enviar notificacao de e-mail (assunto=%r).", assunto, exc_info=True)
-        return False
+    override = _test_backend()
+    # Parametros de conexao resolvidos agora (senha ja decifrada), para a thread
+    # nao depender do objeto de config nem do banco.
+    conn_kwargs = None
+    if not override:
+        conn_kwargs = {
+            "backend": "django.core.mail.backends.smtp.EmailBackend",
+            "host": (config.host or "").strip(),
+            "port": config.porta,
+            "username": (config.usuario or "").strip(),
+            "password": config.obter_senha(),
+            "use_tls": config.usar_tls,
+            "use_ssl": config.usar_ssl,
+            "timeout": config.timeout or 15,
+        }
+
+    def _send():
+        try:
+            conexao = get_connection(backend=override) if override else get_connection(**conn_kwargs)
+            msg = EmailMultiAlternatives(assunto, corpo_txt, de, destinatarios, connection=conexao)
+            msg.attach_alternative(corpo_html, "text/html")
+            msg.send(fail_silently=False)
+        except Exception:
+            logger.warning("Falha ao enviar notificacao de e-mail (assunto=%r).", assunto, exc_info=True)
+
+    if override:
+        # Testes: sincrono para o mail.outbox ficar disponivel na hora.
+        _send()
+    else:
+        threading.Thread(target=_send, name="email-notify", daemon=True).start()
+    return True
 
 
 def _notificacoes_ativas() -> EmailConfig | None:
