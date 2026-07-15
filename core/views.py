@@ -259,13 +259,16 @@ def _attendant_display(user):
     return user.get_full_name() or user.username
 
 
-def _serialize_kanban_card(chamado: Chamado, active_map=None):
-    """`active_map`: dict {numero_do_chamado: datetime_inicio} com os atendimentos
-    ATIVOS do usuario atual. Um chamado pode estar ativo para o usuario ao mesmo
-    tempo que outros (multiplos Plays)."""
+def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
+    """`active_map`: dict {numero: {"started", "attendant_id", "attendant"}} com os
+    atendimentos ATIVOS de TODOS os atendentes (para todos verem quais chamados
+    estao com play, de quem). `viewer_id` distingue o que e "meu" (mostra Pause/
+    Stop) do que e de outro atendente (so exibe, sem botoes de acao)."""
     active_map = active_map or {}
-    started = active_map.get(chamado.numero)
-    is_active = started is not None
+    info = active_map.get(chamado.numero)
+    is_active = info is not None
+    is_mine = bool(is_active and info.get("attendant_id") == viewer_id)
+    started = info["started"] if is_active else None
     return {
         "number": chamado.numero,
         "title": chamado.titulo,
@@ -279,6 +282,8 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None):
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "attendance": {
             "is_active": is_active,
+            "is_mine": is_mine,
+            "by": info["attendant"] if is_active else "",
             "started_at_iso": started.isoformat() if is_active else "",
             "elapsed_display": _format_duration(timezone.now() - started) if is_active else "",
         },
@@ -287,11 +292,16 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None):
 
 @ti_required
 def tickets_dashboard_view(request):
-    # Mapa dos atendimentos ATIVOS do usuario (pode haver varios ao mesmo tempo).
+    # Mapa dos atendimentos ATIVOS de TODOS os atendentes, para todos verem quais
+    # chamados estao com play (e de quem).
     active_map = {
-        att.chamado.numero: att.iniciado_em
-        for att in AtendimentoHistorico.objects.select_related("chamado").filter(
-            atendente=request.user, finalizado_em__isnull=True
+        att.chamado.numero: {
+            "started": att.iniciado_em,
+            "attendant_id": att.atendente_id,
+            "attendant": _attendant_display(att.atendente),
+        }
+        for att in AtendimentoHistorico.objects.select_related("chamado", "atendente").filter(
+            finalizado_em__isnull=True
         )
     }
 
@@ -321,7 +331,7 @@ def tickets_dashboard_view(request):
         .order_by("-criado_em")
     )
     for chamado in chamados:
-        card = _serialize_kanban_card(chamado, active_map)
+        card = _serialize_kanban_card(chamado, active_map, viewer_id=request.user.id)
         if chamado.atendente_atual_id in attendant_ids:
             by_attendant[chamado.atendente_atual_id].append(card)
         else:

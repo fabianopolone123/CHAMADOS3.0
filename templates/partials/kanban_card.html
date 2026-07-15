@@ -35,7 +35,7 @@
     <div class="ticket-attendance-panel">
         <div class="ticket-attendance-state">
             <span class="ticket-attendance-indicator{% if ticket.attendance.is_active %} ticket-attendance-indicator--active{% endif %}" data-ticket-state>
-                {% if ticket.attendance.is_active %}Em atendimento{% else %}Pronto para iniciar{% endif %}
+                {% if ticket.attendance.is_active %}Em atendimento{% if not ticket.attendance.is_mine %} - {{ ticket.attendance.by }}{% endif %}{% else %}Pronto para iniciar{% endif %}
             </span>
             <span class="ticket-attendance-timer{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-timer>
                 {{ ticket.attendance.elapsed_display|default:"0m" }}
@@ -46,10 +46,10 @@
             <button type="button" class="ticket-action-btn ticket-action-btn--play{% if ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="play" aria-label="Iniciar atendimento">
                 <span>Play</span>
             </button>
-            <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
+            <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_mine %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
                 <span>Pause</span>
             </button>
-            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_active %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
+            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_mine %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
                 <span>Stop</span>
             </button>
         </div>
