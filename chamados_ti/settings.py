@@ -86,6 +86,15 @@ if extra_hosts:
         if normalized and normalized not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(normalized)
 
+# Origens confiaveis para CSRF (necessario para POSTs via HTTPS). Cobre os hosts
+# permitidos nos dois esquemas (http/https).
+CSRF_TRUSTED_ORIGINS = []
+for _host in ALLOWED_HOSTS:
+    if _host == "testserver":
+        continue
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_host}")
+    CSRF_TRUSTED_ORIGINS.append(f"http://{_host}")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
