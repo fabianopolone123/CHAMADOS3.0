@@ -258,8 +258,13 @@ def _attendant_display(user):
     return user.get_full_name() or user.username
 
 
-def _serialize_kanban_card(chamado: Chamado, active_state):
-    is_active = bool(active_state and active_state["ticket_number"] == chamado.numero)
+def _serialize_kanban_card(chamado: Chamado, active_map=None):
+    """`active_map`: dict {numero_do_chamado: datetime_inicio} com os atendimentos
+    ATIVOS do usuario atual. Um chamado pode estar ativo para o usuario ao mesmo
+    tempo que outros (multiplos Plays)."""
+    active_map = active_map or {}
+    started = active_map.get(chamado.numero)
+    is_active = started is not None
     return {
         "number": chamado.numero,
         "title": chamado.titulo,
@@ -273,20 +278,21 @@ def _serialize_kanban_card(chamado: Chamado, active_state):
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "attendance": {
             "is_active": is_active,
-            "started_at_iso": active_state["started_at_iso"] if is_active else "",
-            "elapsed_display": active_state["elapsed_display"] if is_active else "",
+            "started_at_iso": started.isoformat() if is_active else "",
+            "elapsed_display": _format_duration(timezone.now() - started) if is_active else "",
         },
     }
 
 
 @ti_required
 def tickets_dashboard_view(request):
-    active_attendance = (
-        AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=request.user, finalizado_em__isnull=True)
-        .first()
-    )
-    active_state = _serialize_attendance_state(active_attendance)
+    # Mapa dos atendimentos ATIVOS do usuario (pode haver varios ao mesmo tempo).
+    active_map = {
+        att.chamado.numero: att.iniciado_em
+        for att in AtendimentoHistorico.objects.select_related("chamado").filter(
+            atendente=request.user, finalizado_em__isnull=True
+        )
+    }
 
     attendants = _attendant_users()
     attendant_ids = {user.id for user in attendants}
@@ -314,7 +320,7 @@ def tickets_dashboard_view(request):
         .order_by("-criado_em")
     )
     for chamado in chamados:
-        card = _serialize_kanban_card(chamado, active_state)
+        card = _serialize_kanban_card(chamado, active_map)
         if chamado.atendente_atual_id in attendant_ids:
             by_attendant[chamado.atendente_atual_id].append(card)
         else:
@@ -512,14 +518,10 @@ def create_ticket_kanban_view(request):
     else:
         return _json_error("Nao foi possivel gerar o numero do chamado. Tente novamente.")
 
-    active_attendance = (
-        AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=request.user, finalizado_em__isnull=True)
-        .first()
-    )
     notificacoes.notificar_novo_chamado(chamado, request)
 
-    card = _serialize_kanban_card(chamado, _serialize_attendance_state(active_attendance))
+    # Chamado recem-criado nunca esta em atendimento ainda.
+    card = _serialize_kanban_card(chamado, {})
     card_html = render_to_string("partials/kanban_card.html", {"ticket": card}, request=request)
 
     return JsonResponse(
@@ -676,12 +678,8 @@ def pendencia_convert_view(request, pendencia_id: int):
 
     notificacoes.notificar_novo_chamado(chamado, request)
 
-    active_attendance = (
-        AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=request.user, finalizado_em__isnull=True)
-        .first()
-    )
-    card = _serialize_kanban_card(chamado, _serialize_attendance_state(active_attendance))
+    # Chamado recem-criado a partir da pendencia ainda nao tem Play ativo.
+    card = _serialize_kanban_card(chamado, {})
     card_html = render_to_string("partials/kanban_card.html", {"ticket": card}, request=request)
 
     return JsonResponse(
@@ -750,52 +748,30 @@ def start_attendance_view(request):
             status=409,
         )
 
-    existing_active = (
-        AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=request.user, finalizado_em__isnull=True)
-        .first()
-    )
-    paused_ticket_number = ""
-    if existing_active:
-        if existing_active.chamado.numero == ticket_number:
-            return _json_error(
-                "Este chamado ja esta com atendimento ativo para voce.",
-                status=409,
-                active_ticket_number=existing_active.chamado.numero,
-            )
-        # Troca de atendimento: o atendimento ativo anterior e pausado
-        # automaticamente. Um atendente trabalha um chamado por vez, mas alternar
-        # entre chamados deve ser fluido (sem travar pedindo pause/stop manual).
-        paused_ticket_number = existing_active.chamado.numero
-        existing_active.finalizar(
-            tipo_encerramento=AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE,
-            descricao_atividade="Pausado automaticamente ao iniciar outro atendimento.",
-        )
-        existing_active.save()
-
-    try:
-        with transaction.atomic():
-            attendance = AtendimentoHistorico.objects.create(
-                chamado=chamado,
-                atendente=request.user,
-                iniciado_em=timezone.now(),
-            )
-    except IntegrityError:
+    # Multiplos atendimentos ativos ao mesmo tempo sao permitidos (Play em varios
+    # chamados). So nao pode duplicar o Play no MESMO chamado para o mesmo atendente.
+    ja_ativo = AtendimentoHistorico.objects.filter(
+        atendente=request.user, chamado=chamado, finalizado_em__isnull=True
+    ).exists()
+    if ja_ativo:
         return _json_error(
-            "Ja existe um atendimento ativo para este usuario. Atualize a tela e tente novamente.",
+            "Este chamado ja esta com atendimento ativo para voce.",
             status=409,
+            active_ticket_number=ticket_number,
         )
+
+    attendance = AtendimentoHistorico.objects.create(
+        chamado=chamado,
+        atendente=request.user,
+        iniciado_em=timezone.now(),
+    )
 
     active_state = _serialize_attendance_state(attendance)
-    mensagem = f"Atendimento iniciado no chamado {ticket_number}."
-    if paused_ticket_number:
-        mensagem = f"Atendimento iniciado no chamado {ticket_number} (o {paused_ticket_number} foi pausado)."
     return JsonResponse(
         {
             "ok": True,
-            "message": mensagem,
+            "message": f"Atendimento iniciado no chamado {ticket_number}.",
             "attendance": active_state,
-            "paused_ticket_number": paused_ticket_number,
         }
     )
 
@@ -867,19 +843,15 @@ def finish_attendance_view(request):
     if not description:
         return _json_error("Descreva o que foi feito neste atendimento.")
 
+    # Com multiplos atendimentos ativos, o Pause/Stop age no atendimento ativo do
+    # chamado especifico informado (nao "o unico" ativo do atendente).
     attendance = (
         AtendimentoHistorico.objects.select_related("chamado")
-        .filter(atendente=request.user, finalizado_em__isnull=True)
+        .filter(atendente=request.user, chamado__numero=ticket_number, finalizado_em__isnull=True)
         .first()
     )
     if not attendance:
-        return _json_error("Nao existe atendimento ativo para encerrar.", status=409)
-    if attendance.chamado.numero != ticket_number:
-        return _json_error(
-            "O atendimento ativo pertence a outro chamado. Atualize a tela antes de continuar.",
-            status=409,
-            active_ticket_number=attendance.chamado.numero,
-        )
+        return _json_error("Nao existe atendimento ativo para este chamado.", status=409)
 
     ticket_closed = False
     try:

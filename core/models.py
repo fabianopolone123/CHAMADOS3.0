@@ -275,13 +275,9 @@ class AtendimentoHistorico(models.Model):
 
     class Meta:
         ordering = ["-iniciado_em"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["atendente"],
-                condition=Q(finalizado_em__isnull=True),
-                name="unique_active_attendance_per_user",
-            ),
-        ]
+        # Um atendente pode ter varios atendimentos ativos ao mesmo tempo (Play em
+        # mais de um chamado). A unicidade e apenas por (atendente, chamado) ativo,
+        # garantida na view (nao duplica Play no mesmo chamado).
 
     def __str__(self) -> str:
         return f"{self.atendente} - {self.chamado.numero}"

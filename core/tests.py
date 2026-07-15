@@ -238,9 +238,9 @@ class EncerramentoChamadoTests(TestCase):
         self.chamado.refresh_from_db()
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
 
-    def test_play_troca_pausa_o_atendimento_anterior(self):
-        # Dar Play em outro chamado nao trava: pausa o atendimento ativo anterior
-        # e ativa o novo (um Play por vez, mas alternar deve ser fluido).
+    def test_play_em_varios_chamados_ao_mesmo_tempo(self):
+        # Multiplos atendimentos ativos sao permitidos: dar Play em dois chamados
+        # mantem os dois ativos (nao pausa nem bloqueia).
         self.client.force_login(self.attendant)
         ch2 = Chamado.objects.create(
             numero="CH-000011", titulo="Outro chamado", solicitante=self.owner,
@@ -255,13 +255,39 @@ class EncerramentoChamadoTests(TestCase):
             )
 
         self.assertEqual(_play(self.chamado.numero).status_code, 200)
-        self.assertEqual(_play(ch2.numero).status_code, 200)  # nao bloqueia
+        self.assertEqual(_play(ch2.numero).status_code, 200)
 
         ativos = AtendimentoHistorico.objects.filter(
             atendente=self.attendant, finalizado_em__isnull=True
         )
-        self.assertEqual(ativos.count(), 1)
-        self.assertEqual(ativos.first().chamado, ch2)
+        self.assertEqual(ativos.count(), 2)  # os dois ativos ao mesmo tempo
+
+        # Play repetido no MESMO chamado ainda e bloqueado (nao duplica).
+        self.assertEqual(_play(ch2.numero).status_code, 409)
+
+    def test_stop_age_no_chamado_especifico(self):
+        # Com varios ativos, o Stop/Pause encerra o atendimento do chamado informado.
+        self.client.force_login(self.attendant)
+        ch2 = Chamado.objects.create(
+            numero="CH-000012", titulo="Segundo", solicitante=self.owner,
+            status=Chamado.STATUS_EM_ATENDIMENTO, atendente_atual=self.attendant,
+        )
+        self._start_attendance(self.attendant)  # ativo no self.chamado
+        AtendimentoHistorico.objects.create(chamado=ch2, atendente=self.attendant, iniciado_em=timezone.now())
+
+        resp = self.client.post(
+            reverse("finish_attendance"),
+            data=json.dumps({"ticket_number": ch2.numero, "action": "pause", "description": "pausando o 2"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        # so o ch2 foi finalizado; o self.chamado continua ativo
+        self.assertFalse(
+            AtendimentoHistorico.objects.filter(chamado=ch2, finalizado_em__isnull=True).exists()
+        )
+        self.assertTrue(
+            AtendimentoHistorico.objects.filter(chamado=self.chamado, finalizado_em__isnull=True).exists()
+        )
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

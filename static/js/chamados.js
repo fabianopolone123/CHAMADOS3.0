@@ -20,7 +20,6 @@
     const moveTicketUrl = appElement.dataset.moveTicketUrl;
 
     let dragInProgress = false;
-    let activeTicketNumber = null;
     let timerIntervalId = null;
 
     const attendanceModal = bootstrap.Modal.getOrCreateInstance(attendanceModalElement);
@@ -156,8 +155,7 @@
     }
 
     function syncInitialActiveState() {
-        const activeCard = document.querySelector('.ticket-card[data-ticket-active="true"]');
-        activeTicketNumber = activeCard ? activeCard.dataset.ticketNumber : null;
+        // Varios cards podem estar ativos ao mesmo tempo; o timer atualiza todos.
         startTimerLoop();
     }
 
@@ -256,24 +254,13 @@
             return;
         }
 
-        const previous = activeTicketNumber;
         try {
             const result = await sendJson(startAttendanceUrl, { ticket_number: ticketNumber });
-            // Troca de atendimento: o card anterior foi pausado no backend; reflete na tela.
-            if (previous && previous !== ticketNumber) {
-                const prevCard = getTicketCard(previous);
-                if (prevCard) {
-                    setCardInactiveState(prevCard, "Pausado");
-                }
-            }
-            activeTicketNumber = ticketNumber;
+            // Multiplos atendimentos ativos sao permitidos: apenas ativa este card.
             setCardActiveState(card, result.attendance.started_at_iso);
             startTimerLoop();
             showToast(result.message || "Atendimento iniciado com sucesso.", "success");
         } catch (error) {
-            if (error.active_ticket_number) {
-                activeTicketNumber = error.active_ticket_number;
-            }
             showToast(error.message || "Nao foi possivel iniciar o atendimento.", "error");
         }
     }
@@ -301,7 +288,6 @@
             });
 
             const card = getTicketCard(ticketNumber);
-            activeTicketNumber = null;
             setCardInactiveState(card, action === "pause" ? "Pausado" : "Atendimento encerrado");
 
             // Stop encerra o chamado: o card sai da coluna do atendente. A coluna
@@ -317,9 +303,6 @@
             attendanceModal.hide();
             showToast(result.message || "Atendimento registrado com sucesso.", "success");
         } catch (error) {
-            if (error.active_ticket_number) {
-                activeTicketNumber = error.active_ticket_number;
-            }
             showToast(error.message || "Nao foi possivel registrar o atendimento.", "error");
         } finally {
             attendanceFields.submit.disabled = false;
@@ -544,7 +527,7 @@
                 return;
             }
 
-            if (activeTicketNumber !== ticketNumber) {
+            if (card.dataset.ticketActive !== "true") {
                 showToast("Este chamado nao possui atendimento ativo para voce.", "warning");
                 return;
             }
