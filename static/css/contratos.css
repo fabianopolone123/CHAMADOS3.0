@@ -198,10 +198,16 @@
     margin-bottom: 0.15rem;
 }
 
+.requisicao-detail__meta > div {
+    min-width: 0;
+}
+
 .requisicao-detail__meta dd {
     margin: 0;
     color: #0f172a;
     font-weight: 600;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .requisicao-detail__section {
