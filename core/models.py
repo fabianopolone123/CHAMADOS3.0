@@ -15,16 +15,22 @@ class Chamado(models.Model):
     STATUS_ABERTO = "aberto"
     STATUS_EM_ATENDIMENTO = "em_atendimento"
     STATUS_AGUARDANDO_USUARIO = "aguardando_usuario"
+    STATUS_AGUARDANDO_PECA = "aguardando_peca"
+    STATUS_AGUARDANDO_AUTORIZACAO = "aguardando_autorizacao"
     STATUS_RESOLVIDO = "resolvido"
     STATUS_FECHADO = "fechado"
     STATUS_CHOICES = [
         (STATUS_ABERTO, "Aberto"),
         (STATUS_EM_ATENDIMENTO, "Em atendimento"),
         (STATUS_AGUARDANDO_USUARIO, "Aguardando usuario"),
+        (STATUS_AGUARDANDO_PECA, "Aguardando peca"),
+        (STATUS_AGUARDANDO_AUTORIZACAO, "Aguardando autorizacao"),
         (STATUS_RESOLVIDO, "Resolvido"),
         (STATUS_FECHADO, "Fechado"),
     ]
     STATUS_ENCERRADOS = {STATUS_RESOLVIDO, STATUS_FECHADO}
+    # Status de "aguardando" que uma pausa pode marcar.
+    STATUS_AGUARDANDO = {STATUS_AGUARDANDO_USUARIO, STATUS_AGUARDANDO_PECA, STATUS_AGUARDANDO_AUTORIZACAO}
 
     PRIORIDADE_BAIXA = "baixa"
     PRIORIDADE_MEDIA = "media"

@@ -31,6 +31,8 @@
         action: document.getElementById("attendanceModalAction"),
         description: document.getElementById("attendanceModalDescription"),
         submit: document.getElementById("attendanceModalSubmit"),
+        reason: document.getElementById("attendanceModalReason"),
+        reasonField: document.getElementById("attendanceModalReasonField"),
     };
 
     // Enter salva direto (Shift+Enter quebra linha): clica, digita, Enter e pronto.
@@ -256,6 +258,14 @@
         attendanceFields.description.value = "";
         attendanceFields.submit.textContent = action === "pause" ? "Enviar pausa" : "Finalizar chamado";
 
+        // O motivo (aguardando peca/autorizacao/usuario) so aparece no Pause.
+        if (attendanceFields.reasonField) {
+            attendanceFields.reasonField.hidden = action !== "pause";
+        }
+        if (attendanceFields.reason) {
+            attendanceFields.reason.value = "";
+        }
+
         attendanceModal.show();
         window.setTimeout(() => attendanceFields.description.focus(), 180);
     }
@@ -290,6 +300,8 @@
             return;
         }
 
+        const pauseReason = (action === "pause" && attendanceFields.reason) ? attendanceFields.reason.value : "";
+
         attendanceFields.submit.disabled = true;
 
         try {
@@ -297,10 +309,16 @@
                 ticket_number: ticketNumber,
                 action,
                 description,
+                pause_reason: pauseReason,
             });
 
             const card = getTicketCard(ticketNumber);
             setCardInactiveState(card, action === "pause" ? "Pausado" : "Atendimento encerrado");
+
+            // Se o pause marcou um status (aguardando ...), atualiza o badge do card.
+            if (card && result.status_label) {
+                applyBadgeState(card, result.status_label, result.status_class);
+            }
 
             // Stop encerra o chamado: o card sai da coluna do atendente. A coluna
             // "Chamados fechados" e apenas um resumo (consulta pela busca/modal),

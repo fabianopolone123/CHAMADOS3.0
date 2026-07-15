@@ -765,20 +765,45 @@ def start_attendance_view(request):
             active_ticket_number=ticket_number,
         )
 
-    attendance = AtendimentoHistorico.objects.create(
-        chamado=chamado,
-        atendente=request.user,
-        iniciado_em=timezone.now(),
-    )
+    autor = _attendant_display(request.user)
+    status_changed = False
+    with transaction.atomic():
+        attendance = AtendimentoHistorico.objects.create(
+            chamado=chamado,
+            atendente=request.user,
+            iniciado_em=timezone.now(),
+        )
+        # Retomar o atendimento volta o chamado para "Em atendimento" (ex.: saindo
+        # de um estado "aguardando"). Tudo fica registrado no historico.
+        if chamado.status != Chamado.STATUS_EM_ATENDIMENTO:
+            anterior = chamado.status_label
+            chamado.status = Chamado.STATUS_EM_ATENDIMENTO
+            chamado.save(update_fields=["status", "atualizado_em"])
+            status_changed = True
+            ChamadoEvento.registrar(
+                chamado=chamado,
+                usuario=request.user,
+                tipo=ChamadoEvento.TIPO_STATUS,
+                descricao=f"Status alterado de {anterior} para {chamado.status_label} por {autor}.",
+            )
+        ChamadoEvento.registrar(
+            chamado=chamado,
+            usuario=request.user,
+            tipo=ChamadoEvento.TIPO_ATENDENTE,
+            descricao=f"Atendimento iniciado por {autor}.",
+        )
 
     active_state = _serialize_attendance_state(attendance)
-    return JsonResponse(
-        {
-            "ok": True,
-            "message": f"Atendimento iniciado no chamado {ticket_number}.",
-            "attendance": active_state,
-        }
-    )
+    response = {
+        "ok": True,
+        "message": f"Atendimento iniciado no chamado {ticket_number}.",
+        "attendance": active_state,
+    }
+    if status_changed:
+        response["status"] = chamado.status
+        response["status_label"] = chamado.status_label
+        response["status_class"] = _STATUS_BADGE_CLASS.get(chamado.status, "status-muted")
+    return JsonResponse(response)
 
 
 def _close_chamado_on_stop(chamado: Chamado, user, descricao_atividade: str = "") -> bool:
@@ -837,6 +862,7 @@ def finish_attendance_view(request):
     ticket_number = (payload.get("ticket_number") or "").strip()
     action = (payload.get("action") or "").strip().lower()
     description = (payload.get("description") or "").strip()
+    pause_reason = (payload.get("pause_reason") or "").strip()
 
     if not ticket_number:
         return _json_error("Informe o chamado do atendimento.")
@@ -859,12 +885,45 @@ def finish_attendance_view(request):
         return _json_error("Nao existe atendimento ativo para este chamado.", status=409)
 
     ticket_closed = False
+    pause_status_changed = False
     try:
         with transaction.atomic():
             attendance.finalizar(tipo_encerramento=action, descricao_atividade=description)
             attendance.save()
+            chamado = attendance.chamado
+            autor = _attendant_display(request.user)
             if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
-                ticket_closed = _close_chamado_on_stop(attendance.chamado, request.user, description)
+                ticket_closed = _close_chamado_on_stop(chamado, request.user, description)
+            else:
+                # Pause: pode marcar um status de "aguardando" e registra tudo no
+                # historico do chamado.
+                status_labels = dict(Chamado.STATUS_CHOICES)
+                if (
+                    pause_reason in Chamado.STATUS_AGUARDANDO
+                    and chamado.status not in Chamado.STATUS_ENCERRADOS
+                    and chamado.status != pause_reason
+                ):
+                    anterior = chamado.status_label
+                    chamado.status = pause_reason
+                    chamado.save(update_fields=["status", "atualizado_em"])
+                    pause_status_changed = True
+                    ChamadoEvento.registrar(
+                        chamado=chamado,
+                        usuario=request.user,
+                        tipo=ChamadoEvento.TIPO_STATUS,
+                        descricao=f"Status alterado de {anterior} para {chamado.status_label} por {autor}.",
+                    )
+                texto = f"Atendimento pausado por {autor}."
+                if pause_reason in Chamado.STATUS_AGUARDANDO:
+                    texto = f"Atendimento pausado por {autor} ({status_labels.get(pause_reason)})."
+                if description:
+                    texto += f" O que foi feito: {description}"
+                ChamadoEvento.registrar(
+                    chamado=chamado,
+                    usuario=request.user,
+                    tipo=ChamadoEvento.TIPO_ATENDENTE,
+                    descricao=texto,
+                )
     except ValidationError as exc:
         message = exc.messages[0] if exc.messages else "Nao foi possivel encerrar o atendimento."
         return _json_error(message)
@@ -899,6 +958,11 @@ def finish_attendance_view(request):
         response["status_class"] = _STATUS_BADGE_CLASS.get(chamado.status, "status-muted")
         response["atendente_atual"] = _attendant_display(chamado.atendente_atual)
         response["atendente_atual_id"] = chamado.atendente_atual_id
+    elif pause_status_changed:
+        response["message"] = f"Chamado {ticket_number}: {chamado.status_label}."
+        response["status"] = chamado.status
+        response["status_label"] = chamado.status_label
+        response["status_class"] = _STATUS_BADGE_CLASS.get(chamado.status, "status-muted")
 
     return JsonResponse(response)
 
@@ -907,6 +971,8 @@ _STATUS_BADGE_CLASS = {
     Chamado.STATUS_ABERTO: "status-info",
     Chamado.STATUS_EM_ATENDIMENTO: "status-warning",
     Chamado.STATUS_AGUARDANDO_USUARIO: "status-muted",
+    Chamado.STATUS_AGUARDANDO_PECA: "status-muted",
+    Chamado.STATUS_AGUARDANDO_AUTORIZACAO: "status-muted",
     Chamado.STATUS_RESOLVIDO: "status-success",
     Chamado.STATUS_FECHADO: "status-neutral",
 }

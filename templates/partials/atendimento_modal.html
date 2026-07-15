@@ -17,6 +17,16 @@
 
                     <div class="attendance-modal__action-pill" id="attendanceModalActionLabel">Pause</div>
 
+                    <label class="attendance-modal__field" id="attendanceModalReasonField" hidden>
+                        <span>Motivo da pausa</span>
+                        <select id="attendanceModalReason" class="form-select">
+                            <option value="">Sem motivo (apenas pausar)</option>
+                            <option value="aguardando_peca">Aguardando peca</option>
+                            <option value="aguardando_autorizacao">Aguardando autorizacao</option>
+                            <option value="aguardando_usuario">Aguardando usuario</option>
+                        </select>
+                    </label>
+
                     <label class="attendance-modal__field">
                         <span>O que foi feito neste atendimento?</span>
                         <textarea

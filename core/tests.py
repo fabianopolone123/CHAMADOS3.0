@@ -289,6 +289,43 @@ class EncerramentoChamadoTests(TestCase):
             AtendimentoHistorico.objects.filter(chamado=self.chamado, finalizado_em__isnull=True).exists()
         )
 
+    def test_pause_com_motivo_marca_aguardando_e_registra_historico(self):
+        self.client.force_login(self.attendant)
+        self._start_attendance(self.attendant)
+        resp = self.client.post(
+            reverse("finish_attendance"),
+            data=json.dumps({
+                "ticket_number": self.chamado.numero, "action": "pause",
+                "description": "peca pedida ao fornecedor", "pause_reason": "aguardando_peca",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_AGUARDANDO_PECA)
+        # pausa registrada no historico do chamado
+        self.assertTrue(
+            ChamadoEvento.objects.filter(chamado=self.chamado, descricao__icontains="pausado").exists()
+        )
+
+    def test_play_registra_historico_e_retoma_em_atendimento(self):
+        self.chamado.status = Chamado.STATUS_AGUARDANDO_PECA
+        self.chamado.save()
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("start_attendance"),
+            data=json.dumps({"ticket_number": self.chamado.numero}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+        self.assertTrue(
+            ChamadoEvento.objects.filter(
+                chamado=self.chamado, descricao__icontains="Atendimento iniciado"
+            ).exists()
+        )
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class PendenciaTITests(TestCase):
