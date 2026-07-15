@@ -13,6 +13,7 @@
 <main
     class="tickets-app insumos-app"
     data-insumo-create-url="{% url 'insumo_create' %}"
+    data-insumo-update-url="{% url 'insumo_update' insumo_id=0 %}"
     data-retirada-create-url="{% url 'retirada_create' insumo_id=0 %}"
 >
     {% csrf_token %}
@@ -36,7 +37,7 @@
                 <h3 class="insumos-section__title">Estoque de insumos</h3>
                 <div class="insumos-grid" id="insumosGrid" data-empty-text="Nenhum insumo cadastrado ainda.">
                     {% for insumo in insumos %}
-                        <article class="insumo-card insumo-card--{{ insumo.status }}" data-insumo-id="{{ insumo.id }}" data-insumo-nome="{{ insumo.nome }}">
+                        <article class="insumo-card insumo-card--{{ insumo.status }}" data-insumo-id="{{ insumo.id }}" data-insumo-nome="{{ insumo.nome }}" data-insumo-descricao="{{ insumo.descricao }}" data-insumo-observacao="{{ insumo.observacao }}">
                             <div class="insumo-card__head">
                                 <h4 class="insumo-card__name">{{ insumo.nome }}</h4>
                                 <span class="status-badge insumo-status insumo-status--{{ insumo.status }}" data-insumo-status>{{ insumo.status_label }}</span>
@@ -44,7 +45,10 @@
                             <p class="insumo-card__desc">{{ insumo.descricao|default:"Sem descricao." }}</p>
                             <div class="insumo-card__foot">
                                 <span class="insumo-card__qty">Em estoque: <strong data-insumo-qty>{{ insumo.quantidade_atual }}</strong></span>
-                                <button type="button" class="btn btn-sm btn-outline-primary insumo-retirar-btn" data-retirar aria-label="Retirar insumo">Retirar</button>
+                                <span class="insumo-card__actions">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary insumo-editar-btn" data-editar aria-label="Editar insumo">Editar</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary insumo-retirar-btn" data-retirar aria-label="Retirar insumo">Retirar</button>
+                                </span>
                             </div>
                         </article>
                     {% empty %}
@@ -91,6 +95,7 @@
 </main>
 
 {% include "partials/insumo_create_modal.html" %}
+{% include "partials/insumo_edit_modal.html" %}
 {% include "partials/retirada_create_modal.html" %}
 {% endblock %}
 

@@ -93,6 +93,12 @@
     gap: 0.5rem;
     margin-top: auto;
     padding-top: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.insumo-card__actions {
+    display: inline-flex;
+    gap: 0.4rem;
 }
 
 .insumo-card__qty {

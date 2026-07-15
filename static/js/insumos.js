@@ -5,6 +5,7 @@
     }
 
     const insumoCreateUrl = appElement.dataset.insumoCreateUrl;
+    const insumoUpdateTpl = appElement.dataset.insumoUpdateUrl;
     const retiradaCreateTpl = appElement.dataset.retiradaCreateUrl;
 
     const grid = document.getElementById("insumosGrid");
@@ -68,11 +69,24 @@
         }
     }
 
+    function applyCardFull(card, insumo) {
+        applyCardStatus(card, insumo);
+        card.dataset.insumoNome = insumo.nome;
+        card.dataset.insumoDescricao = insumo.descricao || "";
+        card.dataset.insumoObservacao = insumo.observacao || "";
+        const name = card.querySelector(".insumo-card__name");
+        if (name) name.textContent = insumo.nome;
+        const desc = card.querySelector(".insumo-card__desc");
+        if (desc) desc.textContent = insumo.descricao || "Sem descricao.";
+    }
+
     function buildCard(insumo) {
         const card = document.createElement("article");
         card.className = `insumo-card insumo-card--${insumo.status}`;
         card.dataset.insumoId = insumo.id;
         card.dataset.insumoNome = insumo.nome;
+        card.dataset.insumoDescricao = insumo.descricao || "";
+        card.dataset.insumoObservacao = insumo.observacao || "";
 
         const head = document.createElement("div");
         head.className = "insumo-card__head";
@@ -99,14 +113,24 @@
         qtyStrong.dataset.insumoQty = "";
         qtyStrong.textContent = insumo.quantidade_atual;
         qtyWrap.appendChild(qtyStrong);
+        const actions = document.createElement("span");
+        actions.className = "insumo-card__actions";
+        const editarBtn = document.createElement("button");
+        editarBtn.type = "button";
+        editarBtn.className = "btn btn-sm btn-outline-secondary insumo-editar-btn";
+        editarBtn.dataset.editar = "";
+        editarBtn.textContent = "Editar";
+        editarBtn.addEventListener("click", () => openEditModal(card));
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn btn-sm btn-outline-primary insumo-retirar-btn";
         btn.dataset.retirar = "";
         btn.textContent = "Retirar";
         btn.addEventListener("click", () => openRetiradaModal(card));
+        actions.appendChild(editarBtn);
+        actions.appendChild(btn);
         foot.appendChild(qtyWrap);
-        foot.appendChild(btn);
+        foot.appendChild(actions);
 
         card.appendChild(head);
         card.appendChild(desc);
@@ -116,6 +140,7 @@
 
     function bindCard(card) {
         card.querySelector("[data-retirar]")?.addEventListener("click", () => openRetiradaModal(card));
+        card.querySelector("[data-editar]")?.addEventListener("click", () => openEditModal(card));
     }
 
     // ---------------- Modal de cadastro ----------------
@@ -147,6 +172,45 @@
             showToast(data.message || "Insumo cadastrado.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel cadastrar o insumo.", "error");
+        } finally {
+            if (submit) submit.disabled = false;
+        }
+    });
+
+    // ---------------- Modal de edicao ----------------
+    const editModalEl = document.getElementById("editInsumoModal");
+    const editModal = editModalEl ? bootstrap.Modal.getOrCreateInstance(editModalEl) : null;
+    const editForm = document.getElementById("editInsumoForm");
+    let editingCard = null;
+
+    function openEditModal(card) {
+        editingCard = card;
+        document.getElementById("editInsumoNome").value = card.dataset.insumoNome || "";
+        document.getElementById("editInsumoDescricao").value = card.dataset.insumoDescricao || "";
+        document.getElementById("editInsumoObservacao").value = card.dataset.insumoObservacao || "";
+        document.getElementById("editInsumoQuantidade").value =
+            card.querySelector("[data-insumo-qty]")?.textContent || "0";
+        editModal?.show();
+    }
+
+    editForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!editingCard) return;
+        const submit = document.getElementById("editInsumoSubmit");
+        if (submit) submit.disabled = true;
+        try {
+            const url = buildUrl(insumoUpdateTpl, editingCard.dataset.insumoId);
+            const data = await sendJson(url, {
+                nome: document.getElementById("editInsumoNome").value.trim(),
+                descricao: document.getElementById("editInsumoDescricao").value.trim(),
+                quantidade_atual: document.getElementById("editInsumoQuantidade").value,
+                observacao: document.getElementById("editInsumoObservacao").value.trim(),
+            });
+            applyCardFull(editingCard, data.insumo);
+            editModal?.hide();
+            showToast(data.message || "Insumo atualizado.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel atualizar o insumo.", "error");
         } finally {
             if (submit) submit.disabled = false;
         }

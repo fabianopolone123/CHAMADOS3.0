@@ -2339,6 +2339,42 @@ def insumo_create_view(request):
 
 @login_required
 @require_POST
+def insumo_update_view(request, insumo_id: int):
+    """Edita um insumo, permitindo ajustar o estoque atual (entrada/correcao)."""
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para editar insumos.", status=403)
+
+    insumo = InsumoTI.objects.filter(pk=insumo_id).first()
+    if not insumo:
+        return _json_error("Insumo nao encontrado.", status=404)
+
+    payload = _load_request_payload(request) or {}
+    nome = (payload.get("nome") or "").strip()
+    if len(nome) < 2:
+        return _json_error("Informe um nome com pelo menos 2 caracteres.")
+
+    quantidade_raw = payload.get("quantidade_atual")
+    if quantidade_raw is None or str(quantidade_raw).strip() == "":
+        return _json_error("Informe a quantidade em estoque.")
+    try:
+        quantidade = int(quantidade_raw)
+    except (TypeError, ValueError):
+        return _json_error("Quantidade invalida.")
+    if quantidade < 0:
+        return _json_error("A quantidade nao pode ser negativa.")
+
+    insumo.nome = nome
+    insumo.descricao = (payload.get("descricao") or "").strip()
+    insumo.observacao = (payload.get("observacao") or "").strip()
+    insumo.quantidade_atual = quantidade
+    insumo.save(update_fields=["nome", "descricao", "observacao", "quantidade_atual", "atualizado_em"])
+    return JsonResponse(
+        {"ok": True, "message": "Insumo atualizado com sucesso.", "insumo": _serialize_insumo(insumo)}
+    )
+
+
+@login_required
+@require_POST
 def retirada_create_view(request, insumo_id: int):
     if not _is_ti(request.user):
         return _json_error("Voce nao tem permissao para registrar retiradas.", status=403)

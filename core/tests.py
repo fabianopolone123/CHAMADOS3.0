@@ -1655,3 +1655,46 @@ class EmailNotificacaoTests(TestCase):
         # Nao deve ter ligado ssl junto com tls (rejeitado).
         cfg = EmailConfig.load()
         self.assertFalse(cfg.usar_tls and cfg.usar_ssl)
+
+
+class InsumoUpdateTests(TestCase):
+    """Edicao de insumo (ajuste de estoque) do modulo Insumos."""
+
+    def setUp(self):
+        from .models import InsumoTI
+
+        User = get_user_model()
+        self.ti = User.objects.create_user(username="ti_ins", password="x")
+        self.common = User.objects.create_user(username="comum_ins", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        self.insumo = InsumoTI.objects.create(nome="Bateria", quantidade_atual=0)
+
+    def _edit(self, data):
+        return self.client.post(
+            reverse("insumo_update", args=[self.insumo.id]),
+            data=json.dumps(data),
+            content_type="application/json",
+        )
+
+    def test_ti_edita_estoque(self):
+        from .models import InsumoTI
+
+        self.client.force_login(self.ti)
+        resp = self._edit({"nome": "Bateria", "descricao": "AA", "quantidade_atual": 25, "observacao": ""})
+        self.assertEqual(resp.status_code, 200)
+        self.insumo.refresh_from_db()
+        self.assertEqual(self.insumo.quantidade_atual, 25)
+        self.assertEqual(self.insumo.descricao, "AA")
+
+    def test_quantidade_negativa_rejeitada(self):
+        self.client.force_login(self.ti)
+        resp = self._edit({"nome": "Bateria", "quantidade_atual": -5})
+        self.assertEqual(resp.status_code, 400)
+        self.insumo.refresh_from_db()
+        self.assertEqual(self.insumo.quantidade_atual, 0)
+
+    def test_comum_nao_edita(self):
+        self.client.force_login(self.common)
+        resp = self._edit({"nome": "Bateria", "quantidade_atual": 99})
+        self.assertEqual(resp.status_code, 403)
