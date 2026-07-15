@@ -109,11 +109,10 @@
                                     </button>
                                 {% endfor %}
                             </div>
-                            <p class="closed-column-hint">Ultimos {{ closed_column.recent|length }} encerrados. Use a busca para ver todos.</p>
+                            <p class="closed-column-hint">Ultimos {{ closed_column.recent|length }} encerrados. Clique em "Chamados fechados" para buscar todos.</p>
                         {% else %}
                             <p class="kanban-empty">Nenhum chamado fechado.</p>
                         {% endif %}
-                        <button type="button" class="btn btn-light js-open-closed-modal">Pesquisar chamados fechados</button>
                     </div>
                 </article>
             </div>
