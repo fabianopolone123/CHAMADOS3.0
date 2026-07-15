@@ -1781,3 +1781,27 @@ class InsumoUpdateTests(TestCase):
     def test_busca_retiradas_comum_bloqueado(self):
         self.client.force_login(self.common)
         self.assertEqual(self.client.get(reverse("retiradas_search")).status_code, 403)
+
+
+class NotificacoesStreamTests(TestCase):
+    """Endpoint SSE de notificacoes (permissao e cabecalhos). Nao consome o
+    stream (loop infinito) — valida apenas o handshake."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.ti = User.objects.create_user(username="ti_sse", password="x")
+        self.common = User.objects.create_user(username="comum_sse", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def test_ti_recebe_event_stream(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("notificacoes_stream"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/event-stream", resp["Content-Type"])
+        self.assertEqual(resp["X-Accel-Buffering"], "no")
+
+    def test_comum_bloqueado(self):
+        self.client.force_login(self.common)
+        resp = self.client.get(reverse("notificacoes_stream"))
+        self.assertEqual(resp.status_code, 403)

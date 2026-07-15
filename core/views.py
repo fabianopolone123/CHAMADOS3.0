@@ -6,15 +6,16 @@ from functools import wraps
 import csv
 import io
 import json
+import time
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from django.db import IntegrityError, transaction
-from django.db.models import Count, Q
-from django.http import FileResponse, Http404, JsonResponse
+from django.db import IntegrityError, connection, transaction
+from django.db.models import Count, Max, Q
+from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -2559,6 +2560,76 @@ def retiradas_search_view(request):
         )
     resultados = [_serialize_retirada(r) for r in qs[:200]]
     return JsonResponse({"ok": True, "resultados": resultados})
+
+
+# ==========================================================================
+# Notificacoes em tempo real (SSE) - push do que acontece nos chamados
+# ==========================================================================
+_EVENTO_TIPO_LABEL = dict(ChamadoEvento.TIPO_CHOICES)
+
+
+def _serialize_evento_notificacao(evento: ChamadoEvento) -> dict:
+    return {
+        "id": evento.id,
+        "numero": evento.chamado.numero,
+        "titulo": evento.chamado.titulo,
+        "descricao": evento.descricao,
+        "tipo": evento.tipo,
+        "tipo_label": _EVENTO_TIPO_LABEL.get(evento.tipo, evento.tipo),
+        # Eventos que mexem no quadro (para o navegador atualizar o Kanban).
+        "board": evento.tipo != ChamadoEvento.TIPO_COMENTARIO,
+    }
+
+
+@login_required
+def notificacoes_stream_view(request):
+    """Stream SSE: empurra para o navegador os novos eventos de chamado assim
+    que acontecem (nao mostra os causados pelo proprio usuario). Fonte: os
+    `ChamadoEvento` que ja registram tudo (criacao, status, atendente, mensagem)."""
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return HttpResponseForbidden("Sem permissao.")
+
+    user_id = request.user.id
+
+    def _max_id():
+        try:
+            return ChamadoEvento.objects.aggregate(m=Max("id"))["m"] or 0
+        finally:
+            connection.close()
+
+    def stream():
+        last = _max_id()  # baseline: so eventos NOVOS a partir de agora
+        yield "retry: 5000\n\n"
+        yield ": conectado\n\n"
+        ocioso = 0
+        while True:
+            time.sleep(2)
+            try:
+                novos = list(
+                    ChamadoEvento.objects.select_related("chamado", "usuario")
+                    .filter(id__gt=last)
+                    .exclude(usuario_id=user_id)
+                    .order_by("id")[:20]
+                )
+                gmax = ChamadoEvento.objects.aggregate(m=Max("id"))["m"] or last
+            finally:
+                connection.close()
+
+            if novos:
+                for evento in novos:
+                    yield f"data: {json.dumps(_serialize_evento_notificacao(evento))}\n\n"
+                ocioso = 0
+            else:
+                ocioso += 1
+                if ocioso >= 8:  # heartbeat ~16s (mantem a conexao viva no nginx)
+                    yield ": ping\n\n"
+                    ocioso = 0
+            last = gmax  # avanca a base mesmo por eventos proprios (nao re-notifica)
+
+    response = StreamingHttpResponse(stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"  # desliga o buffering do nginx para SSE
+    return response
 
 
 @login_required

@@ -465,6 +465,7 @@
     function handleDragEnd(event) {
         window.setTimeout(() => {
             dragInProgress = false;
+            window.__kanbanDragging = false;
         }, 0);
 
         if (isPendenciaEl(event.item)) {
@@ -492,6 +493,7 @@
                 onMove: (evt) => canDrop(evt.dragged, evt.to),
                 onStart: () => {
                     dragInProgress = true;
+                    window.__kanbanDragging = true;
                 },
                 onEnd: handleDragEnd,
             });

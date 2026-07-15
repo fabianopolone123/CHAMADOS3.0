@@ -15,12 +15,16 @@
     <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body data-authed="{% if request.user.is_authenticated %}1{% else %}0{% endif %}" data-ti="{% if is_ti_user %}1{% else %}0{% endif %}">
     {% include "partials/notifications.html" %}
     {% block content %}{% endblock %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/notifications.js' %}"></script>
     <script src="{% static 'js/sidebar.js' %}"></script>
+    {% if is_ti_user %}
+    <script>window.NOTIFICACOES_STREAM_URL = "{% url 'notificacoes_stream' %}";</script>
+    <script src="{% static 'js/notifications-live.js' %}"></script>
+    {% endif %}
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
