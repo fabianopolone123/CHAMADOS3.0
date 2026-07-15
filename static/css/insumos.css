@@ -37,6 +37,23 @@
     width: 100%;
 }
 
+.mov-badge {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.mov-badge--entrada {
+    background: #dcfce7;
+    color: #15803d;
+}
+.mov-badge--saida {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
 .insumos-section__title {
     margin: 0 0 0.85rem;
     font-size: 0.78rem;

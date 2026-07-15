@@ -284,6 +284,7 @@
             const url = buildUrl(insumoEntradaTpl, entradaCard.dataset.insumoId);
             const data = await sendJson(url, { quantidade: document.getElementById("entradaQuantidade").value });
             applyCardStatus(entradaCard, data.insumo);
+            if (data.retirada) prependRetiradaRow(data.retirada);
             entradaModal?.hide();
             showToast(data.message || "Entrada registrada.", "success");
         } catch (error) {
@@ -311,15 +312,21 @@
         retiradaModal?.show();
     }
 
-    function buildRetiradaRow(retirada) {
+    function buildRetiradaRow(mov) {
         const tr = document.createElement("tr");
+        const tipoTd = document.createElement("td");
+        const badge = document.createElement("span");
+        badge.className = `mov-badge mov-badge--${mov.tipo}`;
+        badge.textContent = mov.tipo_label;
+        tipoTd.appendChild(badge);
+        tr.appendChild(tipoTd);
         const cells = [
-            retirada.insumo,
-            String(retirada.quantidade),
-            retirada.entregue_para,
-            retirada.motivo,
-            retirada.registrado_por,
-            retirada.criado_em,
+            mov.insumo,
+            String(mov.quantidade),
+            mov.entregue_para,
+            mov.motivo,
+            mov.registrado_por,
+            mov.criado_em,
         ];
         cells.forEach((value, index) => {
             const td = document.createElement("td");
@@ -342,9 +349,9 @@
             const tr = document.createElement("tr");
             tr.dataset.retiradasEmpty = "";
             const td = document.createElement("td");
-            td.colSpan = 6;
+            td.colSpan = 7;
             td.className = "insumos-empty";
-            td.textContent = "Nenhuma retirada encontrada.";
+            td.textContent = "Nenhuma movimentacao encontrada.";
             tr.appendChild(td);
             retiradasBody.appendChild(tr);
             return;

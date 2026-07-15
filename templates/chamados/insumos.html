@@ -65,7 +65,7 @@
 
             <section class="insumos-section">
                 <div class="insumos-retiradas-head">
-                    <h3 class="insumos-section__title">Historico de retiradas</h3>
+                    <h3 class="insumos-section__title">Extrato de movimentacoes</h3>
                     <input type="search" id="retiradasSearch" class="form-control insumos-search"
                            placeholder="Pesquisar (item, quem recebeu, motivo, quem registrou)..." autocomplete="off">
                 </div>
@@ -73,6 +73,7 @@
                     <table class="insumos-table">
                         <thead>
                             <tr>
+                                <th>Tipo</th>
                                 <th>Insumo</th>
                                 <th>Qtd</th>
                                 <th>Entregue para</th>
@@ -81,9 +82,10 @@
                                 <th>Data/Hora</th>
                             </tr>
                         </thead>
-                        <tbody id="retiradasBody" data-empty-text="Nenhuma retirada registrada ainda.">
+                        <tbody id="retiradasBody" data-empty-text="Nenhuma movimentacao registrada ainda.">
                             {% for r in retiradas %}
                                 <tr>
+                                    <td><span class="mov-badge mov-badge--{{ r.tipo }}">{{ r.tipo_label }}</span></td>
                                     <td>{{ r.insumo }}</td>
                                     <td>{{ r.quantidade }}</td>
                                     <td>{{ r.entregue_para }}</td>
@@ -93,7 +95,7 @@
                                 </tr>
                             {% empty %}
                                 <tr data-retiradas-empty>
-                                    <td colspan="6" class="insumos-empty">Nenhuma retirada registrada ainda.</td>
+                                    <td colspan="7" class="insumos-empty">Nenhuma movimentacao registrada ainda.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

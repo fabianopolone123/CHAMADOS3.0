@@ -554,12 +554,20 @@ class InsumoTI(models.Model):
 
 
 class RetiradaInsumoTI(models.Model):
-    """Registro historico de uma retirada/baixa de estoque de um insumo."""
+    """Movimentacao de estoque de um insumo (extrato): entrada (+) ou saida (-)."""
+
+    TIPO_ENTRADA = "entrada"
+    TIPO_SAIDA = "saida"
+    TIPO_CHOICES = [
+        (TIPO_ENTRADA, "Entrada"),
+        (TIPO_SAIDA, "Saida"),
+    ]
 
     insumo = models.ForeignKey(InsumoTI, on_delete=models.CASCADE, related_name="retiradas")
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default=TIPO_SAIDA)
     quantidade = models.PositiveIntegerField()
-    entregue_para = models.CharField(max_length=255)
-    motivo = models.TextField()
+    entregue_para = models.CharField(max_length=255, blank=True)
+    motivo = models.TextField(blank=True)
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -573,7 +581,11 @@ class RetiradaInsumoTI(models.Model):
         ordering = ["-criado_em", "-id"]
 
     def __str__(self) -> str:
-        return f"{self.quantidade}x {self.insumo.nome} -> {self.entregue_para}"
+        return f"{self.get_tipo_display()} {self.quantidade}x {self.insumo.nome}"
+
+    @property
+    def tipo_label(self) -> str:
+        return dict(self.TIPO_CHOICES).get(self.tipo, self.tipo or "-")
 
 
 # ==========================================================================

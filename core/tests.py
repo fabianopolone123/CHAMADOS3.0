@@ -1702,6 +1702,17 @@ class InsumoUpdateTests(TestCase):
         self.assertEqual(self._post("insumo_entrada", {"quantidade": 0}).status_code, 400)
         self.assertEqual(self._post("insumo_entrada", {"quantidade": -3}).status_code, 400)
 
+    def test_entrada_registra_movimento_no_extrato(self):
+        from .models import RetiradaInsumoTI
+
+        self.client.force_login(self.ti)
+        self._post("insumo_entrada", {"quantidade": 3})
+        self.assertTrue(
+            RetiradaInsumoTI.objects.filter(
+                insumo=self.insumo, tipo=RetiradaInsumoTI.TIPO_ENTRADA, quantidade=3
+            ).exists()
+        )
+
     def test_excluir_insumo(self):
         from .models import InsumoTI
 

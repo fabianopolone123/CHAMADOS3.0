@@ -2275,10 +2275,12 @@ def _serialize_insumo(insumo: InsumoTI):
 def _serialize_retirada(retirada: RetiradaInsumoTI):
     return {
         "id": retirada.id,
+        "tipo": retirada.tipo,
+        "tipo_label": retirada.tipo_label,
         "insumo": retirada.insumo.nome,
         "quantidade": retirada.quantidade,
-        "entregue_para": retirada.entregue_para,
-        "motivo": retirada.motivo,
+        "entregue_para": retirada.entregue_para or "-",
+        "motivo": retirada.motivo or "-",
         "registrado_por": _attendant_display(retirada.registrado_por) or "-",
         "criado_em": timezone.localtime(retirada.criado_em).strftime("%d/%m/%Y %H:%M"),
     }
@@ -2378,18 +2380,28 @@ def insumo_entrada_view(request, insumo_id: int):
     if quantidade <= 0:
         return _json_error("A quantidade de entrada deve ser maior que zero.")
 
+    observacao = (payload.get("observacao") or "").strip()
     with transaction.atomic():
         insumo = InsumoTI.objects.select_for_update().filter(pk=insumo_id).first()
         if not insumo:
             return _json_error("Insumo nao encontrado.", status=404)
         insumo.quantidade_atual = insumo.quantidade_atual + quantidade
         insumo.save(update_fields=["quantidade_atual", "atualizado_em"])
+        # Registra a entrada no extrato de movimentacoes.
+        movimento = RetiradaInsumoTI.objects.create(
+            insumo=insumo,
+            tipo=RetiradaInsumoTI.TIPO_ENTRADA,
+            quantidade=quantidade,
+            motivo=observacao or "Entrada de estoque",
+            registrado_por=request.user,
+        )
 
     return JsonResponse(
         {
             "ok": True,
             "message": f"Entrada de {quantidade} registrada. Estoque: {insumo.quantidade_atual}.",
             "insumo": _serialize_insumo(insumo),
+            "retirada": _serialize_retirada(movimento),
         }
     )
 
