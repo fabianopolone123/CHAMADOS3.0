@@ -23,7 +23,7 @@
                 <h2 class="topbar-title">{{ chamado.titulo }}</h2>
                 <p class="topbar-subtitle">Abertura em {{ chamado.criado_em|date:"d/m/Y H:i" }} - Ultima atualizacao em {{ chamado.atualizado_em|date:"d/m/Y H:i" }}</p>
             </div>
-            <a href="{% url 'my_tickets' %}" class="btn btn-light portal-cta">Voltar</a>
+            <a href="{% if is_admin or is_attendant %}{% url 'tickets_dashboard' %}{% else %}{% url 'my_tickets' %}{% endif %}" class="btn btn-light portal-cta">Voltar</a>
         </header>
 
         <section class="portal-detail">
