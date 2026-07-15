@@ -94,14 +94,11 @@
                                 <span class="column-title__hint" aria-hidden="true">&#128269;</span>
                             </button>
                         </div>
-                        <span class="column-count">{{ closed_column.count }}</span>
+                        <span class="column-count" data-closed-count>{{ closed_column.count }}</span>
                     </div>
-                    <div class="ticket-list js-ticket-list" data-column-type="fechado" data-empty-text="Nenhum chamado fechado.">
-                        {% for ticket in closed_column.tickets %}
-                            {% include "partials/kanban_card.html" %}
-                        {% empty %}
-                            <p class="kanban-empty">Nenhum chamado fechado.</p>
-                        {% endfor %}
+                    <div class="closed-column-body">
+                        <p class="kanban-empty">Os chamados fechados nao ficam no quadro. Use a busca para consultar.</p>
+                        <button type="button" class="btn btn-light js-open-closed-modal">Pesquisar chamados fechados</button>
                     </div>
                 </article>
             </div>

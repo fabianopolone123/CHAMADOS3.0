@@ -292,14 +292,20 @@ def tickets_dashboard_view(request):
     attendant_ids = {user.id for user in attendants}
     by_attendant = {user.id: [] for user in attendants}
     abertos = []
-    fechados = []
 
-    chamados = Chamado.objects.select_related("solicitante", "atendente_atual").order_by("-criado_em")
+    # A coluna "Chamados fechados" e apenas um resumo (contagem + busca no modal):
+    # nao renderiza os cards, que podem ser milhares. Isso evita carregar tudo no
+    # Kanban e o travamento ao arrastar um card para uma lista enorme.
+    closed_count = Chamado.objects.filter(status__in=Chamado.STATUS_ENCERRADOS).count()
+
+    chamados = (
+        Chamado.objects.select_related("solicitante", "atendente_atual")
+        .exclude(status__in=Chamado.STATUS_ENCERRADOS)
+        .order_by("-criado_em")
+    )
     for chamado in chamados:
         card = _serialize_kanban_card(chamado, active_state)
-        if chamado.status in Chamado.STATUS_ENCERRADOS:
-            fechados.append(card)
-        elif chamado.atendente_atual_id in attendant_ids:
+        if chamado.atendente_atual_id in attendant_ids:
             by_attendant[chamado.atendente_atual_id].append(card)
         else:
             abertos.append(card)
@@ -324,7 +330,7 @@ def tickets_dashboard_view(request):
         "open_column": {"tickets": abertos, "count": len(abertos)},
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "attendant_columns": attendant_columns,
-        "closed_column": {"tickets": fechados, "count": len(fechados)},
+        "closed_column": {"count": closed_count},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
         "can_view_history": True,

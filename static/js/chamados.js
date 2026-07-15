@@ -161,6 +161,13 @@
         startTimerLoop();
     }
 
+    function incrementClosedCount() {
+        const el = document.querySelector("[data-closed-count]");
+        if (el) {
+            el.textContent = (parseInt(el.textContent, 10) || 0) + 1;
+        }
+    }
+
     function updateColumnCounts() {
         document.querySelectorAll(".kanban-column").forEach((column) => {
             const list = column.querySelector(LIST_SELECTOR);
@@ -294,14 +301,12 @@
             activeTicketNumber = null;
             setCardInactiveState(card, action === "pause" ? "Pausado" : "Atendimento encerrado");
 
-            // Stop encerra o chamado: move o card para "Chamados fechados" e atualiza o badge.
+            // Stop encerra o chamado: o card sai da coluna do atendente. A coluna
+            // "Chamados fechados" e apenas um resumo (consulta pela busca/modal),
+            // por isso removemos o card e so incrementamos a contagem de fechados.
             if (action === "stop" && result.ticket_closed && card) {
-                applyBadgeState(card, result.status_label, result.status_class);
-                applyAttendantState(card, result.atendente_atual);
-                const closedList = document.querySelector('.js-ticket-list[data-column-type="fechado"]');
-                if (closedList) {
-                    closedList.appendChild(card);
-                }
+                card.remove();
+                incrementClosedCount();
                 updateColumnCounts();
                 refreshEmptyStates();
             }
