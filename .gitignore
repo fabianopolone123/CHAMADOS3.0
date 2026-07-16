@@ -10,3 +10,4 @@ lista_contatos_*.pdf
 seed/
 # Dump do sistema antigo (grande, nao versionar)
 chamados.zip
+chamados/
