@@ -203,8 +203,10 @@ class EncerramentoChamadoTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.json().get("ticket_closed"))
 
+        # Pause sem motivo encerra o periodo de atendimento e devolve o chamado
+        # para "Atribuido" (nao fica "Em atendimento" sem Play ativo).
         self.chamado.refresh_from_db()
-        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+        self.assertEqual(self.chamado.status, Chamado.STATUS_ATRIBUIDO)
 
     def test_common_user_cannot_finish_attendance(self):
         self.client.force_login(self.owner)
@@ -308,6 +310,39 @@ class EncerramentoChamadoTests(TestCase):
             ChamadoEvento.objects.filter(chamado=self.chamado, descricao__icontains="pausado").exists()
         )
 
+    def test_move_para_atendente_marca_atribuido_nao_em_atendimento(self):
+        # Arrastar para um atendente apenas atribui o chamado; "Em atendimento"
+        # so vale com Play ativo. Depois o Play muda o status para em_atendimento.
+        self.chamado.status = Chamado.STATUS_ABERTO
+        self.chamado.atendente_atual = None
+        self.chamado.save()
+        self.client.force_login(self.attendant)
+
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps(
+                {"ticket_number": self.chamado.numero, "target": "atendente", "attendant_id": self.attendant.id}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], Chamado.STATUS_ATRIBUIDO)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_ATRIBUIDO)
+        self.assertFalse(
+            AtendimentoHistorico.objects.filter(chamado=self.chamado, finalizado_em__isnull=True).exists()
+        )
+
+        # Play inicia o periodo de atendimento e move para "Em atendimento".
+        resp = self.client.post(
+            reverse("start_attendance"),
+            data=json.dumps({"ticket_number": self.chamado.numero}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+
     def test_play_registra_historico_e_retoma_em_atendimento(self):
         self.chamado.status = Chamado.STATUS_AGUARDANDO_PECA
         self.chamado.save()
@@ -382,7 +417,8 @@ class PendenciaTITests(TestCase):
         self.assertEqual(chamado.titulo, "Trocar switch")
         self.assertEqual(chamado.solicitante, self.creator)  # solicitante = quem criou a pendencia
         self.assertEqual(chamado.atendente_atual, self.attendant)  # atendente da coluna destino
-        self.assertEqual(chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+        # Convertida para a coluna do atendente = atribuida (sem Play ativo ainda).
+        self.assertEqual(chamado.status, Chamado.STATUS_ATRIBUIDO)
 
         pend.refresh_from_db()
         self.assertTrue(pend.convertido_em_chamado)
@@ -504,6 +540,72 @@ class RequisicaoDeleteFilesTests(TestCase):
         self.assertFalse(RequisicaoContrato.objects.filter(id=requisicao.id).exists())
         for caminho in caminhos:
             self.assertFalse(os.path.exists(caminho), f"arquivo orfao nao removido: {caminho}")
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class OrcamentoAprovacaoTests(TestCase):
+    """Aprovacao exclusiva de orcamento dentro de uma requisicao."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+        self.requisicao = RequisicaoContrato.objects.create(
+            titulo="Notebooks", criado_por=self.ti, status=RequisicaoContrato.STATUS_EM_COTACAO
+        )
+        self.orc_a = OrcamentoContrato.objects.create(requisicao=self.requisicao, titulo="Loja A")
+        self.orc_b = OrcamentoContrato.objects.create(requisicao=self.requisicao, titulo="Loja B")
+
+    def _aprovar(self, orcamento):
+        return self.client.post(reverse("orcamento_aprovar", args=[orcamento.id]))
+
+    def test_aprovar_e_exclusivo_e_finaliza_requisicao(self):
+        self.client.force_login(self.ti)
+        resp = self._aprovar(self.orc_a)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["aprovado"])
+
+        self.orc_a.refresh_from_db()
+        self.orc_b.refresh_from_db()
+        self.requisicao.refresh_from_db()
+        self.assertTrue(self.orc_a.aprovado)
+        self.assertEqual(self.orc_a.aprovado_por, self.ti)
+        self.assertFalse(self.orc_b.aprovado)
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_FINALIZADA)
+
+        # Aprovar o B remove a aprovacao do A (exclusiva).
+        self._aprovar(self.orc_b)
+        self.orc_a.refresh_from_db()
+        self.orc_b.refresh_from_db()
+        self.assertFalse(self.orc_a.aprovado)
+        self.assertTrue(self.orc_b.aprovado)
+
+    def test_remover_aprovacao_volta_para_esperando(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)  # aprova
+        resp = self._aprovar(self.orc_a)  # alterna: desaprova
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["aprovado"])
+
+        self.orc_a.refresh_from_db()
+        self.requisicao.refresh_from_db()
+        self.assertFalse(self.orc_a.aprovado)
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_EM_COTACAO)
+
+    def test_common_user_cannot_approve(self):
+        self.client.force_login(self.common)
+        resp = self._aprovar(self.orc_a)
+        self.assertEqual(resp.status_code, 403)
+        self.orc_a.refresh_from_db()
+        self.assertFalse(self.orc_a.aprovado)
+
+    def test_aprovar_requires_post(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("orcamento_aprovar", args=[self.orc_a.id]))
+        self.assertEqual(resp.status_code, 405)
 
 
 class ContaEmailImportTests(TestCase):

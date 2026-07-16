@@ -28,6 +28,7 @@
 | `/contratos/requisicoes/<id>/excluir/` | POST | Exclui a requisicao e, por cascata, orcamentos, suborcamentos e documentos vinculados (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/orcamentos/criar/` | POST | Cria orcamento na requisicao (multipart: campos + foto + documentos) (apenas TI/admin) | Implementada |
 | `/contratos/orcamentos/<id>/suborcamentos/criar/` | POST | Cria suborcamento vinculado ao orcamento (multipart) (apenas TI/admin) | Implementada |
+| `/contratos/orcamentos/<id>/aprovar/` | POST | Aprova/desaprova (alterna) um orcamento; aprovacao exclusiva por requisicao, finaliza a requisicao (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/orcamentos/<id>/foto/` | GET | Serve a foto do orcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
@@ -134,7 +135,7 @@
 - Recebe em JSON: `ticket_number`, `target` (`aberto` ou `atendente`) e, quando `target=atendente`, `attendant_id`.
 - O destino `fechado` e recusado com `409` e a mensagem "Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.": a coluna "Chamados fechados" so recebe chamados via acao Stop. No frontend o drop nessa coluna e cancelado (o card volta para a origem) com a mesma mensagem.
 - Valida que o `attendant_id` pertence ao grupo `Atendente TI` (caso contrario retorna `400`).
-- `target=atendente`: define `atendente_atual` e status "Em atendimento". `target=aberto`: status "Aberto" e limpa `atendente_atual`.
+- `target=atendente`: define `atendente_atual` e marca o status como "Atribuido" (o status "Em atendimento" so vale enquanto ha um atendimento ativo/Play). Se o chamado ja tiver um Play ativo, o "Em atendimento" e preservado. `target=aberto`: status "Aberto" e limpa `atendente_atual`.
 - O `atendente_atual` e apenas o atendente que agiu por ultimo; nao e dono do chamado.
 - Toda movimentacao registra eventos em `ChamadoEvento` (mudanca de status e/ou troca de atendente).
 - A resposta JSON retorna `status`, `status_label`, `status_class` e `atendente_atual` para o Kanban atualizar texto e cor do badge e o atendente do card sem recarregar a pagina.
@@ -172,7 +173,7 @@
 - `criar/` e `converter/` aceitam apenas `POST` com CSRF (payload JSON); `detail` responde JSON para o modal.
 - A criacao valida titulo (minimo de caracteres) e descricao obrigatoria e retorna o HTML do card para insercao imediata na coluna "Pendencias".
 - A conversao valida que o `attendant_id` pertence ao grupo `Atendente TI` (senao `400`) e recusa pendencia ja convertida (`409`), evitando chamado duplicado.
-- A conversao cria o chamado (titulo/descricao da pendencia, `solicitante` = criador, `atendente_atual` = atendente destino, status "Em atendimento"), marca a pendencia como convertida e registra os eventos no `ChamadoEvento`.
+- A conversao cria o chamado (titulo/descricao da pendencia, `solicitante` = criador, `atendente_atual` = atendente destino, status "Atribuido" — ainda sem Play ativo), marca a pendencia como convertida e registra os eventos no `ChamadoEvento`.
 - A resposta da conversao retorna `ticket_number`, `status`, `status_label`, `status_class`, `atendente_atual` e `card_html` para o Kanban montar o card do chamado sem refresh.
 
 ## Regras de acesso a anexos

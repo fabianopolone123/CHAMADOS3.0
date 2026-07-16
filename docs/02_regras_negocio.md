@@ -21,7 +21,9 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 5. As colunas do meio sao dinamicas: uma para cada usuario do grupo `Atendente TI`, exibindo os chamados nao encerrados cujo `atendente_atual` e aquele usuario.
 6. A ultima coluna e fixa: "Chamados fechados" (status `resolvido` ou `fechado`).
 7. Cada card exibe numero, titulo, solicitante, data de abertura, status atual e atendente atual (quando existir).
-8. Arrastar para a coluna de um atendente define o `atendente_atual` como aquele usuario e o status como "Em atendimento".
+8. Arrastar para a coluna de um atendente define o `atendente_atual` como aquele usuario e marca o status como "Atribuido" (o chamado foi atribuido, mas o periodo de atendimento so comeca no Play). Se o chamado ja tiver um Play ativo, o status "Em atendimento" e preservado ao mover.
+8a. O status "Em atendimento" so vale enquanto ha um atendimento ativo (do Play ao Pause/Stop). Play marca "Em atendimento"; Pause sem motivo devolve o chamado para "Atribuido"; Pause com motivo marca "Aguardando" (usuario/peca/autorizacao); Stop fecha o chamado.
+8b. Ao ser arrastado (ou convertido de pendencia) para a coluna de um atendente, o card aparece no topo da coluna, logo abaixo dos que estao com Play ativo. No recarregamento, cada coluna de atendente ordena os cards com Play ativo no topo e, dentro de cada grupo, por atividade mais recente.
 9. Arrastar entre atendentes atualiza o `atendente_atual`.
 10. Nao e possivel arrastar um chamado para "Chamados fechados": o drop e recusado (o card volta para a coluna de origem) e o usuario recebe a mensagem "Para fechar o chamado, inicie o atendimento e finalize usando o botao Stop.". A coluna "Chamados fechados" so recebe chamados via acao Stop e serve apenas como lista/consulta. O bloqueio tambem e validado no backend (o endpoint de movimentacao recusa o destino `fechado` com `409`).
 11. Arrastar para "Chamados abertos" volta o status para "Aberto" e limpa o `atendente_atual`.
@@ -59,7 +61,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. O fechamento de chamado acontece exclusivamente pela acao "Stop" (nao por drag). O Stop exige, validado no backend: usuario Atendente TI/Admin (`403` caso contrario), atendimento ativo/Play em andamento (`409` se nao houver), campo "O que foi feito" preenchido e chamado ainda nao encerrado.
 11. Ao clicar em "Stop", abre-se o modal de encerramento com o titulo do chamado, o campo obrigatorio "O que foi feito", o botao "Finalizar chamado" e o botao "Cancelar". O campo nao pode ser vazio (validado no frontend e no backend).
 12. Ao finalizar com "Stop": salva-se o texto informado, o status vai para "Fechado", `fechado_em` e preenchido, o atendente atual passa a ser quem finalizou, o card e movido automaticamente para "Chamados fechados" e o badge (texto e cor) e atualizado sem refresh. Se o Stop falhar, o card permanece na coluna atual.
-13. "Pause" apenas encerra o periodo de atendimento e nao altera o status do chamado.
+13. "Pause" encerra o periodo de atendimento. Com um motivo de "aguardando" (usuario/peca/autorizacao) marca esse status; sem motivo, devolve o chamado para "Atribuido" (deixa de ficar "Em atendimento", pois nao ha mais Play ativo), desde que nao haja outro atendimento ativo no mesmo chamado.
 14. O encerramento pelo "Stop" registra no historico tecnico a mudanca de status e um evento de finalizacao com quem finalizou e o texto de "O que foi feito" (ex.: "Chamado finalizado por fabiano.polone. O que foi feito: atualizacao do driver e validacao com o usuario."), sem duplicar registros se o chamado ja estiver fechado. Esse texto e registro tecnico de encerramento, separado da conversa do usuario (`ChamadoMensagem`).
 
 ## Regras atuais de permissao
@@ -90,8 +92,9 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 3. A pendencia e criada pelo usuario logado, com titulo e descricao; na coluna exibe somente o titulo.
 4. O clique na pendencia abre um modal com titulo, descricao, data de criacao e quem criou.
 5. Arrastar uma pendencia para a coluna de um atendente a converte em um novo chamado; nao e permitido arrastar para "Chamados abertos" nem para "Chamados fechados" (destino invalido devolve a pendencia a coluna de origem).
-6. O chamado gerado recebe: titulo e descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Em atendimento".
-7. Apos converter, a pendencia sai da coluna "Pendencias" e o novo chamado aparece na coluna do atendente, sem refresh.
+6. O chamado gerado recebe: titulo e descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Atribuido" (ainda sem Play ativo).
+7. Apos converter, a pendencia sai da coluna "Pendencias" e o novo chamado aparece no topo da coluna do atendente (abaixo dos que estao com Play), sem refresh.
+7a. A coluna "Pendencias" lista as pendencias mais recentes no topo (ordenacao por data/hora de criacao decrescente); uma pendencia recem-criada entra no topo.
 8. A pendencia nao e apagada: fica marcada como convertida (rastreabilidade) e nao pode gerar chamado duplicado se arrastada novamente.
 9. O atendente de destino e validado no backend (precisa pertencer ao grupo Atendente TI); a conversao usa POST com CSRF.
 10. Se a conversao falhar, a pendencia volta para a coluna "Pendencias" e um erro e exibido.
@@ -127,6 +130,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. Fotos e documentos ficam em `MEDIA_ROOT/contratos/...` e sao servidos por rotas protegidas; usuario sem permissao nao acessa os arquivos.
 11. Ao abrir o detalhe de uma requisicao, o Atendente TI/Admin ve a opcao "Excluir" (discreta, no rodape do modal). O clique abre uma confirmacao obrigatoria ("Tem certeza que deseja excluir esta requisicao? Esta acao nao podera ser desfeita.") com os botoes "Cancelar" e "Excluir definitivamente" (estilo perigoso); nada e excluido sem confirmacao.
 12. A exclusao e feita via `POST` com CSRF (nunca por GET) e validada no backend (usuario comum recebe `403`). Ela remove a requisicao e, por cascata, todos os orcamentos, suborcamentos e documentos vinculados. Apos excluir, a requisicao some da lista sem refresh; em caso de erro, ela permanece visivel e uma mensagem e exibida. Os arquivos fisicos anexados nao sao removidos do disco (pendencia conhecida).
+13. Cada orcamento no detalhe tem o botao "Aprovar orcamento" (ou "Remover aprovacao"). A aprovacao e exclusiva por requisicao: aprovar um orcamento remove a aprovacao dos demais e move a requisicao para "Finalizada". Remover a aprovacao, quando nenhum orcamento fica aprovado, volta a requisicao para "Esperando aprovacao". O orcamento aprovado fica destacado (borda verde + chip "Aprovado em ...") e o badge de status da requisicao atualiza na lista e no detalhe sem refresh. A acao e `POST` com CSRF, restrita a TI/admin (usuario comum recebe `403`), e alterna o estado do orcamento (`aprovado`/`aprovado_em`/`aprovado_por`).
 
 ## Regras atuais do modulo Insumos
 

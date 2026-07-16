@@ -13,6 +13,7 @@ from django.utils import timezone
 
 class Chamado(models.Model):
     STATUS_ABERTO = "aberto"
+    STATUS_ATRIBUIDO = "atribuido"
     STATUS_EM_ATENDIMENTO = "em_atendimento"
     STATUS_AGUARDANDO_USUARIO = "aguardando_usuario"
     STATUS_AGUARDANDO_PECA = "aguardando_peca"
@@ -21,6 +22,7 @@ class Chamado(models.Model):
     STATUS_FECHADO = "fechado"
     STATUS_CHOICES = [
         (STATUS_ABERTO, "Aberto"),
+        (STATUS_ATRIBUIDO, "Atribuido"),
         (STATUS_EM_ATENDIMENTO, "Em atendimento"),
         (STATUS_AGUARDANDO_USUARIO, "Aguardando usuario"),
         (STATUS_AGUARDANDO_PECA, "Aguardando peca"),
@@ -444,6 +446,15 @@ class OrcamentoContrato(_ItemOrcamentoBase):
         RequisicaoContrato, on_delete=models.CASCADE, related_name="orcamentos"
     )
     foto_produto = models.ImageField(upload_to=orcamento_foto_path, null=True, blank=True)
+    aprovado = models.BooleanField(default=False)
+    aprovado_em = models.DateTimeField(null=True, blank=True)
+    aprovado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orcamentos_aprovados",
+    )
 
     class Meta:
         ordering = ["criado_em", "id"]

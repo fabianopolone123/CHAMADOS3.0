@@ -104,7 +104,7 @@ Campos atuais:
 - `categoria`
 - `subcategoria`
 - `prioridade` (choices: `baixa`, `media`, `alta`, `critica`)
-- `status` (choices: `aberto`, `em_atendimento`, `aguardando_usuario`, `resolvido`, `fechado`; default `aberto`)
+- `status` (choices: `aberto`, `atribuido`, `em_atendimento`, `aguardando_usuario`, `aguardando_peca`, `aguardando_autorizacao`, `resolvido`, `fechado`; default `aberto`). `atribuido` = chamado na coluna de um atendente sem Play ativo; `em_atendimento` = ha um atendimento ativo (Play). O campo nao usa `choices` no banco, entao novos status nao geram migration.
 - `atendente_atual` (FK opcional para o usuario que realizou a ultima acao; **nao representa dono do chamado**)
 - `origem`
 - `aberto_em_referencia`
@@ -221,7 +221,7 @@ Regras atuais:
 
 - So Atendente TI/Admin criam, veem e convertem pendencias; usuario comum nao acessa.
 - A coluna "Pendencias" lista apenas pendencias com `convertido_em_chamado = False`.
-- Ao converter: cria um `Chamado` com titulo/descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Em atendimento".
+- Ao converter: cria um `Chamado` com titulo/descricao da pendencia, `solicitante` = quem criou a pendencia, `atendente_atual` = atendente da coluna destino e status "Atribuido" (ainda sem Play ativo).
 - A conversao e idempotente: uma pendencia ja convertida nao gera chamado duplicado.
 - A conversao registra eventos no chamado (criacao a partir da pendencia e atribuicao ao atendente).
 
@@ -281,6 +281,7 @@ Campos atuais:
 - `quantidade` (inteiro positivo, minimo 1)
 - `link` (URL opcional)
 - `foto_produto` (`ImageField`, opcional; usa Pillow)
+- `aprovado` (bool, default `False`), `aprovado_em` (datetime, opcional), `aprovado_por` (FK usuario, `on_delete=SET_NULL`, related_name `orcamentos_aprovados`) — marcam o orcamento aprovado; a aprovacao e exclusiva por requisicao e finaliza a requisicao (migration `0035`).
 - `criado_por`, `criado_em`, `atualizado_em`
 
 Regras de calculo:

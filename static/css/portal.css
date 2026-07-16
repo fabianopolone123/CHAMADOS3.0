@@ -25,6 +25,11 @@
     background: #dbeafe;
 }
 
+.status-badge.status-assigned {
+    color: #6d28d9;
+    background: #ede9fe;
+}
+
 .status-badge.status-warning {
     color: #b45309;
     background: #ffedd5;

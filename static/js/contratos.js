@@ -8,6 +8,7 @@
     const requisicaoDetailTpl = appElement.dataset.requisicaoDetailUrl;
     const orcamentoCreateTpl = appElement.dataset.orcamentoCreateUrl;
     const suborcamentoCreateTpl = appElement.dataset.suborcamentoCreateUrl;
+    const orcamentoAprovarTpl = appElement.dataset.orcamentoAprovarUrl;
 
     function buildUrl(template, id) {
         return template.replace("/0/", `/${id}/`);
@@ -220,7 +221,7 @@
 
     function renderOrcamento(orc) {
         const card = document.createElement("div");
-        card.className = "orcamento-card";
+        card.className = "orcamento-card" + (orc.aprovado ? " orcamento-card--aprovado" : "");
 
         const head = document.createElement("div");
         head.className = "orcamento-card__head";
@@ -234,6 +235,12 @@
         headLeft.appendChild(title);
         headLeft.appendChild(loja);
         head.appendChild(headLeft);
+        if (orc.aprovado) {
+            const chip = document.createElement("span");
+            chip.className = "orcamento-aprovado-chip";
+            chip.textContent = orc.aprovado_em ? `Aprovado em ${orc.aprovado_em}` : "Aprovado";
+            head.appendChild(chip);
+        }
         card.appendChild(head);
 
         const grid = document.createElement("div");
@@ -267,14 +274,60 @@
             card.appendChild(subList);
         }
 
+        const actions = document.createElement("div");
+        actions.className = "orcamento-card__actions";
+
+        const approveBtn = document.createElement("button");
+        approveBtn.type = "button";
+        approveBtn.className =
+            "btn btn-sm aprovar-orcamento-btn " +
+            (orc.aprovado ? "btn-outline-secondary" : "btn-success");
+        approveBtn.textContent = orc.aprovado ? "Remover aprovacao" : "Aprovar orcamento";
+        approveBtn.addEventListener("click", () => aprovarOrcamento(orc.id, approveBtn));
+        actions.appendChild(approveBtn);
+
         const addSub = document.createElement("button");
         addSub.type = "button";
         addSub.className = "btn btn-light btn-sm add-suborcamento-btn";
         addSub.textContent = "+ Suborcamento";
         addSub.addEventListener("click", () => openOrcamentoForm("suborcamento", orc.id, orc.titulo));
-        card.appendChild(addSub);
+        actions.appendChild(addSub);
+
+        card.appendChild(actions);
 
         return card;
+    }
+
+    function updateRequisicaoListBadge(id, status, statusLabel) {
+        const btn = requisicoesList?.querySelector(`.requisicao-item[data-requisicao-id="${id}"]`);
+        const badge = btn ? btn.querySelector(".status-badge") : null;
+        if (badge) {
+            badge.className = `status-badge contrato-status contrato-status--${status}`;
+            badge.textContent = statusLabel;
+        }
+    }
+
+    async function aprovarOrcamento(orcamentoId, button) {
+        if (!orcamentoAprovarTpl) {
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+        }
+        try {
+            const data = await sendJson(buildUrl(orcamentoAprovarTpl, orcamentoId), {});
+            // Recarrega o detalhe (destaque do aprovado + status da requisicao).
+            if (currentRequisicaoId) {
+                await loadRequisicaoDetail(currentRequisicaoId);
+            }
+            updateRequisicaoListBadge(data.requisicao_id, data.requisicao_status, data.requisicao_status_label);
+            showToast(data.message || "Orcamento atualizado.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel aprovar o orcamento.", "error");
+            if (button) {
+                button.disabled = false;
+            }
+        }
     }
 
     function renderOrcamentos(orcamentos) {

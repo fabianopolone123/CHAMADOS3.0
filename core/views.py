@@ -307,6 +307,7 @@ def tickets_dashboard_view(request):
 
     attendants = _attendant_users()
     attendant_ids = {user.id for user in attendants}
+    # Guarda tuplas (atualizado_em, card) por atendente para ordenar por atividade.
     by_attendant = {user.id: [] for user in attendants}
     abertos = []
 
@@ -333,14 +334,18 @@ def tickets_dashboard_view(request):
     for chamado in chamados:
         card = _serialize_kanban_card(chamado, active_map, viewer_id=request.user.id)
         if chamado.atendente_atual_id in attendant_ids:
-            by_attendant[chamado.atendente_atual_id].append(card)
+            by_attendant[chamado.atendente_atual_id].append((chamado.atualizado_em, card))
         else:
             abertos.append(card)
 
-    # Chamados com atendimento (Play) ativo aparecem primeiro na coluna; o resto
-    # mantem a ordem por data (sort estavel).
-    for lista in by_attendant.values():
-        lista.sort(key=lambda c: not c["attendance"]["is_active"])
+    # Ordena cada coluna de atendente: chamados com Play ativo no topo e, dentro
+    # de cada grupo, os que entraram/foram movidos por ultimo primeiro (atividade
+    # mais recente). Assim um chamado recem-arrastado aparece logo abaixo dos que
+    # estao com Play, batendo com o comportamento do drag no navegador.
+    for atendente_id, itens in by_attendant.items():
+        itens.sort(key=lambda item: item[0], reverse=True)  # atividade recente primeiro
+        itens.sort(key=lambda item: not item[1]["attendance"]["is_active"])  # ativos no topo (estavel)
+        by_attendant[atendente_id] = [card for _, card in itens]
 
     attendant_columns = [
         {
@@ -353,8 +358,11 @@ def tickets_dashboard_view(request):
         for user in attendants
     ]
 
+    # Pendencias mais recentes no topo da coluna (por data/hora de criacao).
     pendencias = list(
-        PendenciaTI.objects.filter(convertido_em_chamado=False).select_related("criado_por")
+        PendenciaTI.objects.filter(convertido_em_chamado=False)
+        .select_related("criado_por")
+        .order_by("-criado_em", "-id")
     )
 
     context = {
@@ -417,7 +425,15 @@ def move_ticket_view(request):
         )
         if not novo_atendente:
             return _json_error("O atendente de destino nao pertence ao perfil Atendente TI.", status=400)
-        new_status = Chamado.STATUS_EM_ATENDIMENTO
+        # Arrastar para um atendente apenas ATRIBUI o chamado. O status "Em
+        # atendimento" so vale enquanto ha um atendimento ativo (do Play ao
+        # Pause/Stop); por isso o destino da coluna do atendente e "Atribuido".
+        # Se ja houver um Play ativo neste chamado, o status "Em atendimento" e
+        # preservado (nao rebaixa para Atribuido).
+        tem_play_ativo = AtendimentoHistorico.objects.filter(
+            chamado=chamado, finalizado_em__isnull=True
+        ).exists()
+        new_status = Chamado.STATUS_EM_ATENDIMENTO if tem_play_ativo else Chamado.STATUS_ATRIBUIDO
     else:  # aberto (unico destino restante; fechado ja foi barrado acima)
         new_status = Chamado.STATUS_ABERTO
 
@@ -652,7 +668,9 @@ def pendencia_convert_view(request, pendencia_id: int):
         solicitante=solicitante,
         solicitante_nome=_attendant_display(solicitante),
         solicitante_email=(getattr(solicitante, "email", "") or ""),
-        status=Chamado.STATUS_EM_ATENDIMENTO,
+        # Convertido para a coluna de um atendente = apenas atribuido; ainda sem
+        # Play ativo (o periodo de atendimento so comeca no Play).
+        status=Chamado.STATUS_ATRIBUIDO,
         atendente_atual=attendant,
         origem="Pendencia TI",
     )
@@ -906,16 +924,29 @@ def finish_attendance_view(request):
             if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
                 ticket_closed = _close_chamado_on_stop(chamado, request.user, description)
             else:
-                # Pause: pode marcar um status de "aguardando" e registra tudo no
-                # historico do chamado.
+                # Pause encerra o periodo de atendimento: com motivo, marca o
+                # "aguardando" escolhido; sem motivo, volta o chamado para
+                # "Atribuido" (nao fica mais "Em atendimento" sem Play ativo),
+                # desde que nao haja outro atendimento ativo no mesmo chamado.
                 status_labels = dict(Chamado.STATUS_CHOICES)
+                if pause_reason in Chamado.STATUS_AGUARDANDO:
+                    novo_status = pause_reason
+                else:
+                    outro_play_ativo = (
+                        AtendimentoHistorico.objects.filter(
+                            chamado=chamado, finalizado_em__isnull=True
+                        )
+                        .exclude(pk=attendance.pk)
+                        .exists()
+                    )
+                    novo_status = None if outro_play_ativo else Chamado.STATUS_ATRIBUIDO
                 if (
-                    pause_reason in Chamado.STATUS_AGUARDANDO
+                    novo_status
                     and chamado.status not in Chamado.STATUS_ENCERRADOS
-                    and chamado.status != pause_reason
+                    and chamado.status != novo_status
                 ):
                     anterior = chamado.status_label
-                    chamado.status = pause_reason
+                    chamado.status = novo_status
                     chamado.save(update_fields=["status", "atualizado_em"])
                     pause_status_changed = True
                     ChamadoEvento.registrar(
@@ -980,6 +1011,7 @@ def finish_attendance_view(request):
 
 _STATUS_BADGE_CLASS = {
     Chamado.STATUS_ABERTO: "status-info",
+    Chamado.STATUS_ATRIBUIDO: "status-assigned",
     Chamado.STATUS_EM_ATENDIMENTO: "status-warning",
     Chamado.STATUS_AGUARDANDO_USUARIO: "status-muted",
     Chamado.STATUS_AGUARDANDO_PECA: "status-muted",
@@ -1606,6 +1638,9 @@ def _serialize_orcamento(orc: OrcamentoContrato):
         "frete": f"{orc.frete:.2f}",
         "desconto": f"{orc.desconto:.2f}",
         "link": orc.link,
+        "aprovado": orc.aprovado,
+        "aprovado_por": _attendant_display(orc.aprovado_por) if orc.aprovado else "",
+        "aprovado_em": timezone.localtime(orc.aprovado_em).strftime("%d/%m/%Y %H:%M") if orc.aprovado_em else "",
         "subtotal_display": _fmt_money(orc.subtotal, orc.moeda),
         "total_display": _fmt_money(orc.total, orc.moeda),
         "total_com_suborcamentos_display": _fmt_money(total_com_sub, orc.moeda),
@@ -1811,6 +1846,70 @@ def suborcamento_create_view(request, orcamento_id: int):
             "message": "Suborcamento adicionado com sucesso.",
             "suborcamento_id": suborcamento.id,
             "orcamento_id": orcamento.id,
+        }
+    )
+
+
+@login_required
+@require_POST
+def orcamento_aprovar_view(request, orcamento_id: int):
+    """Aprova/desaprova um orcamento especifico de uma requisicao.
+
+    A aprovacao e exclusiva: aprovar um orcamento desaprova os demais da mesma
+    requisicao e move a requisicao para "Finalizada". Desaprovar volta a
+    requisicao para "Esperando aprovacao" quando nenhum orcamento fica aprovado.
+    Alterna com base no estado atual do orcamento.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    orcamento = (
+        OrcamentoContrato.objects.select_related("requisicao").filter(pk=orcamento_id).first()
+    )
+    if not orcamento:
+        return _json_error("Orcamento nao encontrado.", status=404)
+
+    requisicao = orcamento.requisicao
+    aprovar = not orcamento.aprovado  # alterna
+
+    with transaction.atomic():
+        if aprovar:
+            # Aprovacao exclusiva: zera os demais orcamentos da requisicao.
+            requisicao.orcamentos.exclude(pk=orcamento.pk).filter(aprovado=True).update(
+                aprovado=False, aprovado_em=None, aprovado_por=None
+            )
+            orcamento.aprovado = True
+            orcamento.aprovado_em = timezone.now()
+            orcamento.aprovado_por = request.user
+            orcamento.save(update_fields=["aprovado", "aprovado_em", "aprovado_por", "atualizado_em"])
+            if requisicao.status != RequisicaoContrato.STATUS_FINALIZADA:
+                requisicao.status = RequisicaoContrato.STATUS_FINALIZADA
+                requisicao.save(update_fields=["status", "atualizado_em"])
+        else:
+            orcamento.aprovado = False
+            orcamento.aprovado_em = None
+            orcamento.aprovado_por = None
+            orcamento.save(update_fields=["aprovado", "aprovado_em", "aprovado_por", "atualizado_em"])
+            # Se nenhum orcamento continua aprovado, volta para "Esperando aprovacao".
+            ainda_aprovado = requisicao.orcamentos.filter(aprovado=True).exists()
+            if not ainda_aprovado and requisicao.status == RequisicaoContrato.STATUS_FINALIZADA:
+                requisicao.status = RequisicaoContrato.STATUS_EM_COTACAO
+                requisicao.save(update_fields=["status", "atualizado_em"])
+
+    mensagem = (
+        f'Orcamento "{orcamento.titulo}" aprovado.'
+        if aprovar
+        else f'Aprovacao do orcamento "{orcamento.titulo}" removida.'
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": mensagem,
+            "orcamento_id": orcamento.id,
+            "aprovado": orcamento.aprovado,
+            "requisicao_id": requisicao.id,
+            "requisicao_status": requisicao.status,
+            "requisicao_status_label": requisicao.status_label,
         }
     )
 

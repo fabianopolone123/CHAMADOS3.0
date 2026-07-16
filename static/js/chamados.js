@@ -341,12 +341,26 @@
 
     const STATUS_BADGE_CLASSES = [
         "status-info",
+        "status-assigned",
         "status-warning",
         "status-muted",
         "status-success",
         "status-neutral",
         "status-danger",
     ];
+
+    // Coloca o card no topo da coluna, logo abaixo dos que estao com Play ativo.
+    function placeCardBelowActive(list, card) {
+        const actives = Array.from(
+            list.querySelectorAll('.ticket-card[data-ticket-active="true"]')
+        ).filter((c) => c !== card);
+        const anchor = actives[actives.length - 1];
+        if (anchor) {
+            anchor.after(card);
+        } else {
+            list.insertBefore(card, list.firstChild);
+        }
+    }
 
     function applyBadgeState(card, statusLabel, statusClass) {
         const badge = card.querySelector("[data-status-badge]");
@@ -379,6 +393,11 @@
             const result = await sendJson(moveTicketUrl, payload);
             applyBadgeState(card, result.status_label, result.status_class);
             applyAttendantState(card, result.atendente_atual);
+            // Ao entrar na coluna de um atendente, o card sobe para o topo (logo
+            // abaixo dos que estao com Play ativo), em vez de ficar onde foi solto.
+            if (payload.target === "atendente") {
+                placeCardBelowActive(event.to, card);
+            }
             updateColumnCounts();
             refreshEmptyStates();
             showToast(result.message || "Chamado movido.", "success");
@@ -511,7 +530,8 @@
             wrapper.innerHTML = (result.card_html || "").trim();
             const newCard = wrapper.firstElementChild;
             if (newCard) {
-                event.to.appendChild(newCard);
+                // Chamado recem-convertido entra no topo, abaixo dos que tem Play.
+                placeCardBelowActive(event.to, newCard);
                 bindCard(newCard);
             }
             updateColumnCounts();
@@ -809,7 +829,12 @@
             window.location.reload();
             return;
         }
-        list.appendChild(card);
+        // Pendencia nova entra no topo da coluna (mais recentes primeiro).
+        const emptyState = list.querySelector(".kanban-empty");
+        if (emptyState) {
+            emptyState.remove();
+        }
+        list.insertBefore(card, list.firstChild);
         bindPendenciaCard(card);
         updateColumnCounts();
         refreshEmptyStates();

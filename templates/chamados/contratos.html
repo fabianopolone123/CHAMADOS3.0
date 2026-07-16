@@ -16,6 +16,7 @@
     data-requisicao-delete-url="{% url 'requisicao_delete' requisicao_id=0 %}"
     data-orcamento-create-url="{% url 'orcamento_create' requisicao_id=0 %}"
     data-suborcamento-create-url="{% url 'suborcamento_create' orcamento_id=0 %}"
+    data-orcamento-aprovar-url="{% url 'orcamento_aprovar' orcamento_id=0 %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="contratos" %}
