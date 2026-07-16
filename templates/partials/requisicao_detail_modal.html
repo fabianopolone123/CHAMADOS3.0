@@ -3,7 +3,7 @@
         <div class="modal-content create-ticket-modal requisicao-detail-modal">
             <div class="modal-header">
                 <div>
-                    <span class="create-ticket-kicker">Requisicao</span>
+                    <span class="create-ticket-kicker"><span data-req-detail="codigo">Requisicao</span></span>
                     <h5 class="modal-title" id="requisicaoDetailModalLabel" data-req-detail="titulo">Requisicao</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
@@ -41,6 +41,12 @@
                     </div>
                     <div class="orcamentos-container" data-orcamentos></div>
                     <p class="orcamentos-empty" data-orcamentos-empty>Nenhum orcamento cadastrado nesta requisicao.</p>
+                </section>
+
+                <section class="requisicao-detail__section">
+                    <h6 class="requisicao-detail__section-title">Historico</h6>
+                    <ol class="requisicao-timeline" data-req-timeline></ol>
+                    <p class="requisicao-timeline-empty" data-req-timeline-empty>Sem eventos registrados.</p>
                 </section>
             </div>
 

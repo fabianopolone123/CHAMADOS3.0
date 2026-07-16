@@ -9,6 +9,7 @@
     const orcamentoCreateTpl = appElement.dataset.orcamentoCreateUrl;
     const suborcamentoCreateTpl = appElement.dataset.suborcamentoCreateUrl;
     const orcamentoAprovarTpl = appElement.dataset.orcamentoAprovarUrl;
+    const requisicaoMarcarEntregueTpl = appElement.dataset.requisicaoMarcarEntregueUrl;
 
     function buildUrl(template, id) {
         return template.replace("/0/", `/${id}/`);
@@ -96,6 +97,13 @@
         button.className = "requisicao-item";
         button.dataset.requisicaoId = req.id;
 
+        if (req.codigo) {
+            const code = document.createElement("span");
+            code.className = "requisicao-item__code";
+            code.textContent = req.codigo;
+            button.appendChild(code);
+        }
+
         const title = document.createElement("span");
         title.className = "requisicao-item__title";
         title.textContent = req.titulo;
@@ -138,6 +146,7 @@
     const detailModalEl = document.getElementById("requisicaoDetailModal");
     const detailModal = detailModalEl ? bootstrap.Modal.getOrCreateInstance(detailModalEl) : null;
     let currentRequisicaoId = null;
+    let currentRequisicaoStatus = null;
 
     function setDetailField(key, value) {
         const el = detailModalEl.querySelector(`[data-req-detail="${key}"]`);
@@ -277,14 +286,37 @@
         const actions = document.createElement("div");
         actions.className = "orcamento-card__actions";
 
-        const approveBtn = document.createElement("button");
-        approveBtn.type = "button";
-        approveBtn.className =
-            "btn btn-sm aprovar-orcamento-btn " +
-            (orc.aprovado ? "btn-outline-secondary" : "btn-success");
-        approveBtn.textContent = orc.aprovado ? "Remover aprovacao" : "Aprovar orcamento";
-        approveBtn.addEventListener("click", () => aprovarOrcamento(orc.id, approveBtn));
-        actions.appendChild(approveBtn);
+        const entregue = currentRequisicaoStatus === "entregue";
+        if (orc.aprovado && entregue) {
+            // Requisicao ja entregue: mostra o estado, sem acao.
+            const done = document.createElement("span");
+            done.className = "orcamento-entregue-chip";
+            done.textContent = "Entregue";
+            actions.appendChild(done);
+        } else if (orc.aprovado) {
+            // Aprovado e aguardando entrega: botao vira "Marcar entregue".
+            const deliverBtn = document.createElement("button");
+            deliverBtn.type = "button";
+            deliverBtn.className = "btn btn-sm btn-success marcar-entregue-btn";
+            deliverBtn.textContent = "Marcar entregue";
+            deliverBtn.addEventListener("click", () => marcarEntregue(deliverBtn));
+            actions.appendChild(deliverBtn);
+
+            const undoBtn = document.createElement("button");
+            undoBtn.type = "button";
+            undoBtn.className = "btn btn-sm btn-outline-secondary aprovar-orcamento-btn";
+            undoBtn.textContent = "Remover aprovacao";
+            undoBtn.addEventListener("click", () => aprovarOrcamento(orc.id, undoBtn));
+            actions.appendChild(undoBtn);
+        } else if (!entregue) {
+            // Nao aprovado (e requisicao nao entregue): permite aprovar.
+            const approveBtn = document.createElement("button");
+            approveBtn.type = "button";
+            approveBtn.className = "btn btn-sm btn-success aprovar-orcamento-btn";
+            approveBtn.textContent = "Aprovar orcamento";
+            approveBtn.addEventListener("click", () => aprovarOrcamento(orc.id, approveBtn));
+            actions.appendChild(approveBtn);
+        }
 
         const addSub = document.createElement("button");
         addSub.type = "button";
@@ -330,6 +362,26 @@
         }
     }
 
+    async function marcarEntregue(button) {
+        if (!requisicaoMarcarEntregueTpl || !currentRequisicaoId) {
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+        }
+        try {
+            const data = await sendJson(buildUrl(requisicaoMarcarEntregueTpl, currentRequisicaoId), {});
+            await loadRequisicaoDetail(currentRequisicaoId);
+            updateRequisicaoListBadge(data.requisicao_id, data.requisicao_status, data.requisicao_status_label);
+            showToast(data.message || "Requisicao entregue.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel marcar como entregue.", "error");
+            if (button) {
+                button.disabled = false;
+            }
+        }
+    }
+
     function renderOrcamentos(orcamentos) {
         const container = detailModalEl.querySelector("[data-orcamentos]");
         const empty = detailModalEl.querySelector("[data-orcamentos-empty]");
@@ -342,9 +394,45 @@
         orcamentos.forEach((orc) => container.appendChild(renderOrcamento(orc)));
     }
 
+    function renderTimeline(eventos) {
+        const list = detailModalEl.querySelector("[data-req-timeline]");
+        const empty = detailModalEl.querySelector("[data-req-timeline-empty]");
+        if (!list) {
+            return;
+        }
+        list.innerHTML = "";
+        if (!eventos || !eventos.length) {
+            if (empty) empty.classList.remove("is-hidden");
+            return;
+        }
+        if (empty) empty.classList.add("is-hidden");
+        eventos.forEach((ev) => {
+            const li = document.createElement("li");
+            li.className = `requisicao-timeline__item requisicao-timeline__item--${ev.tipo}`;
+            const head = document.createElement("div");
+            head.className = "requisicao-timeline__head";
+            const data = document.createElement("span");
+            data.className = "requisicao-timeline__date";
+            data.textContent = ev.data;
+            const autor = document.createElement("span");
+            autor.className = "requisicao-timeline__author";
+            autor.textContent = ev.usuario;
+            head.appendChild(data);
+            head.appendChild(autor);
+            const desc = document.createElement("p");
+            desc.className = "requisicao-timeline__desc";
+            desc.textContent = ev.descricao;
+            li.appendChild(head);
+            li.appendChild(desc);
+            list.appendChild(li);
+        });
+    }
+
     async function loadRequisicaoDetail(id) {
         const data = await sendGet(buildUrl(requisicaoDetailTpl, id));
         const req = data.requisicao;
+        currentRequisicaoStatus = req.status;
+        setDetailField("codigo", req.codigo || "Requisicao");
         setDetailField("titulo", req.titulo);
         setDetailField("tipo", req.tipo_label);
         setDetailField("criado_por", req.criado_por);
@@ -356,6 +444,7 @@
             statusBadge.className = `status-badge contrato-status contrato-status--${req.status}`;
         }
         renderOrcamentos(data.orcamentos);
+        renderTimeline(data.eventos);
     }
 
     async function sendGet(url) {

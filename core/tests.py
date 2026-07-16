@@ -31,6 +31,7 @@ from .models import (
     PendenciaTI,
     Ramal,
     RequisicaoContrato,
+    RequisicaoContratoEvento,
     ServicoFeito,
     ServicoFeitoAnexo,
     Starlink,
@@ -562,7 +563,7 @@ class OrcamentoAprovacaoTests(TestCase):
     def _aprovar(self, orcamento):
         return self.client.post(reverse("orcamento_aprovar", args=[orcamento.id]))
 
-    def test_aprovar_e_exclusivo_e_finaliza_requisicao(self):
+    def test_aprovar_e_exclusivo_e_aguarda_entrega(self):
         self.client.force_login(self.ti)
         resp = self._aprovar(self.orc_a)
         self.assertEqual(resp.status_code, 200)
@@ -574,7 +575,12 @@ class OrcamentoAprovacaoTests(TestCase):
         self.assertTrue(self.orc_a.aprovado)
         self.assertEqual(self.orc_a.aprovado_por, self.ti)
         self.assertFalse(self.orc_b.aprovado)
-        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_FINALIZADA)
+        # Aprovar move a requisicao para "Aguardando entrega" (nao "Finalizada").
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA)
+        # Historico registra a aprovacao.
+        self.assertTrue(
+            self.requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_APROVACAO).exists()
+        )
 
         # Aprovar o B remove a aprovacao do A (exclusiva).
         self._aprovar(self.orc_b)
@@ -594,6 +600,41 @@ class OrcamentoAprovacaoTests(TestCase):
         self.requisicao.refresh_from_db()
         self.assertFalse(self.orc_a.aprovado)
         self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_EM_COTACAO)
+
+    def test_marcar_entregue(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)  # precisa estar aprovada primeiro
+        resp = self.client.post(reverse("requisicao_marcar_entregue", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 200)
+
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_ENTREGUE)
+        self.assertIsNotNone(self.requisicao.entregue_em)
+        self.assertEqual(self.requisicao.entregue_por, self.ti)
+        self.assertTrue(
+            self.requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_ENTREGA).exists()
+        )
+
+        # Nao pode marcar entregue de novo, nem alterar aprovacao depois de entregue.
+        self.assertEqual(
+            self.client.post(reverse("requisicao_marcar_entregue", args=[self.requisicao.id])).status_code,
+            409,
+        )
+        self.assertEqual(self._aprovar(self.orc_a).status_code, 409)
+
+    def test_marcar_entregue_exige_orcamento_aprovado(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("requisicao_marcar_entregue", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 409)  # nenhum orcamento aprovado
+
+    def test_codigo_gerado_continua_do_sistema_antigo(self):
+        # Sem requisicoes anteriores no setUp com codigo, a primeira criada aqui
+        # deve seguir a numeracao a partir de REQ-00049.
+        RequisicaoContrato.objects.all().delete()
+        req = RequisicaoContrato.objects.create(titulo="Primeira", criado_por=self.ti)
+        self.assertEqual(req.codigo, "REQ-00049")
+        req2 = RequisicaoContrato.objects.create(titulo="Segunda", criado_por=self.ti)
+        self.assertEqual(req2.codigo, "REQ-00050")
 
     def test_common_user_cannot_approve(self):
         self.client.force_login(self.common)

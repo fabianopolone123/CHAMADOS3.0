@@ -334,19 +334,37 @@ class RequisicaoContrato(models.Model):
 
     STATUS_ABERTA = "aberta"
     STATUS_EM_COTACAO = "em_cotacao"
+    STATUS_AGUARDANDO_ENTREGA = "aguardando_entrega"
+    STATUS_ENTREGUE = "entregue"
     STATUS_FINALIZADA = "finalizada"
     STATUS_CANCELADA = "cancelada"
     STATUS_CHOICES = [
         (STATUS_ABERTA, "Aberta"),
         (STATUS_EM_COTACAO, "Esperando aprovacao"),
+        (STATUS_AGUARDANDO_ENTREGA, "Aguardando entrega"),
+        (STATUS_ENTREGUE, "Entregue"),
         (STATUS_FINALIZADA, "Finalizada"),
         (STATUS_CANCELADA, "Cancelada"),
     ]
 
+    # Codigo sequencial (REQ-00049, ...). Continua a numeracao do sistema antigo,
+    # que parou em REQ-00048; por isso as novas requisicoes comecam em 49.
+    CODIGO_PREFIXO = "REQ-"
+    CODIGO_BASE_ANTERIOR = 48
+
+    codigo = models.CharField(max_length=24, unique=True, null=True, blank=True)
     titulo = models.CharField(max_length=255)
     tipo = models.CharField(max_length=10, choices=TIPO_CHOICES, default=TIPO_FISICA)
     texto = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ABERTA)
+    entregue_em = models.DateTimeField(null=True, blank=True)
+    entregue_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requisicoes_entregues",
+    )
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -361,7 +379,29 @@ class RequisicaoContrato(models.Model):
         ordering = ["-criado_em", "-id"]
 
     def __str__(self) -> str:
-        return self.titulo
+        return f"{self.codigo or 'REQ'} - {self.titulo}"
+
+    def save(self, *args, **kwargs):
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+        # Gera o codigo apos o insert (idempotente): so quando ainda nao existe.
+        if creating and not self.codigo:
+            codigo = self.gerar_codigo()
+            type(self).objects.filter(pk=self.pk).update(codigo=codigo)
+            self.codigo = codigo
+
+    @classmethod
+    def gerar_codigo(cls) -> str:
+        """Proximo codigo sequencial, continuando do sistema antigo (REQ-00049...)."""
+        ultimo = cls.CODIGO_BASE_ANTERIOR
+        for codigo in cls.objects.filter(codigo__startswith=cls.CODIGO_PREFIXO).values_list(
+            "codigo", flat=True
+        ):
+            try:
+                ultimo = max(ultimo, int((codigo or "").replace(cls.CODIGO_PREFIXO, "")))
+            except (TypeError, ValueError):
+                continue
+        return f"{cls.CODIGO_PREFIXO}{ultimo + 1:05d}"
 
     @property
     def status_label(self) -> str:
@@ -370,6 +410,49 @@ class RequisicaoContrato(models.Model):
     @property
     def tipo_label(self) -> str:
         return dict(self.TIPO_CHOICES).get(self.tipo, self.tipo or "-")
+
+
+class RequisicaoContratoEvento(models.Model):
+    """Historico/timeline de uma requisicao (criacao, aprovacao, entrega, etc.)."""
+
+    TIPO_CRIACAO = "criacao"
+    TIPO_APROVACAO = "aprovacao"
+    TIPO_ENTREGA = "entrega"
+    TIPO_STATUS = "status"
+    TIPO_CHOICES = [
+        (TIPO_CRIACAO, "Criacao"),
+        (TIPO_APROVACAO, "Aprovacao de orcamento"),
+        (TIPO_ENTREGA, "Entrega"),
+        (TIPO_STATUS, "Mudanca de status"),
+    ]
+
+    requisicao = models.ForeignKey(
+        RequisicaoContrato, on_delete=models.CASCADE, related_name="eventos"
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="eventos_requisicao",
+    )
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    descricao = models.TextField()
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em", "-id"]
+        verbose_name = "Evento de requisicao"
+        verbose_name_plural = "Eventos de requisicao"
+
+    def __str__(self) -> str:
+        return f"{self.requisicao_id} - {self.tipo}"
+
+    @classmethod
+    def registrar(cls, *, requisicao, usuario, tipo, descricao):
+        return cls.objects.create(
+            requisicao=requisicao, usuario=usuario, tipo=tipo, descricao=descricao
+        )
 
 
 class _ItemOrcamentoBase(models.Model):

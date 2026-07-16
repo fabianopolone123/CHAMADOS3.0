@@ -58,6 +58,7 @@ from .models import (
     PendenciaTI,
     Ramal,
     RequisicaoContrato,
+    RequisicaoContratoEvento,
     RetiradaInsumoTI,
     ServicoFeito,
     ServicoFeitoAnexo,
@@ -1656,6 +1657,7 @@ def contratos_dashboard_view(request):
     rows = [
         {
             "id": req.id,
+            "codigo": req.codigo or "",
             "titulo": req.titulo,
             "status": req.status,
             "status_label": req.status_label,
@@ -1696,12 +1698,19 @@ def requisicao_create_view(request):
         status=RequisicaoContrato.STATUS_ABERTA,
         criado_por=request.user,
     )
+    RequisicaoContratoEvento.registrar(
+        requisicao=requisicao,
+        usuario=request.user,
+        tipo=RequisicaoContratoEvento.TIPO_CRIACAO,
+        descricao=f"Requisicao {requisicao.codigo or ''} criada por {_attendant_display(request.user)}.".strip(),
+    )
     return JsonResponse(
         {
             "ok": True,
             "message": "Requisicao criada com sucesso.",
             "requisicao": {
                 "id": requisicao.id,
+                "codigo": requisicao.codigo or "",
                 "titulo": requisicao.titulo,
                 "status": requisicao.status,
                 "status_label": requisicao.status_label,
@@ -1726,11 +1735,22 @@ def requisicao_detail_view(request, requisicao_id: int):
     orcamentos = (
         requisicao.orcamentos.prefetch_related("suborcamentos", "documentos", "suborcamentos__documentos")
     )
+    eventos = [
+        {
+            "tipo": ev.tipo,
+            "tipo_label": dict(RequisicaoContratoEvento.TIPO_CHOICES).get(ev.tipo, ev.tipo),
+            "descricao": ev.descricao,
+            "usuario": _attendant_display(ev.usuario) or "-",
+            "data": timezone.localtime(ev.criado_em).strftime("%d/%m/%Y %H:%M"),
+        }
+        for ev in requisicao.eventos.select_related("usuario").all()
+    ]
     return JsonResponse(
         {
             "ok": True,
             "requisicao": {
                 "id": requisicao.id,
+                "codigo": requisicao.codigo or "",
                 "titulo": requisicao.titulo,
                 "tipo": requisicao.tipo,
                 "tipo_label": requisicao.tipo_label,
@@ -1739,8 +1759,11 @@ def requisicao_detail_view(request, requisicao_id: int):
                 "status_label": requisicao.status_label,
                 "criado_por": _attendant_display(requisicao.criado_por) or "-",
                 "criado_em": timezone.localtime(requisicao.criado_em).strftime("%d/%m/%Y %H:%M"),
+                "entregue_em": timezone.localtime(requisicao.entregue_em).strftime("%d/%m/%Y %H:%M") if requisicao.entregue_em else "",
+                "entregue_por": _attendant_display(requisicao.entregue_por) if requisicao.entregue_por else "",
             },
             "orcamentos": [_serialize_orcamento(orc) for orc in orcamentos],
+            "eventos": eventos,
         }
     )
 
@@ -1856,9 +1879,10 @@ def orcamento_aprovar_view(request, orcamento_id: int):
     """Aprova/desaprova um orcamento especifico de uma requisicao.
 
     A aprovacao e exclusiva: aprovar um orcamento desaprova os demais da mesma
-    requisicao e move a requisicao para "Finalizada". Desaprovar volta a
+    requisicao e move a requisicao para "Aguardando entrega". Desaprovar volta a
     requisicao para "Esperando aprovacao" quando nenhum orcamento fica aprovado.
-    Alterna com base no estado atual do orcamento.
+    Alterna com base no estado atual do orcamento e registra no historico.
+    Nao e permitido alterar a aprovacao depois que a requisicao ja foi entregue.
     """
     if not _is_ti(request.user):
         return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
@@ -1870,7 +1894,11 @@ def orcamento_aprovar_view(request, orcamento_id: int):
         return _json_error("Orcamento nao encontrado.", status=404)
 
     requisicao = orcamento.requisicao
+    if requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error("Esta requisicao ja foi entregue; nao e possivel alterar a aprovacao.", status=409)
+
     aprovar = not orcamento.aprovado  # alterna
+    autor = _attendant_display(request.user)
 
     with transaction.atomic():
         if aprovar:
@@ -1882,9 +1910,15 @@ def orcamento_aprovar_view(request, orcamento_id: int):
             orcamento.aprovado_em = timezone.now()
             orcamento.aprovado_por = request.user
             orcamento.save(update_fields=["aprovado", "aprovado_em", "aprovado_por", "atualizado_em"])
-            if requisicao.status != RequisicaoContrato.STATUS_FINALIZADA:
-                requisicao.status = RequisicaoContrato.STATUS_FINALIZADA
+            if requisicao.status != RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA:
+                requisicao.status = RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA
                 requisicao.save(update_fields=["status", "atualizado_em"])
+            RequisicaoContratoEvento.registrar(
+                requisicao=requisicao,
+                usuario=request.user,
+                tipo=RequisicaoContratoEvento.TIPO_APROVACAO,
+                descricao=f'Orcamento "{orcamento.titulo}" aprovado por {autor}. Aguardando entrega.',
+            )
         else:
             orcamento.aprovado = False
             orcamento.aprovado_em = None
@@ -1892,12 +1926,18 @@ def orcamento_aprovar_view(request, orcamento_id: int):
             orcamento.save(update_fields=["aprovado", "aprovado_em", "aprovado_por", "atualizado_em"])
             # Se nenhum orcamento continua aprovado, volta para "Esperando aprovacao".
             ainda_aprovado = requisicao.orcamentos.filter(aprovado=True).exists()
-            if not ainda_aprovado and requisicao.status == RequisicaoContrato.STATUS_FINALIZADA:
+            if not ainda_aprovado and requisicao.status == RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA:
                 requisicao.status = RequisicaoContrato.STATUS_EM_COTACAO
                 requisicao.save(update_fields=["status", "atualizado_em"])
+            RequisicaoContratoEvento.registrar(
+                requisicao=requisicao,
+                usuario=request.user,
+                tipo=RequisicaoContratoEvento.TIPO_APROVACAO,
+                descricao=f'Aprovacao do orcamento "{orcamento.titulo}" removida por {autor}.',
+            )
 
     mensagem = (
-        f'Orcamento "{orcamento.titulo}" aprovado.'
+        f'Orcamento "{orcamento.titulo}" aprovado. Aguardando entrega.'
         if aprovar
         else f'Aprovacao do orcamento "{orcamento.titulo}" removida.'
     )
@@ -1910,6 +1950,47 @@ def orcamento_aprovar_view(request, orcamento_id: int):
             "requisicao_id": requisicao.id,
             "requisicao_status": requisicao.status,
             "requisicao_status_label": requisicao.status_label,
+        }
+    )
+
+
+@login_required
+@require_POST
+def requisicao_marcar_entregue_view(request, requisicao_id: int):
+    """Marca a requisicao como entregue (apos aprovada/aguardando entrega)."""
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+    if requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error("Esta requisicao ja foi marcada como entregue.", status=409)
+    if not requisicao.orcamentos.filter(aprovado=True).exists():
+        return _json_error("Aprove um orcamento antes de marcar como entregue.", status=409)
+
+    autor = _attendant_display(request.user)
+    with transaction.atomic():
+        requisicao.status = RequisicaoContrato.STATUS_ENTREGUE
+        requisicao.entregue_em = timezone.now()
+        requisicao.entregue_por = request.user
+        requisicao.save(update_fields=["status", "entregue_em", "entregue_por", "atualizado_em"])
+        RequisicaoContratoEvento.registrar(
+            requisicao=requisicao,
+            usuario=request.user,
+            tipo=RequisicaoContratoEvento.TIPO_ENTREGA,
+            descricao=f"Requisicao marcada como entregue por {autor}.",
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Requisicao {requisicao.codigo or ''} marcada como entregue.".strip(),
+            "requisicao_id": requisicao.id,
+            "requisicao_status": requisicao.status,
+            "requisicao_status_label": requisicao.status_label,
+            "entregue_em": timezone.localtime(requisicao.entregue_em).strftime("%d/%m/%Y %H:%M"),
+            "entregue_por": autor,
         }
     )
 

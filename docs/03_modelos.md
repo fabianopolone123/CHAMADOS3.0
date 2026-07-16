@@ -17,6 +17,7 @@ Fluxo de atendimento (Chamados):
 Modulo Requisicoes (exibido como "Requisicoes" na interface; os models mantem o prefixo tecnico `Contrato`):
 
 - `RequisicaoContrato`
+- `RequisicaoContratoEvento`
 - `OrcamentoContrato`
 - `OrcamentoDocumento`
 - `SuborcamentoContrato`
@@ -255,10 +256,12 @@ Requisicao de contrato/compra do modulo Contratos. Agrupa varios orcamentos.
 
 Campos atuais:
 
+- `codigo` (CharField unico, sequencial `REQ-00049`...; gerado no cadastro continuando o sistema antigo, que parou em `REQ-00048`)
 - `titulo`
 - `tipo` (choices: `fisica`, `digital`; default `fisica`)
 - `texto`
-- `status` (choices: `aberta`, `em_cotacao`, `finalizada`, `cancelada`; default `aberta`, definido automaticamente na criacao)
+- `status` (choices: `aberta`, `em_cotacao` = "Esperando aprovacao", `aguardando_entrega`, `entregue`, `finalizada`, `cancelada`; default `aberta`)
+- `entregue_em` (datetime, opcional), `entregue_por` (FK usuario, `on_delete=SET_NULL`, related_name `requisicoes_entregues`)
 - `criado_por` (FK opcional para o usuario, `on_delete=SET_NULL`)
 - `criado_em`
 - `atualizado_em`
@@ -266,7 +269,18 @@ Campos atuais:
 Regras atuais:
 
 - So Atendente TI/Admin criam/veem requisicoes (validado no backend).
-- O status inicial e sempre `aberta`; o fluxo de aprovacao nao foi implementado (campo apenas preparado).
+- Fluxo: `aberta` -> (aprovar um orcamento) -> `aguardando_entrega` -> (marcar entregue) -> `entregue`. Aprovar um orcamento e exclusivo por requisicao. `codigo` gerado no `save()` (migration `0036`).
+- Todo evento relevante (criacao, aprovacao/desaprovacao, entrega) e registrado em `RequisicaoContratoEvento`.
+
+### RequisicaoContratoEvento
+
+Historico/timeline de uma requisicao.
+
+- `requisicao` (FK `on_delete=CASCADE`, related_name `eventos`)
+- `usuario` (FK usuario, `on_delete=SET_NULL`, opcional)
+- `tipo` (choices: `criacao`, `aprovacao`, `entrega`, `status`)
+- `descricao`, `criado_em`
+- `Meta.ordering = ["-criado_em", "-id"]` (mais recentes primeiro)
 
 ### OrcamentoContrato
 

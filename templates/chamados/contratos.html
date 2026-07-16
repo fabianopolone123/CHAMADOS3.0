@@ -17,6 +17,7 @@
     data-orcamento-create-url="{% url 'orcamento_create' requisicao_id=0 %}"
     data-suborcamento-create-url="{% url 'suborcamento_create' orcamento_id=0 %}"
     data-orcamento-aprovar-url="{% url 'orcamento_aprovar' orcamento_id=0 %}"
+    data-requisicao-marcar-entregue-url="{% url 'requisicao_marcar_entregue' requisicao_id=0 %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="contratos" %}
@@ -39,6 +40,7 @@
                 {% for req in requisicoes %}
                     <li>
                         <button type="button" class="requisicao-item" data-requisicao-id="{{ req.id }}">
+                            {% if req.codigo %}<span class="requisicao-item__code">{{ req.codigo }}</span>{% endif %}
                             <span class="requisicao-item__title">{{ req.titulo }}</span>
                             <span class="status-badge contrato-status contrato-status--{{ req.status }}">{{ req.status_label }}</span>
                         </button>
