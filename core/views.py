@@ -2836,7 +2836,11 @@ def notificacoes_stream_view(request):
         last = _max_id()  # baseline: so eventos NOVOS a partir de agora
         yield "retry: 5000\n\n"
         yield ": conectado\n\n"
-        ocioso = 0
+        inicio = time.monotonic()
+        # Recicla a conexao periodicamente: o EventSource reconecta sozinho, mas
+        # assim a thread do worker gthread e SEMPRE liberada de tempos em tempos,
+        # evitando acumulo de conexoes penduradas (troca rapida de menu).
+        max_duracao = 55
         while True:
             time.sleep(2)
             try:
@@ -2853,13 +2857,17 @@ def notificacoes_stream_view(request):
             if novos:
                 for evento in novos:
                     yield f"data: {json.dumps(_serialize_evento_notificacao(evento))}\n\n"
-                ocioso = 0
             else:
-                ocioso += 1
-                if ocioso >= 8:  # heartbeat ~16s (mantem a conexao viva no nginx)
-                    yield ": ping\n\n"
-                    ocioso = 0
+                # Heartbeat leve a CADA ciclo (~2s). Alem de manter a conexao viva
+                # no nginx, faz o servidor detectar rapido quando o navegador saiu
+                # (o yield falha em socket fechado), liberando a thread em ~2s em
+                # vez de esperar ~16s. Comentarios (linha ":") sao ignorados pelo
+                # EventSource, entao nao ha efeito no cliente.
+                yield ": ping\n\n"
             last = gmax  # avanca a base mesmo por eventos proprios (nao re-notifica)
+
+            if time.monotonic() - inicio > max_duracao:
+                break  # encerra o generator; o EventSource reabre em ~5s
 
     response = StreamingHttpResponse(stream(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
