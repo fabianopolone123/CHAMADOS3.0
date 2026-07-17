@@ -11,3 +11,6 @@ seed/
 # Dump do sistema antigo (grande, nao versionar)
 chamados.zip
 chamados/
+
+# Certificados/chaves TLS (nunca versionar)
+certs/
