@@ -362,7 +362,24 @@
 .pendencia-card {
     cursor: pointer;
     padding: clamp(0.6rem, 0.5rem + 0.4vw, 0.85rem) clamp(0.75rem, 0.6rem + 0.5vw, 1rem);
+}
+
+/* Card pintado com a cor da prioridade (tom suave para o titulo continuar
+   legivel) + faixa e borda mais fortes. Seletor combinado para vencer a
+   especificidade do .ticket-card, que vem depois no arquivo. */
+.ticket-card.pendencia-card {
     border-left: 5px solid var(--pendencia-cor, #cbd5e1);
+    background: #f9fbff; /* fallback p/ navegadores sem color-mix */
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--pendencia-cor, #cbd5e1) 28%, #fff) 0%,
+        color-mix(in srgb, var(--pendencia-cor, #cbd5e1) 16%, #fff) 100%
+    );
+    border-color: color-mix(in srgb, var(--pendencia-cor, #cbd5e1) 42%, rgba(148, 163, 184, 0.16));
+}
+
+.ticket-card.pendencia-card:hover {
+    border-color: color-mix(in srgb, var(--pendencia-cor, #cbd5e1) 60%, transparent);
 }
 
 /* ----- Prioridade por cor (swatches) ----- */
