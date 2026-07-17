@@ -225,8 +225,27 @@ class PendenciaTI(models.Model):
     arrastada para a coluna de um atendente. Mantida como rastro apos a
     conversao (marcada como convertida, nao apagada)."""
 
+    # Escala de prioridade por cor: 1 = mais urgente (vermelho) ... 5 = menos
+    # urgente (verde). Cada nivel guarda rotulo e cor (fonte unica de verdade,
+    # usada no card, nos swatches e na API).
+    PRIORIDADES = (
+        (1, "Urgente", "#dc3545"),
+        (2, "Alta", "#fd7e14"),
+        (3, "Media", "#f5c518"),
+        (4, "Baixa", "#7cb342"),
+        (5, "Minima", "#2e9e5b"),
+    )
+    PRIORIDADE_CHOICES = tuple((valor, rotulo) for valor, rotulo, _cor in PRIORIDADES)
+    PRIORIDADE_CORES = {valor: cor for valor, _rotulo, cor in PRIORIDADES}
+    PRIORIDADE_PADRAO = 3
+
     titulo = models.CharField(max_length=255)
     descricao = models.TextField(blank=True)
+    prioridade = models.PositiveSmallIntegerField(
+        choices=PRIORIDADE_CHOICES,
+        default=PRIORIDADE_PADRAO,
+        help_text="1 = mais urgente (vermelho), 5 = menos urgente (verde).",
+    )
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -253,10 +272,30 @@ class PendenciaTI(models.Model):
     convertido_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["criado_em", "id"]
+        # Mais urgentes (prioridade menor = vermelho) no topo; dentro do mesmo
+        # nivel, os mais recentes primeiro.
+        ordering = ["prioridade", "-criado_em", "-id"]
 
     def __str__(self) -> str:
         return f"Pendencia #{self.pk} - {self.titulo}"
+
+    @property
+    def cor(self) -> str:
+        return self.PRIORIDADE_CORES.get(
+            self.prioridade, self.PRIORIDADE_CORES[self.PRIORIDADE_PADRAO]
+        )
+
+    @property
+    def prioridade_label(self) -> str:
+        return dict(self.PRIORIDADE_CHOICES).get(self.prioridade, "")
+
+    @classmethod
+    def prioridade_opcoes(cls):
+        """Lista de niveis para renderizar os swatches nos modais."""
+        return [
+            {"valor": valor, "rotulo": rotulo, "cor": cor}
+            for valor, rotulo, cor in cls.PRIORIDADES
+        ]
 
 
 class AtendimentoHistorico(models.Model):

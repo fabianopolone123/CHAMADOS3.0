@@ -15,6 +15,22 @@
                     <span data-pendencia-detail="criado_em">-</span>
                 </div>
                 <p class="pendencia-detail__descricao" data-pendencia-detail="descricao"></p>
+
+                <div class="pendencia-detail__priority">
+                    <span class="pendencia-detail__priority-label">Prioridade</span>
+                    <div class="pendencia-priority" data-pendencia-priority role="radiogroup" aria-label="Prioridade da pendencia">
+                        {% for op in pendencia_prioridades %}
+                        <button type="button"
+                            class="pendencia-priority__swatch"
+                            style="--swatch-cor: {{ op.cor }};"
+                            data-priority-value="{{ op.valor }}"
+                            role="radio"
+                            aria-checked="false"
+                            title="{{ op.rotulo }}"
+                            aria-label="{{ op.rotulo }}"></button>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             <div class="modal-footer">

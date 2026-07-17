@@ -703,6 +703,39 @@
         : null;
 
     let currentPendenciaCard = null;
+    const pendenciaPriorityContainer = pendenciaDetailModalElement
+        ? pendenciaDetailModalElement.querySelector("[data-pendencia-priority]")
+        : null;
+
+    // Marca visualmente o swatch da prioridade selecionada dentro de um grupo.
+    function markPrioritySelection(container, value) {
+        if (!container) {
+            return;
+        }
+        container.querySelectorAll(".pendencia-priority__swatch").forEach((swatch) => {
+            const selected = String(swatch.dataset.priorityValue) === String(value);
+            swatch.classList.toggle("is-selected", selected);
+            swatch.setAttribute("aria-checked", selected ? "true" : "false");
+        });
+    }
+
+    // Reposiciona o card na coluna: mais urgentes (prioridade menor) no topo.
+    // Coloca o card no topo do seu grupo de prioridade.
+    function positionPendenciaCard(list, card) {
+        if (!list || !card) {
+            return;
+        }
+        const value = Number(card.dataset.prioridade) || 99;
+        const siblings = Array.from(list.querySelectorAll(PENDENCIA_CARD_SELECTOR)).filter(
+            (other) => other !== card
+        );
+        const before = siblings.find((other) => (Number(other.dataset.prioridade) || 99) >= value);
+        if (before) {
+            list.insertBefore(card, before);
+        } else {
+            list.appendChild(card);
+        }
+    }
 
     function setPendenciaDetailField(key, value) {
         if (!pendenciaDetailModalElement) {
@@ -746,6 +779,7 @@
             setPendenciaDetailField("descricao", data.descricao);
             setPendenciaDetailField("criado_por", data.criado_por);
             setPendenciaDetailField("criado_em", data.criado_em);
+            markPrioritySelection(pendenciaPriorityContainer, data.prioridade);
             pendenciaDetailModal.show();
         } catch (error) {
             showToast(error.message || "Nao foi possivel abrir a pendencia.", "error");
@@ -770,6 +804,32 @@
         } catch (error) {
             showToast(error.message || "Nao foi possivel excluir a pendencia.", "error");
         }
+    }
+
+    async function updateCurrentPendenciaPriority(value) {
+        const card = currentPendenciaCard;
+        if (!card || !card.dataset.priorityUrl) {
+            return;
+        }
+        try {
+            const result = await sendJson(card.dataset.priorityUrl, { prioridade: value });
+            markPrioritySelection(pendenciaPriorityContainer, result.prioridade);
+            card.dataset.prioridade = result.prioridade;
+            card.style.setProperty("--pendencia-cor", result.cor);
+            const list = card.closest(PENDENCIA_LIST_SELECTOR);
+            positionPendenciaCard(list, card);
+            showToast(result.message || "Prioridade atualizada.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel atualizar a prioridade.", "error");
+        }
+    }
+
+    if (pendenciaPriorityContainer) {
+        pendenciaPriorityContainer.querySelectorAll(".pendencia-priority__swatch").forEach((swatch) => {
+            swatch.addEventListener("click", () => {
+                updateCurrentPendenciaPriority(swatch.dataset.priorityValue);
+            });
+        });
     }
 
     if (pendenciaDetailModalElement) {
@@ -829,12 +889,12 @@
             window.location.reload();
             return;
         }
-        // Pendencia nova entra no topo da coluna (mais recentes primeiro).
+        // Pendencia nova entra no topo do seu grupo de prioridade (vermelho no topo).
         const emptyState = list.querySelector(".kanban-empty");
         if (emptyState) {
             emptyState.remove();
         }
-        list.insertBefore(card, list.firstChild);
+        positionPendenciaCard(list, card);
         bindPendenciaCard(card);
         updateColumnCounts();
         refreshEmptyStates();
@@ -851,6 +911,20 @@
 
         const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
 
+        const priorityContainer = form.querySelector(".pendencia-priority");
+        const priorityInput = form.querySelector("#createPendenciaPrioridade");
+        const defaultPriority = priorityInput ? priorityInput.value : "3";
+        if (priorityContainer) {
+            priorityContainer.querySelectorAll(".pendencia-priority__swatch").forEach((swatch) => {
+                swatch.addEventListener("click", () => {
+                    if (priorityInput) {
+                        priorityInput.value = swatch.dataset.priorityValue;
+                    }
+                    markPrioritySelection(priorityContainer, swatch.dataset.priorityValue);
+                });
+            });
+        }
+
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
             if (submitButton) {
@@ -859,14 +933,19 @@
 
             const titulo = form.querySelector("#createPendenciaTitulo").value.trim();
             const descricao = form.querySelector("#createPendenciaDescricao").value.trim();
+            const prioridade = priorityInput ? priorityInput.value : defaultPriority;
 
             try {
-                const data = await sendJson(createUrl, { titulo, descricao });
+                const data = await sendJson(createUrl, { titulo, descricao, prioridade });
                 if (data.card_html) {
                     insertNewPendenciaCard(data.card_html);
                 }
                 modal.hide();
                 form.reset();
+                if (priorityInput) {
+                    priorityInput.value = defaultPriority;
+                }
+                markPrioritySelection(priorityContainer, defaultPriority);
                 showToast(data.message || "Pendencia criada com sucesso.", "success");
             } catch (error) {
                 showToast(error.message || "Nao foi possivel criar a pendencia.", "error");

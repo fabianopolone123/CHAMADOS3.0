@@ -362,6 +362,60 @@
 .pendencia-card {
     cursor: pointer;
     padding: clamp(0.6rem, 0.5rem + 0.4vw, 0.85rem) clamp(0.75rem, 0.6rem + 0.5vw, 1rem);
+    border-left: 5px solid var(--pendencia-cor, #cbd5e1);
+}
+
+/* ----- Prioridade por cor (swatches) ----- */
+.pendencia-priority {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pendencia-priority__swatch {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(15, 23, 42, 0.15);
+    background: var(--swatch-cor, #cbd5e1);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.pendencia-priority__swatch:hover {
+    transform: scale(1.12);
+}
+
+.pendencia-priority__swatch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--swatch-cor, #94a3b8);
+}
+
+.pendencia-priority__swatch.is-selected {
+    border-color: #0f172a;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--swatch-cor, #94a3b8);
+}
+
+.pendencia-priority__hint {
+    margin: 0.45rem 0 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.pendencia-detail__priority {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.pendencia-detail__priority-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
 }
 
 .pendencia-card__title {

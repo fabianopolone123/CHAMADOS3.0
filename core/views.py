@@ -359,17 +359,18 @@ def tickets_dashboard_view(request):
         for user in attendants
     ]
 
-    # Pendencias mais recentes no topo da coluna (por data/hora de criacao).
+    # Mais urgentes (vermelho) no topo; dentro do mesmo nivel, mais recentes
+    # primeiro (ordenacao definida no Meta do model).
     pendencias = list(
         PendenciaTI.objects.filter(convertido_em_chamado=False)
         .select_related("criado_por")
-        .order_by("-criado_em", "-id")
     )
 
     context = {
         "page_title": "Painel de Chamados TI",
         "open_column": {"tickets": abertos, "count": len(abertos)},
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
+        "pendencia_prioridades": PendenciaTI.prioridade_opcoes(),
         "attendant_columns": attendant_columns,
         "closed_column": {"count": closed_count, "recent": closed_recent},
         "is_admin": is_admin_user(request.user),
@@ -571,6 +572,17 @@ def _render_pendencia_card(request, pendencia: PendenciaTI) -> str:
     return render_to_string("partials/pendencia_card.html", {"p": pendencia}, request=request)
 
 
+def _parse_prioridade(valor):
+    """Normaliza a prioridade recebida (1..5); cai no padrao se invalida."""
+    try:
+        prioridade = int(valor)
+    except (TypeError, ValueError):
+        return PendenciaTI.PRIORIDADE_PADRAO
+    if prioridade not in PendenciaTI.PRIORIDADE_CORES:
+        return PendenciaTI.PRIORIDADE_PADRAO
+    return prioridade
+
+
 @login_required
 @require_POST
 def pendencia_create_view(request):
@@ -592,6 +604,7 @@ def pendencia_create_view(request):
     pendencia = PendenciaTI.objects.create(
         titulo=titulo,
         descricao=descricao,
+        prioridade=_parse_prioridade(payload.get("prioridade")),
         criado_por=request.user,
     )
 
@@ -600,6 +613,7 @@ def pendencia_create_view(request):
             "ok": True,
             "message": "Pendencia criada com sucesso.",
             "pendencia_id": pendencia.id,
+            "prioridade": pendencia.prioridade,
             "card_html": _render_pendencia_card(request, pendencia),
         }
     )
@@ -618,6 +632,36 @@ def pendencia_detail_view(request, pendencia_id: int):
             "descricao": pendencia.descricao,
             "criado_em": timezone.localtime(pendencia.criado_em).strftime("%d/%m/%Y %H:%M"),
             "criado_por": _attendant_display(pendencia.criado_por) or "Usuario removido",
+            "prioridade": pendencia.prioridade,
+            "prioridade_label": pendencia.prioridade_label,
+            "cor": pendencia.cor,
+        }
+    )
+
+
+@login_required
+@require_POST
+def pendencia_priority_view(request, pendencia_id: int):
+    """Altera a prioridade (cor) de uma pendencia (apenas TI/admin)."""
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Voce nao tem permissao para alterar pendencias.", status=403)
+
+    pendencia = get_object_or_404(PendenciaTI, pk=pendencia_id)
+    payload = _load_request_payload(request)
+    if payload is None:
+        return _json_error("Nao foi possivel ler os dados enviados.")
+
+    pendencia.prioridade = _parse_prioridade(payload.get("prioridade"))
+    pendencia.save(update_fields=["prioridade"])
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Prioridade atualizada.",
+            "pendencia_id": pendencia.id,
+            "prioridade": pendencia.prioridade,
+            "prioridade_label": pendencia.prioridade_label,
+            "cor": pendencia.cor,
         }
     )
 

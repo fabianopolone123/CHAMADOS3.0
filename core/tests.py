@@ -485,6 +485,96 @@ class PendenciaTITests(TestCase):
         resp = self.client.get(reverse("pendencia_delete", args=[pend.id]))
         self.assertEqual(resp.status_code, 405)
 
+    def test_create_pendencia_default_priority(self):
+        self.client.force_login(self.creator)
+        resp = self.client.post(
+            reverse("pendencia_create"),
+            data=json.dumps({"titulo": "Sem prioridade", "descricao": "usa padrao"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pend = PendenciaTI.objects.get(titulo="Sem prioridade")
+        self.assertEqual(pend.prioridade, PendenciaTI.PRIORIDADE_PADRAO)
+
+    def test_create_pendencia_with_priority(self):
+        self.client.force_login(self.creator)
+        resp = self.client.post(
+            reverse("pendencia_create"),
+            data=json.dumps(
+                {"titulo": "Urgente", "descricao": "vermelho", "prioridade": 1}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pend = PendenciaTI.objects.get(titulo="Urgente")
+        self.assertEqual(pend.prioridade, 1)
+
+    def test_create_pendencia_invalid_priority_falls_back(self):
+        self.client.force_login(self.creator)
+        resp = self.client.post(
+            reverse("pendencia_create"),
+            data=json.dumps(
+                {"titulo": "Invalida", "descricao": "fora da escala", "prioridade": 99}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pend = PendenciaTI.objects.get(titulo="Invalida")
+        self.assertEqual(pend.prioridade, PendenciaTI.PRIORIDADE_PADRAO)
+
+    def test_detail_returns_priority_and_color(self):
+        pend = self._create_pendencia(self.creator)
+        pend.prioridade = 2
+        pend.save(update_fields=["prioridade"])
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("pendencia_detail", args=[pend.id]))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["prioridade"], 2)
+        self.assertEqual(data["cor"], PendenciaTI.PRIORIDADE_CORES[2])
+
+    def test_update_priority(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("pendencia_priority", args=[pend.id]),
+            data=json.dumps({"prioridade": 5}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        pend.refresh_from_db()
+        self.assertEqual(pend.prioridade, 5)
+        self.assertEqual(resp.json()["cor"], PendenciaTI.PRIORIDADE_CORES[5])
+
+    def test_update_priority_requires_post(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("pendencia_priority", args=[pend.id]))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_common_user_cannot_update_priority(self):
+        pend = self._create_pendencia(self.creator)
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("pendencia_priority", args=[pend.id]),
+            data=json.dumps({"prioridade": 1}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_priority_ordering_red_first(self):
+        baixa = PendenciaTI.objects.create(
+            titulo="Baixa", descricao="verde", criado_por=self.creator, prioridade=5
+        )
+        urgente = PendenciaTI.objects.create(
+            titulo="Urgente", descricao="vermelho", criado_por=self.creator, prioridade=1
+        )
+        media = PendenciaTI.objects.create(
+            titulo="Media", descricao="amarelo", criado_por=self.creator, prioridade=3
+        )
+        ordenadas = list(PendenciaTI.objects.all())
+        self.assertEqual(ordenadas, [urgente, media, baixa])
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class RequisicaoDeleteFilesTests(TestCase):

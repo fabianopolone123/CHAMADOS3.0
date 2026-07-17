@@ -1,5 +1,9 @@
 # 06 - Changelog
 
+## 2026-07-17
+
+- Pendencias: cada pendencia ganhou uma **prioridade por cor** em 5 niveis (vermelho = mais urgente ... verde = menos urgente). A cor e escolhida por **swatches** tanto no modal de **cadastro** quanto no de **detalhe** (ao clicar no card), com atualizacao imediata (sem refresh). O card mostra uma **faixa colorida a esquerda** indicando o nivel. A coluna "Pendencias" agora e **ordenada por prioridade** (vermelho no topo) e, dentro do mesmo nivel, pelos mais recentes; ao criar/alterar a prioridade o card e reposicionado no topo do seu grupo. Novo campo `prioridade` (inteiro 1..5, default 3) no model `PendenciaTI` com a tabela de cores/rotulos em `PendenciaTI.PRIORIDADES` (fonte unica). Migrations `0037` (campo) e `0038` (ordering do Meta). Nova rota `POST /chamados/pendencias/<id>/prioridade/` (name `pendencia_priority`, TI/admin). (Substitui a ordenacao anterior, que era so por data de criacao.)
+
 ## 2026-07-16
 
 - Requisicoes: fluxo de aprovacao/entrega alinhado ao sistema antigo. Aprovar um orcamento agora move a requisicao para **"Aguardando entrega"** (antes ia direto para "Finalizada") e o botao do orcamento aprovado vira **"Marcar entregue"**; ao marcar, a requisicao vai para **"Entregue"** (com data e responsavel). Novos status `aguardando_entrega` e `entregue` no `RequisicaoContrato`. Nova rota `POST /contratos/requisicoes/<id>/marcar-entregue/` (name `requisicao_marcar_entregue`, TI/admin). Nao e possivel alterar a aprovacao depois de entregue.

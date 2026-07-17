@@ -14,7 +14,8 @@
 | `/chamados/fechados/buscar/` | GET | Lista/pesquisa (JSON) os chamados encerrados para o modal do Kanban; sem `q` retorna os mais recentes, com `q` filtra por ID, titulo, descricao, solicitante, atendente, mensagens e historico (apenas TI/admin) | Implementada |
 | `/chamados/fechados/<numero>/` | GET | Detalhe completo (JSON) de um chamado encerrado para o modal: dados, descricao, conversa, anexos e historico tecnico (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/criar/` | POST | Cria uma pendencia na coluna "Pendencias" (apenas TI/admin) | Implementada |
-| `/chamados/pendencias/<id>/` | GET | Detalhe (JSON) da pendencia para o modal: titulo, descricao, data e autor (apenas TI/admin) | Implementada |
+| `/chamados/pendencias/<id>/` | GET | Detalhe (JSON) da pendencia para o modal: titulo, descricao, data, autor e prioridade/cor (apenas TI/admin) | Implementada |
+| `/chamados/pendencias/<id>/prioridade/` | POST | Altera a prioridade/cor da pendencia (1..5) e retorna a nova cor/rotulo (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/converter/` | POST | Converte a pendencia em chamado ao ser arrastada para um atendente (apenas TI/admin) | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
@@ -172,7 +173,8 @@
 
 - Todas exigem `login_required` e permissao de Atendente TI/Admin; usuario comum recebe `403` (validado no backend, nao apenas no template).
 - `criar/` e `converter/` aceitam apenas `POST` com CSRF (payload JSON); `detail` responde JSON para o modal.
-- A criacao valida titulo (minimo de caracteres) e descricao obrigatoria e retorna o HTML do card para insercao imediata na coluna "Pendencias".
+- A criacao valida titulo (minimo de caracteres) e descricao obrigatoria, aceita `prioridade` (1..5; padrao 3 se ausente/invalida) e retorna o HTML do card para insercao imediata na coluna "Pendencias".
+- `prioridade/` aceita apenas `POST` com CSRF e atualiza o nivel (1..5); o front reposiciona o card na coluna (mais urgentes/vermelho no topo) e troca a cor sem refresh. A coluna e ordenada por `prioridade` e, dentro do nivel, pelos mais recentes.
 - A conversao valida que o `attendant_id` pertence ao grupo `Atendente TI` (senao `400`) e recusa pendencia ja convertida (`409`), evitando chamado duplicado.
 - A conversao cria o chamado (titulo/descricao da pendencia, `solicitante` = criador, `atendente_atual` = atendente destino, status "Atribuido" — ainda sem Play ativo), marca a pendencia como convertida e registra os eventos no `ChamadoEvento`.
 - A resposta da conversao retorna `ticket_number`, `status`, `status_label`, `status_class`, `atendente_atual` e `card_html` para o Kanban montar o card do chamado sem refresh.

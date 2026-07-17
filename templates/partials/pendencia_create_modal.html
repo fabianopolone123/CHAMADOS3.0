@@ -22,6 +22,24 @@
                         <label for="createPendenciaDescricao">Descricao</label>
                         <textarea id="createPendenciaDescricao" name="descricao" class="form-control" rows="5" placeholder="Descreva a pendencia." required></textarea>
                     </div>
+
+                    <div class="portal-field">
+                        <label id="createPendenciaPrioridadeLabel">Prioridade</label>
+                        <div class="pendencia-priority" role="radiogroup" aria-labelledby="createPendenciaPrioridadeLabel">
+                            {% for op in pendencia_prioridades %}
+                            <button type="button"
+                                class="pendencia-priority__swatch{% if op.valor == 3 %} is-selected{% endif %}"
+                                style="--swatch-cor: {{ op.cor }};"
+                                data-priority-value="{{ op.valor }}"
+                                role="radio"
+                                aria-checked="{% if op.valor == 3 %}true{% else %}false{% endif %}"
+                                title="{{ op.rotulo }}"
+                                aria-label="{{ op.rotulo }}"></button>
+                            {% endfor %}
+                        </div>
+                        <input type="hidden" id="createPendenciaPrioridade" name="prioridade" value="3">
+                        <p class="pendencia-priority__hint">Vermelho = mais urgente &middot; Verde = menos urgente</p>
+                    </div>
                 </div>
 
                 <div class="modal-footer">

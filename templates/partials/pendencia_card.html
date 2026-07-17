@@ -1,6 +1,8 @@
 {% comment %}
 Card compacto de pendencia no Kanban. Mostra apenas o titulo; o clique abre o
-modal de detalhe. Arrastavel apenas para colunas de Atendente TI (regra no JS/backend).
+modal de detalhe. A faixa colorida a esquerda indica a prioridade (vermelho =
+mais urgente, verde = menos urgente). Arrastavel apenas para colunas de
+Atendente TI (regra no JS/backend).
 {% endcomment %}
 <article
     class="ticket-card pendencia-card"
@@ -9,7 +11,10 @@ modal de detalhe. Arrastavel apenas para colunas de Atendente TI (regra no JS/ba
     data-detail-url="{% url 'pendencia_detail' p.id %}"
     data-convert-url="{% url 'pendencia_convert' p.id %}"
     data-delete-url="{% url 'pendencia_delete' p.id %}"
-    aria-label="Pendencia: {{ p.titulo }}"
+    data-priority-url="{% url 'pendencia_priority' p.id %}"
+    data-prioridade="{{ p.prioridade }}"
+    style="--pendencia-cor: {{ p.cor }};"
+    aria-label="Pendencia: {{ p.titulo }} (prioridade: {{ p.prioridade_label }})"
 >
     <h4 class="pendencia-card__title">{{ p.titulo }}</h4>
 </article>
