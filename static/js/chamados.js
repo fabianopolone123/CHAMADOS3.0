@@ -814,8 +814,15 @@
         try {
             const result = await sendJson(card.dataset.priorityUrl, { prioridade: value });
             markPrioritySelection(pendenciaPriorityContainer, result.prioridade);
-            card.dataset.prioridade = result.prioridade;
-            card.style.setProperty("--pendencia-cor", result.cor);
+            if (result.prioridade) {
+                card.dataset.prioridade = result.prioridade;
+                card.style.setProperty("--pendencia-cor", result.cor);
+                card.classList.add("pendencia-card--colored");
+            } else {
+                card.dataset.prioridade = "";
+                card.style.removeProperty("--pendencia-cor");
+                card.classList.remove("pendencia-card--colored");
+            }
             const list = card.closest(PENDENCIA_LIST_SELECTOR);
             positionPendenciaCard(list, card);
             showToast(result.message || "Prioridade atualizada.", "success");

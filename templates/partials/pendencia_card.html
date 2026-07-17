@@ -5,15 +5,15 @@ mais urgente, verde = menos urgente). Arrastavel apenas para colunas de
 Atendente TI (regra no JS/backend).
 {% endcomment %}
 <article
-    class="ticket-card pendencia-card"
+    class="ticket-card pendencia-card{% if p.prioridade %} pendencia-card--colored{% endif %}"
     tabindex="0"
     data-pendencia-id="{{ p.id }}"
     data-detail-url="{% url 'pendencia_detail' p.id %}"
     data-convert-url="{% url 'pendencia_convert' p.id %}"
     data-delete-url="{% url 'pendencia_delete' p.id %}"
     data-priority-url="{% url 'pendencia_priority' p.id %}"
-    data-prioridade="{{ p.prioridade }}"
-    style="--pendencia-cor: {{ p.cor }};"
+    data-prioridade="{{ p.prioridade|default:'' }}"
+    {% if p.prioridade %}style="--pendencia-cor: {{ p.cor }};"{% endif %}
     aria-label="Pendencia: {{ p.titulo }} (prioridade: {{ p.prioridade_label }})"
 >
     <h4 class="pendencia-card__title">{{ p.titulo }}</h4>

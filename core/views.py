@@ -573,13 +573,14 @@ def _render_pendencia_card(request, pendencia: PendenciaTI) -> str:
 
 
 def _parse_prioridade(valor):
-    """Normaliza a prioridade recebida (1..5); cai no padrao se invalida."""
+    """Normaliza a prioridade recebida (1..5); retorna None (sem cor) se vazia
+    ou invalida."""
     try:
         prioridade = int(valor)
     except (TypeError, ValueError):
-        return PendenciaTI.PRIORIDADE_PADRAO
+        return None
     if prioridade not in PendenciaTI.PRIORIDADE_CORES:
-        return PendenciaTI.PRIORIDADE_PADRAO
+        return None
     return prioridade
 
 

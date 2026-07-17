@@ -24,21 +24,21 @@
                     </div>
 
                     <div class="portal-field">
-                        <label id="createPendenciaPrioridadeLabel">Prioridade</label>
+                        <label id="createPendenciaPrioridadeLabel">Prioridade <span class="pendencia-priority__optional">(opcional)</span></label>
                         <div class="pendencia-priority" role="radiogroup" aria-labelledby="createPendenciaPrioridadeLabel">
                             {% for op in pendencia_prioridades %}
                             <button type="button"
-                                class="pendencia-priority__swatch{% if op.valor == 3 %} is-selected{% endif %}"
+                                class="pendencia-priority__swatch"
                                 style="--swatch-cor: {{ op.cor }};"
                                 data-priority-value="{{ op.valor }}"
                                 role="radio"
-                                aria-checked="{% if op.valor == 3 %}true{% else %}false{% endif %}"
+                                aria-checked="false"
                                 title="{{ op.rotulo }}"
                                 aria-label="{{ op.rotulo }}"></button>
                             {% endfor %}
                         </div>
-                        <input type="hidden" id="createPendenciaPrioridade" name="prioridade" value="3">
-                        <p class="pendencia-priority__hint">Vermelho = mais urgente &middot; Verde = menos urgente</p>
+                        <input type="hidden" id="createPendenciaPrioridade" name="prioridade" value="">
+                        <p class="pendencia-priority__hint">Sem cor por padrao &middot; Vermelho = mais urgente, Verde = menos urgente</p>
                     </div>
                 </div>
 

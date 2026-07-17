@@ -485,16 +485,17 @@ class PendenciaTITests(TestCase):
         resp = self.client.get(reverse("pendencia_delete", args=[pend.id]))
         self.assertEqual(resp.status_code, 405)
 
-    def test_create_pendencia_default_priority(self):
+    def test_create_pendencia_without_priority_is_colorless(self):
         self.client.force_login(self.creator)
         resp = self.client.post(
             reverse("pendencia_create"),
-            data=json.dumps({"titulo": "Sem prioridade", "descricao": "usa padrao"}),
+            data=json.dumps({"titulo": "Sem prioridade", "descricao": "sem cor"}),
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 200)
         pend = PendenciaTI.objects.get(titulo="Sem prioridade")
-        self.assertEqual(pend.prioridade, PendenciaTI.PRIORIDADE_PADRAO)
+        self.assertIsNone(pend.prioridade)
+        self.assertEqual(pend.cor, "")
 
     def test_create_pendencia_with_priority(self):
         self.client.force_login(self.creator)
@@ -509,7 +510,7 @@ class PendenciaTITests(TestCase):
         pend = PendenciaTI.objects.get(titulo="Urgente")
         self.assertEqual(pend.prioridade, 1)
 
-    def test_create_pendencia_invalid_priority_falls_back(self):
+    def test_create_pendencia_invalid_priority_is_colorless(self):
         self.client.force_login(self.creator)
         resp = self.client.post(
             reverse("pendencia_create"),
@@ -520,7 +521,7 @@ class PendenciaTITests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         pend = PendenciaTI.objects.get(titulo="Invalida")
-        self.assertEqual(pend.prioridade, PendenciaTI.PRIORIDADE_PADRAO)
+        self.assertIsNone(pend.prioridade)
 
     def test_detail_returns_priority_and_color(self):
         pend = self._create_pendencia(self.creator)
@@ -562,7 +563,10 @@ class PendenciaTITests(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
-    def test_priority_ordering_red_first(self):
+    def test_priority_ordering_red_first_colorless_last(self):
+        sem_cor = PendenciaTI.objects.create(
+            titulo="Sem cor", descricao="branco", criado_por=self.creator
+        )
         baixa = PendenciaTI.objects.create(
             titulo="Baixa", descricao="verde", criado_por=self.creator, prioridade=5
         )
@@ -572,8 +576,9 @@ class PendenciaTITests(TestCase):
         media = PendenciaTI.objects.create(
             titulo="Media", descricao="amarelo", criado_por=self.creator, prioridade=3
         )
+        # Vermelho no topo, verde depois, e as sem cor por ultimo.
         ordenadas = list(PendenciaTI.objects.all())
-        self.assertEqual(ordenadas, [urgente, media, baixa])
+        self.assertEqual(ordenadas, [urgente, media, baixa, sem_cor])
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())

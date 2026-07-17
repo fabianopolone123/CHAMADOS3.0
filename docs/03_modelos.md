@@ -211,7 +211,7 @@ Campos atuais:
 
 - `titulo`
 - `descricao`
-- `prioridade` (inteiro 1..5, default `3`; `1` = mais urgente/vermelho, `5` = menos urgente/verde). Cores e rotulos ficam em `PendenciaTI.PRIORIDADES` (fonte unica usada no card, nos swatches e na API).
+- `prioridade` (inteiro 1..5, **anulavel**, default `None` = sem cor; `1` = mais urgente/vermelho, `5` = menos urgente/verde). Cores e rotulos ficam em `PendenciaTI.PRIORIDADES` (fonte unica usada no card, nos swatches e na API). So os cards com prioridade definida sao pintados; os "sem cor" ficam brancos.
 - `criado_por` (FK opcional para quem criou, `on_delete=SET_NULL`, related_name `pendencias_criadas`)
 - `criado_em`
 - `convertido_em_chamado` (booleano, default `False`)

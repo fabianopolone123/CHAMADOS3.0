@@ -237,14 +237,17 @@ class PendenciaTI(models.Model):
     )
     PRIORIDADE_CHOICES = tuple((valor, rotulo) for valor, rotulo, _cor in PRIORIDADES)
     PRIORIDADE_CORES = {valor: cor for valor, _rotulo, cor in PRIORIDADES}
-    PRIORIDADE_PADRAO = 3
 
     titulo = models.CharField(max_length=255)
     descricao = models.TextField(blank=True)
+    # Sem cor por padrao (nulo). So fica pintada quando alguem escolhe um nivel
+    # no cadastro ou depois, no detalhe do card.
     prioridade = models.PositiveSmallIntegerField(
         choices=PRIORIDADE_CHOICES,
-        default=PRIORIDADE_PADRAO,
-        help_text="1 = mais urgente (vermelho), 5 = menos urgente (verde).",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="1 = mais urgente (vermelho), 5 = menos urgente (verde); vazio = sem cor.",
     )
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -272,21 +275,23 @@ class PendenciaTI(models.Model):
     convertido_em = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        # Mais urgentes (prioridade menor = vermelho) no topo; dentro do mesmo
-        # nivel, os mais recentes primeiro.
-        ordering = ["prioridade", "-criado_em", "-id"]
+        # Mais urgentes (prioridade menor = vermelho) no topo; as sem cor (nulo)
+        # vao para o fim; dentro do mesmo nivel, os mais recentes primeiro.
+        ordering = [models.F("prioridade").asc(nulls_last=True), "-criado_em", "-id"]
 
     def __str__(self) -> str:
         return f"Pendencia #{self.pk} - {self.titulo}"
 
     @property
     def cor(self) -> str:
-        return self.PRIORIDADE_CORES.get(
-            self.prioridade, self.PRIORIDADE_CORES[self.PRIORIDADE_PADRAO]
-        )
+        if not self.prioridade:
+            return ""
+        return self.PRIORIDADE_CORES.get(self.prioridade, "")
 
     @property
     def prioridade_label(self) -> str:
+        if not self.prioridade:
+            return "Sem cor"
         return dict(self.PRIORIDADE_CHOICES).get(self.prioridade, "")
 
     @classmethod

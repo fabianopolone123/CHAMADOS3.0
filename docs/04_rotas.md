@@ -173,8 +173,8 @@
 
 - Todas exigem `login_required` e permissao de Atendente TI/Admin; usuario comum recebe `403` (validado no backend, nao apenas no template).
 - `criar/` e `converter/` aceitam apenas `POST` com CSRF (payload JSON); `detail` responde JSON para o modal.
-- A criacao valida titulo (minimo de caracteres) e descricao obrigatoria, aceita `prioridade` (1..5; padrao 3 se ausente/invalida) e retorna o HTML do card para insercao imediata na coluna "Pendencias".
-- `prioridade/` aceita apenas `POST` com CSRF e atualiza o nivel (1..5); o front reposiciona o card na coluna (mais urgentes/vermelho no topo) e troca a cor sem refresh. A coluna e ordenada por `prioridade` e, dentro do nivel, pelos mais recentes.
+- A criacao valida titulo (minimo de caracteres) e descricao obrigatoria, aceita `prioridade` (1..5; **sem cor** se ausente/invalida) e retorna o HTML do card para insercao imediata na coluna "Pendencias".
+- `prioridade/` aceita apenas `POST` com CSRF e atualiza o nivel (1..5; vazio/invalido = sem cor); o front pinta/despinta o card, reposiciona na coluna (vermelho no topo, sem cor por ultimo) e troca a cor sem refresh. A coluna e ordenada por `prioridade` (nulos por ultimo) e, dentro do nivel, pelos mais recentes.
 - A conversao valida que o `attendant_id` pertence ao grupo `Atendente TI` (senao `400`) e recusa pendencia ja convertida (`409`), evitando chamado duplicado.
 - A conversao cria o chamado (titulo/descricao da pendencia, `solicitante` = criador, `atendente_atual` = atendente destino, status "Atribuido" — ainda sem Play ativo), marca a pendencia como convertida e registra os eventos no `ChamadoEvento`.
 - A resposta da conversao retorna `ticket_number`, `status`, `status_label`, `status_class`, `atendente_atual` e `card_html` para o Kanban montar o card do chamado sem refresh.
