@@ -118,10 +118,11 @@ redireciona HTTP->HTTPS (assumindo o header `X-Forwarded-Proto` do nginx).
 
 O repositorio traz `scripts/deploy.sh`, que faz o ciclo completo de qualquer
 alteracao: `git pull` -> `pip install -r requirements.txt` -> `migrate` ->
-`collectstatic` -> `systemctl restart`. Ele carrega o `/etc/chamados/app.env`
-antes de rodar o `manage.py` (para migrate/collectstatic terem a
-`VAULT_ENCRYPTION_KEY` e demais variaveis) e so declara sucesso se o servico
-subir.
+`collectstatic` -> `systemctl restart`. Antes de rodar o `manage.py`, ele carrega
+a env de producao (autodetecta o `.env` da raiz do projeto — o mesmo que o
+`settings.py` ja le — e, se nao houver, cai para `/etc/chamados/app.env`), para
+migrate/collectstatic terem a `VAULT_ENCRYPTION_KEY` e demais variaveis. So
+declara sucesso se o servico subir.
 
 Instale o atalho global **uma vez** no servidor (symlink para o script
 versionado, entao ele acompanha o codigo):

@@ -12,7 +12,8 @@
 # Variaveis de ambiente para ajustar o ambiente (todas opcionais):
 #   CHAMADOS_DIR      diretorio do projeto        (default: /opt/chamados)
 #   CHAMADOS_VENV     virtualenv                  (default: $CHAMADOS_DIR/.venv)
-#   CHAMADOS_ENV      arquivo de env de producao  (default: /etc/chamados/app.env)
+#   CHAMADOS_ENV      arquivo de env de producao  (default: autodetecta
+#                     $CHAMADOS_DIR/.env ou /etc/chamados/app.env)
 #   CHAMADOS_SERVICE  nome do servico systemd     (default: chamados)
 #   CHAMADOS_BRANCH   branch para o deploy        (default: main)
 #
@@ -21,9 +22,20 @@ set -euo pipefail
 # --- Configuracao (defaults batem com docs/08_deploy_seguro.md) --------------
 APP_DIR="${CHAMADOS_DIR:-/opt/chamados}"
 VENV_DIR="${CHAMADOS_VENV:-$APP_DIR/.venv}"
-ENV_FILE="${CHAMADOS_ENV:-/etc/chamados/app.env}"
 SERVICE="${CHAMADOS_SERVICE:-chamados}"
 BRANCH="${CHAMADOS_BRANCH:-main}"
+
+# Env de producao: usa CHAMADOS_ENV se definido; senao autodetecta o .env da
+# raiz do projeto (que o proprio settings.py ja carrega) e, por fim, o caminho
+# do guia seguro (/etc/chamados/app.env).
+ENV_FILE="${CHAMADOS_ENV:-}"
+if [ -z "$ENV_FILE" ]; then
+    if [ -f "$APP_DIR/.env" ]; then
+        ENV_FILE="$APP_DIR/.env"
+    else
+        ENV_FILE="/etc/chamados/app.env"
+    fi
+fi
 
 PYTHON="$VENV_DIR/bin/python"
 PIP="$VENV_DIR/bin/pip"
