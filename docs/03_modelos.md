@@ -430,6 +430,9 @@ Equipamento vinculado a um emprestimo (um emprestimo pode ter varios).
 
 - `emprestimo` (FK `on_delete=CASCADE`, related_name `equipamentos`)
 - `tipo_equipamento`, `marca`, `modelo`, `numero_serie`, `patrimonio_etiqueta`, `acessorios_entregues`, `criado_em`
+- `data_emprestimo` (data em que ESTE equipamento foi emprestado; permite linha do tempo quando equipamentos sao adicionados em momentos diferentes; equipamentos antigos herdaram a data do emprestimo na migration `0040`)
+- `data_devolucao` (data em que o equipamento foi devolvido; `None` = ainda em posse do colaborador)
+- Properties: `descricao_completa`, `esta_devolvido`, `data_emprestimo_display`, `data_devolucao_display`
 
 ### FotoEquipamentoEmprestimoTI
 

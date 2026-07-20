@@ -14,6 +14,7 @@
     class="tickets-app emprestimos-app"
     data-emprestimo-create-url="{% url 'emprestimo_create' %}"
     data-emprestimo-detail-url="{% url 'emprestimo_detail' emprestimo_id=0 %}"
+    data-emprestimo-editar-url="{% url 'emprestimo_editar' emprestimo_id=0 %}"
     data-emprestimo-termo-url="{% url 'emprestimo_baixar_termo' emprestimo_id=0 %}"
     data-emprestimo-anexar-url="{% url 'emprestimo_anexar_termo_assinado' emprestimo_id=0 %}"
     data-emprestimo-marcar-ok-url="{% url 'emprestimo_marcar_ok' emprestimo_id=0 %}"
@@ -77,6 +78,7 @@
 
 {% include "partials/emprestimo_create_modal.html" %}
 {% include "partials/emprestimo_detail_modal.html" %}
+{% include "partials/emprestimo_edit_modal.html" %}
 {% include "partials/assinatura_create_modal.html" %}
 {% endblock %}
 

@@ -19,6 +19,7 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from .models import (
+    FotoEquipamentoEmprestimoTI,
     OrcamentoContrato,
     OrcamentoDocumento,
     SuborcamentoContrato,
@@ -65,4 +66,11 @@ def _remover_arquivos_do_instance(instance) -> None:
 @receiver(post_delete, sender=SuborcamentoContrato)
 @receiver(post_delete, sender=SuborcamentoDocumento)
 def remover_arquivos_contratos(sender, instance, **kwargs) -> None:
+    _remover_arquivos_do_instance(instance)
+
+
+@receiver(post_delete, sender=FotoEquipamentoEmprestimoTI)
+def remover_arquivos_foto_equipamento(sender, instance, **kwargs) -> None:
+    """Ao remover um equipamento de um emprestimo (cascade) ou uma foto isolada,
+    apaga a imagem do disco, evitando arquivos orfaos em MEDIA_ROOT."""
     _remover_arquivos_do_instance(instance)

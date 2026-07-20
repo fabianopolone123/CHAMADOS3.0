@@ -179,13 +179,12 @@ def gerar_termo_pdf_bytes(emprestimo, aplicar_assinatura: bool = False) -> bytes
     ]))
     elementos.append(Spacer(1, 6))
 
-    # Equipamentos emprestados
-    elementos.append(Paragraph("Equipamentos emprestados", styles["SecTitle"]))
-    linhas_equip = []
+    # Equipamentos emprestados (ativos) e, em seguida, os ja devolvidos.
     equipamentos = list(emprestimo.equipamentos.all())
-    if not equipamentos:
-        linhas_equip.append(("Equipamento", "-"))
-    for indice, equip in enumerate(equipamentos, start=1):
+    ativos = [e for e in equipamentos if e.data_devolucao is None]
+    devolvidos = [e for e in equipamentos if e.data_devolucao is not None]
+
+    def _detalhes_equip(equip, incluir_devolucao=False):
         detalhes = [f"<b>{equip.descricao_completa}</b>"]
         serie_patr = []
         if equip.numero_serie:
@@ -196,9 +195,28 @@ def gerar_termo_pdf_bytes(emprestimo, aplicar_assinatura: bool = False) -> bytes
             detalhes.append(" | ".join(serie_patr))
         if equip.acessorios_entregues:
             detalhes.append(f"Acessorios: {equip.acessorios_entregues}")
-        linhas_equip.append((f"Equipamento {indice}", "<br/>".join(detalhes)))
+        datas = f"Emprestado em {equip.data_emprestimo_display}"
+        if incluir_devolucao:
+            datas += f" | Devolvido em {equip.data_devolucao_display}"
+        detalhes.append(datas)
+        return "<br/>".join(detalhes)
+
+    elementos.append(Paragraph("Equipamentos emprestados", styles["SecTitle"]))
+    linhas_equip = []
+    if not ativos:
+        linhas_equip.append(("Equipamento", "-"))
+    for indice, equip in enumerate(ativos, start=1):
+        linhas_equip.append((f"Equipamento {indice}", _detalhes_equip(equip)))
     elementos.append(_info_table(styles, linhas_equip))
     elementos.append(Spacer(1, 6))
+
+    if devolvidos:
+        elementos.append(Paragraph("Equipamentos ja devolvidos", styles["SecTitle"]))
+        linhas_dev = []
+        for indice, equip in enumerate(devolvidos, start=1):
+            linhas_dev.append((f"Devolvido {indice}", _detalhes_equip(equip, incluir_devolucao=True)))
+        elementos.append(_info_table(styles, linhas_dev))
+        elementos.append(Spacer(1, 6))
 
     # Condicoes do emprestimo
     elementos.append(Paragraph("Condicoes do emprestimo", styles["SecTitle"]))

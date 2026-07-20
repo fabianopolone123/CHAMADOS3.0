@@ -921,6 +921,11 @@ class EquipamentoEmprestimoTI(models.Model):
     numero_serie = models.CharField(max_length=255, blank=True)
     patrimonio_etiqueta = models.CharField(max_length=255, blank=True)
     acessorios_entregues = models.TextField(blank=True)
+    # Data em que ESTE equipamento foi emprestado (permite linha do tempo quando
+    # equipamentos sao adicionados em momentos diferentes ao mesmo emprestimo).
+    data_emprestimo = models.DateField(null=True, blank=True)
+    # Data em que o equipamento foi devolvido; None = ainda em posse do colaborador.
+    data_devolucao = models.DateField(null=True, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -936,6 +941,23 @@ class EquipamentoEmprestimoTI(models.Model):
         if partes:
             titulo = f"{titulo} {' '.join(partes)}".strip()
         return titulo
+
+    @property
+    def esta_devolvido(self) -> bool:
+        return self.data_devolucao is not None
+
+    @property
+    def data_emprestimo_display(self) -> str:
+        if self.data_emprestimo:
+            return self.data_emprestimo.strftime("%d/%m/%Y")
+        # Fallback para equipamentos antigos sem data propria.
+        if self.emprestimo_id and self.emprestimo.data_emprestimo:
+            return self.emprestimo.data_emprestimo.strftime("%d/%m/%Y")
+        return "-"
+
+    @property
+    def data_devolucao_display(self) -> str:
+        return self.data_devolucao.strftime("%d/%m/%Y") if self.data_devolucao else "-"
 
 
 def foto_equipamento_upload_path(instance, filename):

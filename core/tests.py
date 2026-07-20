@@ -22,6 +22,8 @@ from .models import (
     Contrato,
     ContratoAnexo,
     Dica,
+    EmprestimoTI,
+    EquipamentoEmprestimoTI,
     EnderecoIP,
     FuturaDigital,
     Licenca,
@@ -2042,4 +2044,94 @@ class NotificacoesStreamTests(TestCase):
     def test_comum_bloqueado(self):
         self.client.force_login(self.common)
         resp = self.client.get(reverse("notificacoes_stream"))
+        self.assertEqual(resp.status_code, 403)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class EmprestimoEdicaoTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _novo_emprestimo(self):
+        emp = EmprestimoTI.objects.create(
+            colaborador_nome="Fulano",
+            data_emprestimo="2026-01-10",
+            status=EmprestimoTI.STATUS_ASSINADA_OK,
+            termo_assinado_ok=True,
+            criado_por=self.ti,
+        )
+        equip = EquipamentoEmprestimoTI.objects.create(
+            emprestimo=emp, tipo_equipamento="Notebook", data_emprestimo="2026-01-10"
+        )
+        return emp, equip
+
+    def test_adicionar_equipamento_volta_para_aguardando(self):
+        emp, equip = self._novo_emprestimo()
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("emprestimo_editar", args=[emp.id]),
+            {
+                "colaborador_nome": "Fulano",
+                "data_emprestimo": "2026-01-10",
+                f"acao_equip_{equip.id}": "manter",
+                "equipamentos_count": "1",
+                "equip_0_tipo": "Monitor",
+                "equip_0_data": "2026-07-05",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        emp.refresh_from_db()
+        self.assertEqual(emp.equipamentos.count(), 2)
+        self.assertEqual(emp.status, EmprestimoTI.STATUS_AGUARDANDO)
+        self.assertFalse(emp.termo_assinado_ok)
+        self.assertTrue(emp.termo_pdf)
+        novo = emp.equipamentos.get(tipo_equipamento="Monitor")
+        self.assertEqual(novo.data_emprestimo.isoformat(), "2026-07-05")
+
+    def test_devolver_unico_equipamento_marca_devolvido(self):
+        emp, equip = self._novo_emprestimo()
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("emprestimo_editar", args=[emp.id]),
+            {
+                "colaborador_nome": "Fulano",
+                "data_emprestimo": "2026-01-10",
+                f"acao_equip_{equip.id}": "devolver",
+                f"devolver_data_{equip.id}": "2026-07-08",
+                "equipamentos_count": "0",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        equip.refresh_from_db()
+        emp.refresh_from_db()
+        self.assertEqual(equip.data_devolucao.isoformat(), "2026-07-08")
+        self.assertEqual(emp.status, EmprestimoTI.STATUS_DEVOLVIDO)
+
+    def test_nao_remove_todos_os_equipamentos(self):
+        emp, equip = self._novo_emprestimo()
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("emprestimo_editar", args=[emp.id]),
+            {
+                "colaborador_nome": "Fulano",
+                "data_emprestimo": "2026-01-10",
+                f"acao_equip_{equip.id}": "remover",
+                "equipamentos_count": "0",
+            },
+        )
+        self.assertEqual(resp.status_code, 400)
+        emp.refresh_from_db()
+        self.assertEqual(emp.equipamentos.count(), 1)
+
+    def test_comum_bloqueado(self):
+        emp, equip = self._novo_emprestimo()
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("emprestimo_editar", args=[emp.id]),
+            {"colaborador_nome": "Fulano", "data_emprestimo": "2026-01-10", "equipamentos_count": "0"},
+        )
         self.assertEqual(resp.status_code, 403)

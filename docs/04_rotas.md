@@ -37,7 +37,8 @@
 | `/contratos/documentos/suborcamento/<id>/` | GET | Download protegido de documento de suborcamento (apenas TI/admin) | Implementada |
 | `/emprestimos/` | GET | Modulo Emprestimos: lista de emprestimos com botao "+ Adicionar" e acesso a assinaturas (apenas TI/admin) | Implementada |
 | `/emprestimos/criar/` | POST | Cria emprestimo com 1+ equipamentos e fotos, valida senha da assinatura e gera o termo PDF (multipart) (apenas TI/admin) | Implementada |
-| `/emprestimos/<id>/` | GET | Detalhe (JSON) do emprestimo: dados, equipamentos, fotos, termo e status (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/` | GET | Detalhe (JSON) do emprestimo: dados, equipamentos (com datas de emprestimo/devolucao), fotos, termo e status (apenas TI/admin) | Implementada |
+| `/emprestimos/<id>/editar/` | POST | Edita o emprestimo: atualiza dados do colaborador, adiciona/remove equipamentos e marca equipamentos como devolvidos; regera o termo e volta o status para "Aguardando documentacao" (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/baixar-termo/` | GET | Download do termo PDF gerado pelo sistema (apenas TI/admin) | Implementada |
 | `/emprestimos/<id>/termo-assinado/` | GET | Serve o termo assinado anexado, por rota protegida (apenas TI/admin) | Implementada |
 | `/emprestimos/fotos/<id>/` | GET | Serve a foto de um equipamento inline, por rota protegida (apenas TI/admin) | Implementada |

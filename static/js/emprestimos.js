@@ -6,6 +6,7 @@
 
     const createUrl = appElement.dataset.emprestimoCreateUrl;
     const detailTpl = appElement.dataset.emprestimoDetailUrl;
+    const editarTpl = appElement.dataset.emprestimoEditarUrl;
     const termoTpl = appElement.dataset.emprestimoTermoUrl;
     const anexarTpl = appElement.dataset.emprestimoAnexarUrl;
     const marcarOkTpl = appElement.dataset.emprestimoMarcarOkUrl;
@@ -179,6 +180,7 @@
     const detailModal = detailModalEl ? bootstrap.Modal.getOrCreateInstance(detailModalEl) : null;
     const anexarForm = document.getElementById("anexarTermoForm");
     let currentEmprestimoId = null;
+    let currentEmprestimoData = null;
 
     function setField(key, value) {
         const el = detailModalEl.querySelector(`[data-emp-detail="${key}"]`);
@@ -236,8 +238,18 @@
             const meta = document.createElement("div");
             meta.className = "emp-equip-card__meta";
             meta.textContent = `Serie: ${eq.numero_serie} | Patrimonio: ${eq.patrimonio_etiqueta} | Acessorios: ${eq.acessorios_entregues}`;
+            const datas = document.createElement("div");
+            datas.className = "emp-equip-card__datas";
+            if (eq.esta_devolvido) {
+                datas.innerHTML =
+                    `Emprestado em ${eq.data_emprestimo}` +
+                    ` <span class="emp-equip-badge emp-equip-badge--devolvido">Devolvido em ${eq.data_devolucao}</span>`;
+            } else {
+                datas.textContent = `Emprestado em ${eq.data_emprestimo}`;
+            }
             card.appendChild(title);
             card.appendChild(meta);
+            card.appendChild(datas);
             if (eq.fotos && eq.fotos.length) {
                 const fotos = document.createElement("div");
                 fotos.className = "emp-equip-fotos";
@@ -308,34 +320,53 @@
         }
     }
 
+    function renderDetail(data) {
+        currentEmprestimoData = data;
+        setField("colaborador_nome", data.colaborador_nome);
+        setField("empresa", data.empresa);
+        setField("cpf", data.cpf);
+        setField("email", data.email);
+        setField("telefone", data.telefone);
+        setField("data_emprestimo", data.data_emprestimo);
+        setField("devolucao", data.devolucao);
+        setField("assinatura_responsavel", data.assinatura_responsavel);
+        setField("criado_por", data.criado_por);
+        setField("observacoes_internas", data.observacoes_internas || "Sem observacoes.");
+        applyStatusBadge(data.status, data.status_label);
+        renderEquipamentos(data.equipamentos);
+
+        const baixar = detailModalEl.querySelector("[data-emp-baixar-termo]");
+        if (data.termo_pdf_url) {
+            baixar.href = data.termo_pdf_url;
+            baixar.classList.remove("is-hidden");
+        } else {
+            baixar.classList.add("is-hidden");
+        }
+        renderAssinadoInfo(data);
+    }
+
     async function openDetail(id) {
         try {
             currentEmprestimoId = id;
             const data = await sendGet(buildUrl(detailTpl, id));
-            setField("colaborador_nome", data.colaborador_nome);
-            setField("empresa", data.empresa);
-            setField("cpf", data.cpf);
-            setField("email", data.email);
-            setField("telefone", data.telefone);
-            setField("data_emprestimo", data.data_emprestimo);
-            setField("devolucao", data.devolucao);
-            setField("assinatura_responsavel", data.assinatura_responsavel);
-            setField("criado_por", data.criado_por);
-            setField("observacoes_internas", data.observacoes_internas || "Sem observacoes.");
-            applyStatusBadge(data.status, data.status_label);
-            renderEquipamentos(data.equipamentos);
-
-            const baixar = detailModalEl.querySelector("[data-emp-baixar-termo]");
-            if (data.termo_pdf_url) {
-                baixar.href = data.termo_pdf_url;
-                baixar.classList.remove("is-hidden");
-            } else {
-                baixar.classList.add("is-hidden");
-            }
-            renderAssinadoInfo(data);
+            renderDetail(data);
             detailModal?.show();
         } catch (error) {
             showToast(error.message || "Nao foi possivel abrir o emprestimo.", "error");
+        }
+    }
+
+    // Atualiza (ou insere) a linha da tabela a partir do payload de linha.
+    function upsertRow(rowData) {
+        if (!rowData) return;
+        const existing = tbody.querySelector(`.emprestimo-row[data-emprestimo-id="${rowData.id}"]`);
+        const novo = buildRow(rowData);
+        if (existing) {
+            existing.replaceWith(novo);
+        } else {
+            const emptyRow = tbody.querySelector("[data-emprestimos-empty]");
+            if (emptyRow) emptyRow.remove();
+            tbody.insertBefore(novo, tbody.firstChild);
         }
     }
 
@@ -393,6 +424,133 @@
             showToast(error.message || "Nao foi possivel marcar a documentacao.", "error");
         } finally {
             btn.disabled = false;
+        }
+    });
+
+    // ---------------- Edicao de emprestimo ----------------
+    const editModalEl = document.getElementById("editEmprestimoModal");
+    const editModal = editModalEl ? bootstrap.Modal.getOrCreateInstance(editModalEl) : null;
+    const editForm = document.getElementById("editEmprestimoForm");
+    const editExistentes = document.getElementById("editEquipamentosExistentes");
+    const editNovosContainer = document.getElementById("editEquipamentosContainer");
+    const editEquipExistenteTpl = document.getElementById("editEquipExistenteTemplate");
+    let editEquipIndex = 0;
+
+    function hojeIso() {
+        const d = new Date();
+        const off = d.getTimezoneOffset();
+        return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+    }
+
+    function setEditValue(name, value) {
+        const el = editForm.querySelector(`[name="${name}"]`);
+        if (el) el.value = value || "";
+    }
+
+    function addEditEquipamentoBloco() {
+        const html = equipTemplate.innerHTML.replace(/__I__/g, String(editEquipIndex));
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = html.trim();
+        const bloco = wrapper.firstElementChild;
+        bloco.dataset.equipIndex = editEquipIndex;
+        bloco.querySelector("[data-equip-titulo]").textContent = `Novo equipamento ${editNovosContainer.children.length + 1}`;
+        bloco.querySelector("[data-remove-equip]").addEventListener("click", () => {
+            bloco.remove();
+            editNovosContainer.querySelectorAll("[data-equip-bloco]").forEach((b, i) => {
+                b.querySelector("[data-equip-titulo]").textContent = `Novo equipamento ${i + 1}`;
+            });
+        });
+        // Novo equipamento na edicao entra com a data de hoje por padrao.
+        const dataInput = bloco.querySelector('[name$="_data"]');
+        if (dataInput) dataInput.value = hojeIso();
+        editNovosContainer.appendChild(bloco);
+        editEquipIndex += 1;
+    }
+
+    function renderEditExistentes(equipamentos) {
+        editExistentes.innerHTML = "";
+        (equipamentos || []).forEach((eq) => {
+            const html = editEquipExistenteTpl.innerHTML.replace(/__ID__/g, String(eq.id));
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = html.trim();
+            const row = wrapper.firstElementChild;
+            row.querySelector("[data-equip-nome]").textContent = eq.descricao_completa || eq.tipo_equipamento;
+            const metaPartes = [];
+            if (eq.numero_serie && eq.numero_serie !== "-") metaPartes.push(`Serie: ${eq.numero_serie}`);
+            if (eq.patrimonio_etiqueta && eq.patrimonio_etiqueta !== "-") metaPartes.push(`Patr.: ${eq.patrimonio_etiqueta}`);
+            metaPartes.push(`Emprestado em ${eq.data_emprestimo}`);
+            if (eq.esta_devolvido) metaPartes.push(`Devolvido em ${eq.data_devolucao}`);
+            row.querySelector("[data-equip-meta]").textContent = metaPartes.join(" | ");
+
+            const dataInput = row.querySelector("[data-devolver-data]");
+            dataInput.value = hojeIso();
+
+            if (eq.esta_devolvido) {
+                // Ja devolvido: nao oferece "devolver" de novo; mantem por padrao.
+                const devolverRadio = row.querySelector('[data-acao-devolver]');
+                if (devolverRadio) {
+                    devolverRadio.disabled = true;
+                    devolverRadio.closest("label").classList.add("is-disabled");
+                }
+            }
+
+            row.querySelectorAll(`input[name="acao_equip_${eq.id}"]`).forEach((radio) => {
+                radio.addEventListener("change", () => {
+                    const devolver = row.querySelector('[data-acao-devolver]')?.checked;
+                    dataInput.classList.toggle("is-hidden", !devolver);
+                    row.classList.toggle("emprestimo-edit-equip--remover",
+                        row.querySelector(`input[name="acao_equip_${eq.id}"][value="remover"]`)?.checked);
+                });
+            });
+            editExistentes.appendChild(row);
+        });
+    }
+
+    function openEdit() {
+        const data = currentEmprestimoData;
+        if (!data || !data.edit) return;
+        setEditValue("colaborador_nome", data.edit.colaborador_nome);
+        setEditValue("empresa", data.edit.empresa);
+        setEditValue("cpf", data.edit.cpf);
+        setEditValue("email", data.edit.email);
+        setEditValue("telefone", data.edit.telefone);
+        setEditValue("data_emprestimo", data.edit.data_emprestimo);
+        setEditValue("previsao_devolucao", data.edit.previsao_devolucao);
+        setEditValue("observacoes_internas", data.edit.observacoes_internas);
+        const senha = editForm.querySelector('[name="senha_assinatura"]');
+        if (senha) senha.value = "";
+        const assinaturaSel = editForm.querySelector('[name="assinatura_id"]');
+        if (assinaturaSel) assinaturaSel.value = data.edit.assinatura_id ? String(data.edit.assinatura_id) : "";
+
+        renderEditExistentes(data.equipamentos);
+        editNovosContainer.innerHTML = "";
+        editEquipIndex = 0;
+
+        detailModal?.hide();
+        editModal?.show();
+    }
+
+    detailModalEl?.querySelector("[data-emp-editar]")?.addEventListener("click", openEdit);
+    document.getElementById("editAddEquipamentoButton")?.addEventListener("click", addEditEquipamentoBloco);
+
+    editForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!currentEmprestimoId) return;
+        const submit = document.getElementById("editEmprestimoSubmit");
+        if (submit) submit.disabled = true;
+        try {
+            const formData = new FormData(editForm);
+            formData.set("equipamentos_count", String(editEquipIndex));
+            const data = await sendForm(buildUrl(editarTpl, currentEmprestimoId), formData);
+            upsertRow(data.row);
+            editModal?.hide();
+            renderDetail(data);
+            detailModal?.show();
+            showToast(data.message || "Emprestimo atualizado.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel atualizar o emprestimo.", "error");
+        } finally {
+            if (submit) submit.disabled = false;
         }
     });
 })();

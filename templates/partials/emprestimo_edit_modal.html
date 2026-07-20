@@ -1,16 +1,22 @@
-<div class="modal fade" id="createEmprestimoModal" tabindex="-1" aria-labelledby="createEmprestimoModalLabel" aria-hidden="true">
+<div class="modal fade" id="editEmprestimoModal" tabindex="-1" aria-labelledby="editEmprestimoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content create-ticket-modal emprestimo-form-modal">
             <div class="modal-header">
                 <div>
                     <span class="create-ticket-kicker">Emprestimos</span>
-                    <h5 class="modal-title" id="createEmprestimoModalLabel">Novo emprestimo</h5>
+                    <h5 class="modal-title" id="editEmprestimoModalLabel">Editar emprestimo</h5>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
-            <form id="createEmprestimoForm" class="create-ticket-form" enctype="multipart/form-data">
+            <form id="editEmprestimoForm" class="create-ticket-form" enctype="multipart/form-data">
                 <div class="modal-body emprestimo-form__body">
+                    <p class="emprestimo-edit__aviso">
+                        Ao salvar, o termo em PDF e regerado e o status volta para
+                        <strong>Aguardando documentacao assinada</strong> (colha a nova assinatura).
+                        O termo assinado anterior e descartado.
+                    </p>
+
                     <h6 class="emprestimo-form__section">Dados do colaborador</h6>
                     <div class="emprestimo-form__grid">
                         <label class="contrato-field contrato-field--full">
@@ -48,11 +54,20 @@
                         </label>
                     </div>
 
-                    <h6 class="emprestimo-form__section">Assinatura do responsavel TI</h6>
+                    <h6 class="emprestimo-form__section">Equipamentos atuais</h6>
+                    <div id="editEquipamentosExistentes" class="emprestimo-edit__existentes"></div>
+
+                    <div class="emprestimo-form__equip-head">
+                        <h6 class="emprestimo-form__section mb-0">Adicionar equipamentos</h6>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="editAddEquipamentoButton">+ Adicionar mais um equipamento</button>
+                    </div>
+                    <div id="editEquipamentosContainer"></div>
+
+                    <h6 class="emprestimo-form__section">Assinatura do responsavel TI (novo termo)</h6>
                     <div class="emprestimo-form__grid">
                         <label class="contrato-field">
                             <span>Assinatura cadastrada</span>
-                            <select class="form-select" name="assinatura_id" id="emprestimoAssinatura">
+                            <select class="form-select" name="assinatura_id" id="editEmprestimoAssinatura">
                                 <option value="">Sem assinatura</option>
                                 {% for a in assinaturas %}
                                     <option value="{{ a.id }}">{{ a.nome_responsavel }}</option>
@@ -65,64 +80,35 @@
                             <small class="contrato-field__help">Obrigatoria para aplicar a assinatura no termo.</small>
                         </label>
                     </div>
-
-                    <div class="emprestimo-form__equip-head">
-                        <h6 class="emprestimo-form__section mb-0">Equipamentos emprestados</h6>
-                        <button type="button" class="btn btn-sm btn-outline-primary" id="addEquipamentoButton">+ Adicionar mais um equipamento</button>
-                    </div>
-                    <div id="equipamentosContainer"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" id="createEmprestimoSubmit">Cadastrar e gerar termo</button>
+                    <button type="submit" class="btn btn-primary" id="editEmprestimoSubmit">Salvar e regerar termo</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-{# Template de bloco de equipamento (clonado pelo JS; __I__ vira o indice) #}
-<template id="equipamentoTemplate">
-    <div class="equipamento-bloco" data-equip-bloco>
-        <div class="equipamento-bloco__head">
-            <strong data-equip-titulo>Equipamento</strong>
-            <button type="button" class="btn btn-sm btn-link text-danger p-0" data-remove-equip>Remover</button>
+{# Template de linha de equipamento existente (clonado pelo JS; __ID__ vira o id) #}
+<template id="editEquipExistenteTemplate">
+    <div class="emprestimo-edit-equip" data-edit-equip data-equip-id="__ID__">
+        <div class="emprestimo-edit-equip__info">
+            <strong data-equip-nome></strong>
+            <span class="emprestimo-edit-equip__meta" data-equip-meta></span>
         </div>
-        <div class="emprestimo-form__grid">
-            <label class="contrato-field">
-                <span>Tipo de equipamento</span>
-                <input type="text" class="form-control" name="equip___I___tipo" maxlength="255">
+        <div class="emprestimo-edit-equip__acoes">
+            <label class="emprestimo-edit-equip__radio">
+                <input type="radio" name="acao_equip___ID__" value="manter" checked> Manter
             </label>
-            <label class="contrato-field">
-                <span>Marca</span>
-                <input type="text" class="form-control" name="equip___I___marca" maxlength="255">
+            <label class="emprestimo-edit-equip__radio">
+                <input type="radio" name="acao_equip___ID__" value="devolver" data-acao-devolver> Devolver
             </label>
-            <label class="contrato-field">
-                <span>Modelo</span>
-                <input type="text" class="form-control" name="equip___I___modelo" maxlength="255">
+            <label class="emprestimo-edit-equip__radio">
+                <input type="radio" name="acao_equip___ID__" value="remover"> Remover
             </label>
-            <label class="contrato-field">
-                <span>Numero de serie</span>
-                <input type="text" class="form-control" name="equip___I___serie" maxlength="255">
-            </label>
-            <label class="contrato-field">
-                <span>Patrimonio / etiqueta</span>
-                <input type="text" class="form-control" name="equip___I___patrimonio" maxlength="255">
-            </label>
-            <label class="contrato-field">
-                <span>Acessorios entregues</span>
-                <input type="text" class="form-control" name="equip___I___acessorios" maxlength="255">
-            </label>
-            <label class="contrato-field">
-                <span>Data de emprestimo deste equipamento</span>
-                <input type="date" class="form-control" name="equip___I___data">
-                <small class="contrato-field__help">Em branco = mesma data do emprestimo.</small>
-            </label>
-            <label class="contrato-field contrato-field--full">
-                <span>Fotos do equipamento</span>
-                <input type="file" class="form-control" name="equip___I___fotos" accept="image/*" multiple>
-            </label>
+            <input type="date" class="form-control form-control-sm emprestimo-edit-equip__data is-hidden" name="devolver_data___ID__" data-devolver-data>
         </div>
     </div>
 </template>

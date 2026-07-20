@@ -2194,6 +2194,7 @@ def _parse_equipamentos(request):
                 "numero_serie": (request.POST.get(prefixo + "serie") or "").strip(),
                 "patrimonio_etiqueta": (request.POST.get(prefixo + "patrimonio") or "").strip(),
                 "acessorios_entregues": (request.POST.get(prefixo + "acessorios") or "").strip(),
+                "data_emprestimo": parse_date((request.POST.get(prefixo + "data") or "").strip()),
                 "fotos": request.FILES.getlist(prefixo + "fotos"),
             }
         )
@@ -2251,6 +2252,9 @@ def emprestimo_create_view(request):
         )
         for dados in equipamentos:
             fotos = dados.pop("fotos")
+            # Sem data propria => usa a data do emprestimo.
+            if not dados.get("data_emprestimo"):
+                dados["data_emprestimo"] = data_emprestimo
             equip = EquipamentoEmprestimoTI.objects.create(emprestimo=emprestimo, **dados)
             for foto in fotos:
                 FotoEquipamentoEmprestimoTI.objects.create(
@@ -2278,30 +2282,24 @@ def emprestimo_create_view(request):
     )
 
 
-@login_required
-def emprestimo_detail_view(request, emprestimo_id: int):
-    if not _is_ti(request.user):
-        return _json_error("Voce nao tem permissao para ver emprestimos.", status=403)
-
-    emp = (
-        EmprestimoTI.objects.select_related("assinatura_responsavel", "termo_assinado_por")
-        .prefetch_related("equipamentos__fotos")
-        .filter(pk=emprestimo_id)
-        .first()
-    )
-    if not emp:
-        return _json_error("Emprestimo nao encontrado.", status=404)
-
+def _serialize_emprestimo_detail(emp: EmprestimoTI) -> dict:
+    """Monta o JSON completo do detalhe de um emprestimo (usado no detalhe e na
+    resposta da edicao, para o front re-renderizar sem novo fetch)."""
     equipamentos = []
     for equip in emp.equipamentos.all():
         equipamentos.append(
             {
+                "id": equip.id,
                 "tipo_equipamento": equip.tipo_equipamento,
                 "marca": equip.marca,
                 "modelo": equip.modelo,
+                "descricao_completa": equip.descricao_completa,
                 "numero_serie": equip.numero_serie or "-",
                 "patrimonio_etiqueta": equip.patrimonio_etiqueta or "-",
                 "acessorios_entregues": equip.acessorios_entregues or "-",
+                "data_emprestimo": equip.data_emprestimo_display,
+                "data_devolucao": equip.data_devolucao_display,
+                "esta_devolvido": equip.esta_devolvido,
                 "fotos": [
                     {
                         "url": reverse("emprestimo_foto", args=[foto.id]),
@@ -2313,30 +2311,194 @@ def emprestimo_detail_view(request, emprestimo_id: int):
             }
         )
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "id": emp.id,
+    return {
+        "ok": True,
+        "id": emp.id,
+        "colaborador_nome": emp.colaborador_nome,
+        "empresa": emp.empresa or "-",
+        "cpf": emp.cpf or "-",
+        "email": emp.email or "-",
+        "telefone": emp.telefone or "-",
+        "data_emprestimo": emp.data_emprestimo.strftime("%d/%m/%Y") if emp.data_emprestimo else "-",
+        "devolucao": emp.devolucao_display,
+        "observacoes_internas": emp.observacoes_internas or "-",
+        "status": emp.status,
+        "status_label": emp.status_label,
+        "assinatura_responsavel": emp.assinatura_responsavel.nome_responsavel if emp.assinatura_responsavel else "-",
+        "termo_pdf_url": reverse("emprestimo_baixar_termo", args=[emp.id]) if emp.termo_pdf else "",
+        "termo_assinado_url": reverse("emprestimo_termo_assinado", args=[emp.id]) if emp.termo_assinado else "",
+        "termo_assinado_ok": emp.termo_assinado_ok,
+        "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M") if emp.termo_assinado_em else "",
+        "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "",
+        "equipamentos": equipamentos,
+        "criado_por": _attendant_display(emp.criado_por) or "-",
+        # Valores crus (sem "-"/formatacao) para preencher o formulario de edicao.
+        "edit": {
             "colaborador_nome": emp.colaborador_nome,
-            "empresa": emp.empresa or "-",
-            "cpf": emp.cpf or "-",
-            "email": emp.email or "-",
-            "telefone": emp.telefone or "-",
-            "data_emprestimo": emp.data_emprestimo.strftime("%d/%m/%Y") if emp.data_emprestimo else "-",
-            "devolucao": emp.devolucao_display,
-            "observacoes_internas": emp.observacoes_internas or "-",
-            "status": emp.status,
-            "status_label": emp.status_label,
-            "assinatura_responsavel": emp.assinatura_responsavel.nome_responsavel if emp.assinatura_responsavel else "-",
-            "termo_pdf_url": reverse("emprestimo_baixar_termo", args=[emp.id]) if emp.termo_pdf else "",
-            "termo_assinado_url": reverse("emprestimo_termo_assinado", args=[emp.id]) if emp.termo_assinado else "",
-            "termo_assinado_ok": emp.termo_assinado_ok,
-            "termo_assinado_em": timezone.localtime(emp.termo_assinado_em).strftime("%d/%m/%Y %H:%M") if emp.termo_assinado_em else "",
-            "termo_assinado_por": _attendant_display(emp.termo_assinado_por) or "",
-            "equipamentos": equipamentos,
-            "criado_por": _attendant_display(emp.criado_por) or "-",
-        }
+            "empresa": emp.empresa,
+            "cpf": emp.cpf,
+            "email": emp.email,
+            "telefone": emp.telefone,
+            "observacoes_internas": emp.observacoes_internas,
+            "data_emprestimo": emp.data_emprestimo.isoformat() if emp.data_emprestimo else "",
+            "previsao_devolucao": emp.previsao_devolucao.isoformat() if emp.previsao_devolucao else "",
+            "assinatura_id": emp.assinatura_responsavel_id or "",
+        },
+    }
+
+
+def _get_emprestimo_full(emprestimo_id: int):
+    return (
+        EmprestimoTI.objects.select_related("assinatura_responsavel", "termo_assinado_por")
+        .prefetch_related("equipamentos__fotos")
+        .filter(pk=emprestimo_id)
+        .first()
     )
+
+
+@login_required
+def emprestimo_detail_view(request, emprestimo_id: int):
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para ver emprestimos.", status=403)
+
+    emp = _get_emprestimo_full(emprestimo_id)
+    if not emp:
+        return _json_error("Emprestimo nao encontrado.", status=404)
+
+    return JsonResponse(_serialize_emprestimo_detail(emp))
+
+
+@login_required
+@require_POST
+def emprestimo_editar_view(request, emprestimo_id: int):
+    """Edita um emprestimo existente: atualiza dados do colaborador, marca
+    equipamentos como devolvidos, remove equipamentos e/ou adiciona novos.
+
+    Qualquer alteracao regenera o termo em PDF e, havendo ainda equipamento em
+    posse do colaborador, volta o status para "Aguardando documentacao assinada"
+    (exigindo nova assinatura); o termo assinado anterior e descartado. Se todos
+    os equipamentos ficarem devolvidos, o status passa para "Devolvido".
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para editar emprestimos.", status=403)
+
+    emp = _get_emprestimo_full(emprestimo_id)
+    if not emp:
+        return _json_error("Emprestimo nao encontrado.", status=404)
+
+    colaborador = (request.POST.get("colaborador_nome") or "").strip()
+    if len(colaborador) < 2:
+        return _json_error("Informe o nome do colaborador.")
+
+    data_emprestimo = parse_date((request.POST.get("data_emprestimo") or "").strip())
+    if not data_emprestimo:
+        return _json_error("Informe uma data de emprestimo valida.")
+
+    previsao = parse_date((request.POST.get("previsao_devolucao") or "").strip())
+    prazo_indeterminado = previsao is None
+
+    novos_equipamentos = _parse_equipamentos(request)
+
+    # Assinatura (opcional): se selecionada, a senha e obrigatoria e deve conferir.
+    assinatura = None
+    aplicar_assinatura = False
+    assinatura_id = (request.POST.get("assinatura_id") or "").strip()
+    if assinatura_id:
+        assinatura = AssinaturaResponsavelTI.objects.filter(pk=assinatura_id, ativo=True).first()
+        if not assinatura:
+            return _json_error("Assinatura selecionada invalida ou inativa.")
+        senha = request.POST.get("senha_assinatura") or ""
+        if not assinatura.conferir_senha(senha):
+            return _json_error("Senha de autorizacao da assinatura incorreta.", status=403)
+        aplicar_assinatura = True
+
+    existentes = list(emp.equipamentos.all())
+    hoje = timezone.localdate()
+
+    # Valida antes de aplicar: nao pode sobrar nenhum equipamento no emprestimo.
+    remover_ids = set()
+    devolver = {}  # id -> data de devolucao
+    for equip in existentes:
+        acao = (request.POST.get(f"acao_equip_{equip.id}") or "manter").strip()
+        if acao == "remover":
+            remover_ids.add(equip.id)
+        elif acao == "devolver" and not equip.data_devolucao:
+            d = parse_date((request.POST.get(f"devolver_data_{equip.id}") or "").strip()) or hoje
+            devolver[equip.id] = d
+
+    restantes = [e for e in existentes if e.id not in remover_ids]
+    if not restantes and not novos_equipamentos:
+        return _json_error("O emprestimo precisa ter pelo menos um equipamento.")
+
+    with transaction.atomic():
+        # Dados do colaborador / condicoes
+        emp.colaborador_nome = colaborador
+        emp.empresa = (request.POST.get("empresa") or "").strip()
+        emp.cpf = (request.POST.get("cpf") or "").strip()
+        emp.email = (request.POST.get("email") or "").strip()
+        emp.telefone = (request.POST.get("telefone") or "").strip()
+        emp.data_emprestimo = data_emprestimo
+        emp.previsao_devolucao = previsao
+        emp.prazo_indeterminado = prazo_indeterminado
+        emp.observacoes_internas = (request.POST.get("observacoes_internas") or "").strip()
+        if assinatura:
+            emp.assinatura_responsavel = assinatura
+
+        # Remocoes (o post_delete apaga as fotos do disco).
+        for equip in existentes:
+            if equip.id in remover_ids:
+                equip.delete()
+
+        # Devolucoes
+        for equip in existentes:
+            if equip.id in devolver:
+                equip.data_devolucao = devolver[equip.id]
+                equip.save(update_fields=["data_devolucao"])
+
+        # Novos equipamentos (data propria; sem data => hoje)
+        for dados in novos_equipamentos:
+            fotos = dados.pop("fotos")
+            if not dados.get("data_emprestimo"):
+                dados["data_emprestimo"] = hoje
+            equip = EquipamentoEmprestimoTI.objects.create(emprestimo=emp, **dados)
+            for foto in fotos:
+                FotoEquipamentoEmprestimoTI.objects.create(
+                    equipamento=equip, imagem=foto, nome_original=foto.name, enviado_por=request.user
+                )
+
+        # Status: se ainda ha equipamento em posse -> aguardando nova assinatura;
+        # se todos devolvidos -> Devolvido.
+        ativos = emp.equipamentos.filter(data_devolucao__isnull=True).count()
+        emp.status = EmprestimoTI.STATUS_AGUARDANDO if ativos > 0 else EmprestimoTI.STATUS_DEVOLVIDO
+
+        # Descarta o termo assinado anterior (mudou o conteudo do termo).
+        if emp.termo_assinado:
+            emp.termo_assinado.delete(save=False)
+        emp.termo_assinado = None
+        emp.termo_assinado_ok = False
+        emp.termo_assinado_em = None
+        emp.termo_assinado_por = None
+
+        # Regera o termo em PDF.
+        if emp.termo_pdf:
+            emp.termo_pdf.delete(save=False)
+        emp.save()
+        emp = _get_emprestimo_full(emp.id)  # recarrega equipamentos atualizados
+        pdf_bytes = gerar_termo_pdf_bytes(emp, aplicar_assinatura=aplicar_assinatura)
+        emp.termo_pdf.save(f"termo_emprestimo_{emp.id}.pdf", ContentFile(pdf_bytes), save=True)
+
+        if aplicar_assinatura and assinatura:
+            LogUsoAssinaturaTI.objects.create(
+                assinatura=assinatura,
+                emprestimo=emp,
+                usado_por=request.user,
+                observacao="Assinatura aplicada na regeracao do termo (edicao).",
+            )
+
+    detalhe = _serialize_emprestimo_detail(_get_emprestimo_full(emp.id))
+    detalhe["message"] = "Emprestimo atualizado e termo regerado. Colha a nova assinatura."
+    detalhe["row"] = _serialize_emprestimo_row(emp)
+    return JsonResponse(detalhe)
 
 
 @login_required
