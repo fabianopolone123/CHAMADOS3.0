@@ -1,0 +1,2 @@
+# Scripts de shell precisam de quebras de linha LF para rodar no Linux/VPS.
+*.sh text eol=lf

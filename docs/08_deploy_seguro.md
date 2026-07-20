@@ -114,6 +114,53 @@ redireciona HTTP->HTTPS (assumindo o header `X-Forwarded-Proto` do nginx).
 - Se a chave for perdida/trocada, a senha de e-mail (como as do cofre) deixa de
   ser decifravel; basta cadastra-la de novo na tela.
 
+## 5c. Deploy automatico (atalho global `chamados-deploy`)
+
+O repositorio traz `scripts/deploy.sh`, que faz o ciclo completo de qualquer
+alteracao: `git pull` -> `pip install -r requirements.txt` -> `migrate` ->
+`collectstatic` -> `systemctl restart`. Ele carrega o `/etc/chamados/app.env`
+antes de rodar o `manage.py` (para migrate/collectstatic terem a
+`VAULT_ENCRYPTION_KEY` e demais variaveis) e so declara sucesso se o servico
+subir.
+
+Instale o atalho global **uma vez** no servidor (symlink para o script
+versionado, entao ele acompanha o codigo):
+
+```bash
+sudo chmod +x /opt/chamados/scripts/deploy.sh
+sudo ln -sf /opt/chamados/scripts/deploy.sh /usr/local/bin/chamados-deploy
+```
+
+A partir dai, para publicar qualquer mudanca (de qualquer diretorio):
+
+```bash
+chamados-deploy
+```
+
+Ambiente diferente do padrao? Sobrescreva por variaveis (o script tem defaults
+que batem com este guia):
+
+```bash
+CHAMADOS_DIR=/srv/chamados CHAMADOS_SERVICE=chamados-web chamados-deploy
+```
+
+Variaveis suportadas: `CHAMADOS_DIR` (default `/opt/chamados`), `CHAMADOS_VENV`
+(default `$CHAMADOS_DIR/.venv`), `CHAMADOS_ENV` (default
+`/etc/chamados/app.env`), `CHAMADOS_SERVICE` (default `chamados`) e
+`CHAMADOS_BRANCH` (default `main`).
+
+Para o `systemctl restart` funcionar sem senha quando rodar como o usuario da
+aplicacao (`appuser`), libere apenas esse comando no sudoers:
+
+```bash
+echo 'appuser ALL=(root) NOPASSWD: /bin/systemctl restart chamados, /bin/systemctl status chamados, /bin/systemctl is-active chamados' | sudo tee /etc/sudoers.d/chamados-deploy
+sudo chmod 440 /etc/sudoers.d/chamados-deploy
+```
+
+Observacao: o script re-executa a si mesmo a partir de uma copia temporaria
+antes do `git pull`, para que a atualizacao do proprio `deploy.sh` nunca corrompa
+a execucao em andamento.
+
 ## 6. Backups
 
 - O backup do banco contem as senhas **cifradas** (inuteis sem a chave), mas
