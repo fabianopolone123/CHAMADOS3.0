@@ -1,5 +1,9 @@
 # 06 - Changelog
 
+## 2026-07-20
+
+- Emprestimos: corrigido o erro "Anexe o termo assinado antes de marcar como OK" que aparecia mesmo apos o usuario escolher um arquivo. A causa era o fluxo em dois passos do modal de detalhe: escolher o arquivo no campo nao envia nada; era preciso clicar antes em "Anexar termo assinado" para so entao "Marcar documentacao OK". Quem selecionava o arquivo e clicava direto em "Marcar documentacao OK" caia no `409` do backend (o `termo_assinado` ainda estava vazio). Agora o botao "Marcar documentacao OK" **anexa automaticamente** o arquivo que estiver selecionado no campo (mas ainda nao enviado) antes de marcar, eliminando a confusao. Ajuste apenas no frontend (`static/js/emprestimos.js`): funcao `anexarTermo()` reutilizada pelos dois caminhos e o botao "Marcar OK" fica desabilitado durante a requisicao. Sem alteracao de model, rota ou backend.
+
 ## 2026-07-17
 
 - Correcao de travamento ao alternar rapido entre os menus: o stream SSE de notificacoes (`/notificacoes/stream/`) segurava uma **thread do gunicorn (gthread)** por conexao e so detectava a saida do navegador a cada **~16s**. Ao trocar de menu, cada pagina nova abria um novo `EventSource` e a conexao antiga ficava pendurada, acumulando ate esgotar as threads (3 workers x 16 = 48) — as paginas seguintes ficavam "carregando" ate uma conexao velha expirar. Ajustes no `notificacoes_stream_view`: **heartbeat a cada ~2s** (detecta a desconexao e libera a thread em ~2s, nao 16s) e **reciclagem da conexao a cada ~55s** (o `EventSource` reconecta sozinho), garantindo que a thread sempre seja liberada. Sem mudanca de comportamento visivel (comentarios SSE sao ignorados pelo cliente).

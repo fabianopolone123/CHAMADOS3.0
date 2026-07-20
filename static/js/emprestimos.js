@@ -339,20 +339,28 @@
         }
     }
 
+    const termoInput = anexarForm?.querySelector('input[name="termo_assinado"]');
+
+    // Envia o arquivo selecionado para o backend e atualiza a area "Termo assinado".
+    async function anexarTermo() {
+        const data = await sendForm(buildUrl(anexarTpl, currentEmprestimoId), new FormData(anexarForm));
+        renderAssinadoInfo({
+            termo_assinado_url: data.termo_assinado_url,
+            termo_assinado_em: data.termo_assinado_em,
+            termo_assinado_por: data.termo_assinado_por,
+            termo_assinado_ok: false,
+        });
+        anexarForm.reset();
+        return data;
+    }
+
     anexarForm?.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!currentEmprestimoId) return;
         const submit = anexarForm.querySelector("[data-anexar-submit]");
         if (submit) submit.disabled = true;
         try {
-            const data = await sendForm(buildUrl(anexarTpl, currentEmprestimoId), new FormData(anexarForm));
-            renderAssinadoInfo({
-                termo_assinado_url: data.termo_assinado_url,
-                termo_assinado_em: data.termo_assinado_em,
-                termo_assinado_por: data.termo_assinado_por,
-                termo_assinado_ok: false,
-            });
-            anexarForm.reset();
+            const data = await anexarTermo();
             showToast(data.message || "Termo assinado anexado.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel anexar o termo.", "error");
@@ -361,9 +369,16 @@
         }
     });
 
-    detailModalEl?.querySelector("[data-marcar-ok]")?.addEventListener("click", async () => {
+    detailModalEl?.querySelector("[data-marcar-ok]")?.addEventListener("click", async (event) => {
         if (!currentEmprestimoId) return;
+        const btn = event.currentTarget;
+        btn.disabled = true;
         try {
+            // Se o usuario escolheu um arquivo mas ainda nao clicou em "Anexar termo
+            // assinado", envia o arquivo antes de marcar OK (evita o 409 do backend).
+            if (termoInput && termoInput.files && termoInput.files.length > 0) {
+                await anexarTermo();
+            }
             const data = await sendForm(buildUrl(marcarOkTpl, currentEmprestimoId), new FormData());
             applyStatusBadge(data.status, data.status_label);
             // atualiza o badge na linha da tabela
@@ -376,6 +391,8 @@
             showToast(data.message || "Documentacao marcada como OK.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel marcar a documentacao.", "error");
+        } finally {
+            btn.disabled = false;
         }
     });
 })();
