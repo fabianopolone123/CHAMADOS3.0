@@ -1646,11 +1646,11 @@ def _fmt_money(value, moeda: str) -> str:
 
 
 def _serialize_orcamento_documento(doc: OrcamentoDocumento):
-    return {"nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_orcamento_documento", args=[doc.id])}
+    return {"id": doc.id, "nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_orcamento_documento", args=[doc.id])}
 
 
 def _serialize_suborcamento_documento(doc: SuborcamentoDocumento):
-    return {"nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_suborcamento_documento", args=[doc.id])}
+    return {"id": doc.id, "nome": doc.nome_original or doc.arquivo.name, "url": reverse("contrato_suborcamento_documento", args=[doc.id])}
 
 
 def _serialize_suborcamento(sub: SuborcamentoContrato):
@@ -1840,6 +1840,59 @@ def requisicao_delete_view(request, requisicao_id: int):
     )
 
 
+@login_required
+@require_POST
+def requisicao_edit_view(request, requisicao_id: int):
+    """Edita os dados basicos de uma requisicao (titulo, tipo e texto).
+
+    Nao altera orcamentos, status nem aprovacao; apenas TI/admin, via POST/CSRF.
+    Registra um evento de edicao na timeline da requisicao.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+
+    payload = _load_request_payload(request) or {}
+    titulo = (payload.get("titulo") or "").strip()
+    tipo = (payload.get("tipo") or "").strip().lower()
+    texto = (payload.get("texto") or "").strip()
+
+    if len(titulo) < 3:
+        return _json_error("Informe um titulo com pelo menos 3 caracteres.")
+    if tipo not in {RequisicaoContrato.TIPO_FISICA, RequisicaoContrato.TIPO_DIGITAL}:
+        return _json_error("Selecione o tipo da requisicao (Fisica ou Digital).")
+
+    requisicao.titulo = titulo
+    requisicao.tipo = tipo
+    requisicao.texto = texto
+    requisicao.save(update_fields=["titulo", "tipo", "texto", "atualizado_em"])
+    RequisicaoContratoEvento.registrar(
+        requisicao=requisicao,
+        usuario=request.user,
+        tipo=RequisicaoContratoEvento.TIPO_EDICAO,
+        descricao=f"Requisicao editada por {_attendant_display(request.user)}.",
+    )
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Requisicao atualizada com sucesso.",
+            "requisicao": {
+                "id": requisicao.id,
+                "codigo": requisicao.codigo or "",
+                "titulo": requisicao.titulo,
+                "tipo": requisicao.tipo,
+                "tipo_label": requisicao.tipo_label,
+                "texto": requisicao.texto,
+                "status": requisicao.status,
+                "status_label": requisicao.status_label,
+            },
+        }
+    )
+
+
 def _salvar_documentos(model_cls, fk_name, item, arquivos):
     for arquivo in arquivos:
         model_cls.objects.create(
@@ -1847,6 +1900,34 @@ def _salvar_documentos(model_cls, fk_name, item, arquivos):
             arquivo=arquivo,
             nome_original=arquivo.name,
         )
+
+
+def _aplicar_edicao_item(item, campos, request, doc_model, fk_name):
+    """Aplica a edicao de um orcamento/suborcamento (campos + midia).
+
+    Substitui/remove a foto do produto, remove documentos marcados e adiciona os
+    novos enviados. Deve rodar dentro de uma `transaction.atomic()`. Os arquivos
+    fisicos removidos saem do disco pelos signals `post_delete` de `core/signals.py`.
+    """
+    for campo, valor in campos.items():
+        setattr(item, campo, valor)
+
+    foto = request.FILES.get("foto_produto")
+    remover_foto = request.POST.get("remover_foto") == "1"
+    if foto:
+        if item.foto_produto:
+            item.foto_produto.delete(save=False)
+        item.foto_produto = foto
+    elif remover_foto and item.foto_produto:
+        item.foto_produto.delete(save=False)
+        item.foto_produto = None
+    item.save()
+
+    remover_docs = [d for d in request.POST.getlist("remover_documentos") if d.isdigit()]
+    if remover_docs:
+        for doc in doc_model.objects.filter(pk__in=remover_docs, **{fk_name: item}):
+            doc.delete()
+    _salvar_documentos(doc_model, fk_name, item, request.FILES.getlist("documentos"))
 
 
 @login_required
@@ -1883,6 +1964,36 @@ def orcamento_create_view(request, requisicao_id: int):
 
 @login_required
 @require_POST
+def orcamento_edit_view(request, orcamento_id: int):
+    """Edita um orcamento existente (campos + foto/documentos). Apenas TI/admin.
+
+    Nao e permitido editar depois que a requisicao ja foi entregue (mesma regra
+    da aprovacao). Nao mexe no estado de aprovacao do orcamento.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    orcamento = OrcamentoContrato.objects.select_related("requisicao").filter(pk=orcamento_id).first()
+    if not orcamento:
+        return _json_error("Orcamento nao encontrado.", status=404)
+    if orcamento.requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error("Esta requisicao ja foi entregue; nao e possivel editar os orcamentos.", status=409)
+
+    try:
+        campos = _parse_item_fields(request.POST)
+    except ValueError as exc:
+        return _json_error(str(exc))
+
+    with transaction.atomic():
+        _aplicar_edicao_item(orcamento, campos, request, OrcamentoDocumento, "orcamento")
+
+    return JsonResponse(
+        {"ok": True, "message": "Orcamento atualizado com sucesso.", "orcamento_id": orcamento.id}
+    )
+
+
+@login_required
+@require_POST
 def suborcamento_create_view(request, orcamento_id: int):
     if not _is_ti(request.user):
         return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
@@ -1914,6 +2025,44 @@ def suborcamento_create_view(request, orcamento_id: int):
             "message": "Suborcamento adicionado com sucesso.",
             "suborcamento_id": suborcamento.id,
             "orcamento_id": orcamento.id,
+        }
+    )
+
+
+@login_required
+@require_POST
+def suborcamento_edit_view(request, suborcamento_id: int):
+    """Edita um suborcamento existente (campos + foto/documentos). Apenas TI/admin.
+
+    Bloqueado quando a requisicao (do orcamento pai) ja foi entregue.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    suborcamento = (
+        SuborcamentoContrato.objects.select_related("orcamento_pai__requisicao")
+        .filter(pk=suborcamento_id)
+        .first()
+    )
+    if not suborcamento:
+        return _json_error("Suborcamento nao encontrado.", status=404)
+    if suborcamento.orcamento_pai.requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error("Esta requisicao ja foi entregue; nao e possivel editar os orcamentos.", status=409)
+
+    try:
+        campos = _parse_item_fields(request.POST)
+    except ValueError as exc:
+        return _json_error(str(exc))
+
+    with transaction.atomic():
+        _aplicar_edicao_item(suborcamento, campos, request, SuborcamentoDocumento, "suborcamento")
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Suborcamento atualizado com sucesso.",
+            "suborcamento_id": suborcamento.id,
+            "orcamento_id": suborcamento.orcamento_pai_id,
         }
     )
 

@@ -13,9 +13,12 @@
     class="tickets-app contratos-app"
     data-requisicao-create-url="{% url 'requisicao_create' %}"
     data-requisicao-detail-url="{% url 'requisicao_detail' requisicao_id=0 %}"
+    data-requisicao-edit-url="{% url 'requisicao_edit' requisicao_id=0 %}"
     data-requisicao-delete-url="{% url 'requisicao_delete' requisicao_id=0 %}"
     data-orcamento-create-url="{% url 'orcamento_create' requisicao_id=0 %}"
+    data-orcamento-edit-url="{% url 'orcamento_edit' orcamento_id=0 %}"
     data-suborcamento-create-url="{% url 'suborcamento_create' orcamento_id=0 %}"
+    data-suborcamento-edit-url="{% url 'suborcamento_edit' suborcamento_id=0 %}"
     data-orcamento-aprovar-url="{% url 'orcamento_aprovar' orcamento_id=0 %}"
     data-requisicao-marcar-entregue-url="{% url 'requisicao_marcar_entregue' requisicao_id=0 %}"
 >

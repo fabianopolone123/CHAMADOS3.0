@@ -70,6 +70,23 @@
                         </label>
                     </div>
 
+                    {# Midia ja cadastrada (apenas na edicao) #}
+                    <div class="orcamento-existing is-hidden" data-existing-media>
+                        <div class="orcamento-existing__foto is-hidden" data-existing-foto-wrap>
+                            <span class="orcamento-existing__title">Foto atual</span>
+                            <img class="orcamento-thumb" alt="Foto atual do produto" data-existing-foto>
+                            <label class="orcamento-existing__remove">
+                                <input type="checkbox" name="remover_foto" value="1" data-remover-foto>
+                                <span>Remover a foto atual</span>
+                            </label>
+                        </div>
+                        <div class="orcamento-existing__docs is-hidden" data-existing-docs-wrap>
+                            <span class="orcamento-existing__title">Documentos atuais</span>
+                            <ul class="orcamento-existing__doc-list" data-existing-docs></ul>
+                            <small class="contrato-field__help">Marque os que deseja remover.</small>
+                        </div>
+                    </div>
+
                     {# Area de captura/recorte de print #}
                     <div class="print-workspace is-hidden" data-print-workspace>
                         <p class="print-workspace__hint">Arraste sobre a imagem para selecionar a area que deseja recortar.</p>

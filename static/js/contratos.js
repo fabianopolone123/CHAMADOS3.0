@@ -6,8 +6,11 @@
 
     const requisicaoCreateUrl = appElement.dataset.requisicaoCreateUrl;
     const requisicaoDetailTpl = appElement.dataset.requisicaoDetailUrl;
+    const requisicaoEditTpl = appElement.dataset.requisicaoEditUrl;
     const orcamentoCreateTpl = appElement.dataset.orcamentoCreateUrl;
+    const orcamentoEditTpl = appElement.dataset.orcamentoEditUrl;
     const suborcamentoCreateTpl = appElement.dataset.suborcamentoCreateUrl;
+    const suborcamentoEditTpl = appElement.dataset.suborcamentoEditUrl;
     const orcamentoAprovarTpl = appElement.dataset.orcamentoAprovarUrl;
     const requisicaoMarcarEntregueTpl = appElement.dataset.requisicaoMarcarEntregueUrl;
 
@@ -80,11 +83,61 @@
     const createReqModalEl = document.getElementById("createRequisicaoModal");
     const createReqModal = createReqModalEl ? bootstrap.Modal.getOrCreateInstance(createReqModalEl) : null;
     const createReqForm = document.getElementById("createRequisicaoForm");
+    const reqFormTitle = createReqModalEl?.querySelector("[data-req-form-title]");
+    const reqFormSubmit = createReqModalEl?.querySelector("[data-req-form-submit]");
 
-    document.getElementById("createRequisicaoButton")?.addEventListener("click", () => {
+    let reqFormMode = "create"; // "create" | "edit"
+    let reqEditId = null;
+    let returnToDetailFromReqForm = false;
+
+    function openReqCreateForm() {
+        reqFormMode = "create";
+        reqEditId = null;
+        returnToDetailFromReqForm = false;
         createReqForm?.reset();
+        if (reqFormTitle) reqFormTitle.textContent = "Nova requisicao";
+        if (reqFormSubmit) reqFormSubmit.textContent = "Criar requisicao";
         createReqModal?.show();
+    }
+
+    function openReqEditForm() {
+        if (!currentRequisicao) return;
+        reqFormMode = "edit";
+        reqEditId = currentRequisicao.id;
+        createReqForm?.reset();
+        document.getElementById("requisicaoTitulo").value = currentRequisicao.titulo || "";
+        document.getElementById("requisicaoTipo").value = currentRequisicao.tipo || "fisica";
+        document.getElementById("requisicaoTexto").value = currentRequisicao.texto || "";
+        if (reqFormTitle) reqFormTitle.textContent = "Editar requisicao";
+        if (reqFormSubmit) reqFormSubmit.textContent = "Salvar alteracoes";
+        // Empilha sobre o detalhe: esconde e reabre ao fechar.
+        returnToDetailFromReqForm = !!detailModalEl?.classList.contains("show");
+        if (returnToDetailFromReqForm) {
+            detailModal?.hide();
+        }
+        createReqModal?.show();
+    }
+
+    document.getElementById("createRequisicaoButton")?.addEventListener("click", openReqCreateForm);
+
+    createReqModalEl?.addEventListener("hidden.bs.modal", () => {
+        if (returnToDetailFromReqForm && currentRequisicaoId) {
+            detailModal?.show();
+        }
+        returnToDetailFromReqForm = false;
     });
+
+    function updateRequisicaoListItem(req) {
+        const btn = requisicoesList?.querySelector(`.requisicao-item[data-requisicao-id="${req.id}"]`);
+        if (!btn) return;
+        const title = btn.querySelector(".requisicao-item__title");
+        if (title) title.textContent = req.titulo;
+        const badge = btn.querySelector(".status-badge");
+        if (badge) {
+            badge.className = `status-badge contrato-status contrato-status--${req.status}`;
+            badge.textContent = req.status_label;
+        }
+    }
 
     function addRequisicaoToList(req) {
         const empty = requisicoesList.querySelector(".requisicoes-empty");
@@ -123,18 +176,29 @@
         event.preventDefault();
         const submit = document.getElementById("createRequisicaoSubmit");
         if (submit) submit.disabled = true;
+        const payload = {
+            titulo: document.getElementById("requisicaoTitulo").value.trim(),
+            tipo: document.getElementById("requisicaoTipo").value,
+            texto: document.getElementById("requisicaoTexto").value.trim(),
+        };
         try {
-            const data = await sendJson(requisicaoCreateUrl, {
-                titulo: document.getElementById("requisicaoTitulo").value.trim(),
-                tipo: document.getElementById("requisicaoTipo").value,
-                texto: document.getElementById("requisicaoTexto").value.trim(),
-            });
-            addRequisicaoToList(data.requisicao);
-            createReqModal?.hide();
-            createReqForm.reset();
-            showToast(data.message || "Requisicao criada.", "success");
+            if (reqFormMode === "edit" && reqEditId) {
+                const data = await sendJson(buildUrl(requisicaoEditTpl, reqEditId), payload);
+                updateRequisicaoListItem(data.requisicao);
+                if (currentRequisicaoId === reqEditId) {
+                    await loadRequisicaoDetail(reqEditId);
+                }
+                createReqModal?.hide(); // o detalhe reabre pelo hidden handler
+                showToast(data.message || "Requisicao atualizada.", "success");
+            } else {
+                const data = await sendJson(requisicaoCreateUrl, payload);
+                addRequisicaoToList(data.requisicao);
+                createReqModal?.hide();
+                createReqForm.reset();
+                showToast(data.message || "Requisicao criada.", "success");
+            }
         } catch (error) {
-            showToast(error.message || "Nao foi possivel criar a requisicao.", "error");
+            showToast(error.message || "Nao foi possivel salvar a requisicao.", "error");
         } finally {
             if (submit) submit.disabled = false;
         }
@@ -147,6 +211,7 @@
     const detailModal = detailModalEl ? bootstrap.Modal.getOrCreateInstance(detailModalEl) : null;
     let currentRequisicaoId = null;
     let currentRequisicaoStatus = null;
+    let currentRequisicao = null;
 
     function setDetailField(key, value) {
         const el = detailModalEl.querySelector(`[data-req-detail="${key}"]`);
@@ -194,7 +259,7 @@
         return row;
     }
 
-    function renderSuborcamento(sub) {
+    function renderSuborcamento(sub, parentTitle) {
         const card = document.createElement("div");
         card.className = "suborcamento-card";
         const title = document.createElement("p");
@@ -225,6 +290,18 @@
         total.appendChild(label);
         total.appendChild(badge);
         card.appendChild(total);
+
+        if (currentRequisicaoStatus !== "entregue") {
+            const actions = document.createElement("div");
+            actions.className = "suborcamento-card__actions";
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "btn btn-light btn-sm editar-suborcamento-btn";
+            editBtn.textContent = "Editar";
+            editBtn.addEventListener("click", () => openOrcamentoForm("suborcamento-edit", sub.id, parentTitle, sub));
+            actions.appendChild(editBtn);
+            card.appendChild(actions);
+        }
         return card;
     }
 
@@ -279,7 +356,7 @@
         if (orc.suborcamentos && orc.suborcamentos.length) {
             const subList = document.createElement("div");
             subList.className = "suborcamentos-list";
-            orc.suborcamentos.forEach((sub) => subList.appendChild(renderSuborcamento(sub)));
+            orc.suborcamentos.forEach((sub) => subList.appendChild(renderSuborcamento(sub, orc.titulo)));
             card.appendChild(subList);
         }
 
@@ -316,6 +393,15 @@
             approveBtn.textContent = "Aprovar orcamento";
             approveBtn.addEventListener("click", () => aprovarOrcamento(orc.id, approveBtn));
             actions.appendChild(approveBtn);
+        }
+
+        if (!entregue) {
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "btn btn-light btn-sm editar-orcamento-btn";
+            editBtn.textContent = "Editar";
+            editBtn.addEventListener("click", () => openOrcamentoForm("orcamento-edit", orc.id, null, orc));
+            actions.appendChild(editBtn);
         }
 
         const addSub = document.createElement("button");
@@ -431,6 +517,7 @@
     async function loadRequisicaoDetail(id) {
         const data = await sendGet(buildUrl(requisicaoDetailTpl, id));
         const req = data.requisicao;
+        currentRequisicao = req;
         currentRequisicaoStatus = req.status;
         setDetailField("codigo", req.codigo || "Requisicao");
         setDetailField("titulo", req.titulo);
@@ -480,6 +567,13 @@
     detailModalEl?.querySelector("[data-add-orcamento]")?.addEventListener("click", () => {
         if (currentRequisicaoId) {
             openOrcamentoForm("orcamento", currentRequisicaoId, null);
+        }
+    });
+
+    // botao "Editar requisicao" dentro do detalhe
+    detailModalEl?.querySelector("[data-edit-requisicao]")?.addEventListener("click", () => {
+        if (currentRequisicaoId) {
+            openReqEditForm();
         }
     });
 
@@ -553,6 +647,12 @@
     const fotoInput = orcFormModalEl.querySelector("[data-foto-input]");
     const fotoPreviewWrap = orcFormModalEl.querySelector("[data-foto-preview-wrap]");
     const fotoPreviewImg = orcFormModalEl.querySelector("[data-foto-preview]");
+    const existingMedia = orcFormModalEl.querySelector("[data-existing-media]");
+    const existingFotoWrap = orcFormModalEl.querySelector("[data-existing-foto-wrap]");
+    const existingFotoImg = orcFormModalEl.querySelector("[data-existing-foto]");
+    const existingDocsWrap = orcFormModalEl.querySelector("[data-existing-docs-wrap]");
+    const existingDocsList = orcFormModalEl.querySelector("[data-existing-docs]");
+    const removerFotoCheck = orcFormModalEl.querySelector("[data-remover-foto]");
     const printHint = orcFormModalEl.querySelector("[data-print-hint]");
     const workspace = orcFormModalEl.querySelector("[data-print-workspace]");
     const printCanvas = orcFormModalEl.querySelector("[data-print-canvas]");
@@ -577,23 +677,85 @@
         if (cropButton) cropButton.disabled = true;
     }
 
-    function openOrcamentoForm(mode, parentId, parentTitle) {
+    function resetExistingMedia() {
+        if (removerFotoCheck) removerFotoCheck.checked = false;
+        if (existingFotoImg) existingFotoImg.src = "";
+        existingFotoWrap?.classList.add("is-hidden");
+        if (existingDocsList) existingDocsList.innerHTML = "";
+        existingDocsWrap?.classList.add("is-hidden");
+        existingMedia?.classList.add("is-hidden");
+    }
+
+    function fillItemForm(item) {
+        orcForm.titulo.value = item.titulo || "";
+        orcForm.loja.value = item.loja && item.loja !== "-" ? item.loja : "";
+        orcForm.moeda.value = item.moeda || "BRL";
+        orcForm.valor.value = item.valor || "0";
+        orcForm.quantidade.value = item.quantidade || 1;
+        orcForm.frete.value = item.frete || "0";
+        orcForm.desconto.value = item.desconto || "0";
+        orcForm.link.value = item.link || "";
+    }
+
+    function fillExistingMedia(item) {
+        resetExistingMedia();
+        if (item.foto_url) {
+            if (existingFotoImg) existingFotoImg.src = item.foto_url;
+            existingFotoWrap?.classList.remove("is-hidden");
+        }
+        const docs = item.documentos || [];
+        if (docs.length && existingDocsList) {
+            docs.forEach((doc) => {
+                const li = document.createElement("li");
+                const label = document.createElement("label");
+                label.className = "orcamento-existing__doc";
+                const cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.name = "remover_documentos";
+                cb.value = doc.id;
+                const a = document.createElement("a");
+                a.href = doc.url;
+                a.target = "_blank";
+                a.rel = "noopener";
+                a.textContent = doc.nome;
+                label.appendChild(cb);
+                label.appendChild(a);
+                li.appendChild(label);
+                existingDocsList.appendChild(li);
+            });
+            existingDocsWrap?.classList.remove("is-hidden");
+        }
+        existingMedia?.classList.remove("is-hidden");
+    }
+
+    // mode: "orcamento" | "suborcamento" | "orcamento-edit" | "suborcamento-edit"
+    // refId: id do pai (na criacao) ou id do proprio item (na edicao)
+    function openOrcamentoForm(mode, refId, parentTitle, item) {
         formMode = mode;
-        formParentId = parentId;
+        formParentId = refId;
         orcForm.reset();
         resetFoto();
+        resetExistingMedia();
         hideWorkspace();
         if (printHint) printHint.textContent = "";
 
         const kicker = orcFormModalEl.querySelector("[data-orc-kicker]");
         const title = orcFormModalEl.querySelector("[data-orc-title]");
         const submit = orcFormModalEl.querySelector("[data-orc-submit]");
-        if (mode === "suborcamento") {
-            kicker.textContent = "Suborcamento";
+        const isSub = mode === "suborcamento" || mode === "suborcamento-edit";
+        const isEdit = mode === "orcamento-edit" || mode === "suborcamento-edit";
+        kicker.textContent = isSub ? "Suborcamento" : "Orcamento";
+        if (isEdit) {
+            title.textContent = isSub ? "Editar suborcamento" : "Editar orcamento";
+            submit.textContent = "Salvar alteracoes";
+            if (item) {
+                fillItemForm(item);
+                fillExistingMedia(item);
+            }
+        } else if (isSub) {
             title.textContent = parentTitle ? `Novo suborcamento de: ${parentTitle}` : "Novo suborcamento";
             submit.textContent = "Salvar suborcamento";
         } else {
-            kicker.textContent = "Orcamento";
             title.textContent = "Novo orcamento";
             submit.textContent = "Salvar orcamento";
         }
@@ -637,10 +799,16 @@
             formData.set("foto_produto", capturedFile, capturedFile.name);
         }
 
-        const url =
-            formMode === "suborcamento"
-                ? buildUrl(suborcamentoCreateTpl, formParentId)
-                : buildUrl(orcamentoCreateTpl, formParentId);
+        let url;
+        if (formMode === "orcamento-edit") {
+            url = buildUrl(orcamentoEditTpl, formParentId);
+        } else if (formMode === "suborcamento-edit") {
+            url = buildUrl(suborcamentoEditTpl, formParentId);
+        } else if (formMode === "suborcamento") {
+            url = buildUrl(suborcamentoCreateTpl, formParentId);
+        } else {
+            url = buildUrl(orcamentoCreateTpl, formParentId);
+        }
 
         try {
             const data = await sendForm(url, formData);

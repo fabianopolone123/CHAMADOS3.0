@@ -271,7 +271,7 @@ Regras atuais:
 
 - So Atendente TI/Admin criam/veem requisicoes (validado no backend).
 - Fluxo: `aberta` -> (aprovar um orcamento) -> `aguardando_entrega` -> (marcar entregue) -> `entregue`. Aprovar um orcamento e exclusivo por requisicao. `codigo` gerado no `save()` (migration `0036`).
-- Todo evento relevante (criacao, aprovacao/desaprovacao, entrega) e registrado em `RequisicaoContratoEvento`.
+- Todo evento relevante (criacao, aprovacao/desaprovacao, entrega, edicao) e registrado em `RequisicaoContratoEvento`.
 
 ### RequisicaoContratoEvento
 
@@ -279,7 +279,7 @@ Historico/timeline de uma requisicao.
 
 - `requisicao` (FK `on_delete=CASCADE`, related_name `eventos`)
 - `usuario` (FK usuario, `on_delete=SET_NULL`, opcional)
-- `tipo` (choices: `criacao`, `aprovacao`, `entrega`, `status`)
+- `tipo` (choices: `criacao`, `aprovacao`, `entrega`, `status`, `edicao`)
 - `descricao`, `criado_em`
 - `Meta.ordering = ["-criado_em", "-id"]` (mais recentes primeiro)
 

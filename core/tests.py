@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -744,6 +745,159 @@ class OrcamentoAprovacaoTests(TestCase):
         self.client.force_login(self.ti)
         resp = self.client.get(reverse("orcamento_aprovar", args=[self.orc_a.id]))
         self.assertEqual(resp.status_code, 405)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class RequisicaoEdicaoTests(TestCase):
+    """Edicao de requisicao e de seus orcamentos/suborcamentos."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+        self.requisicao = RequisicaoContrato.objects.create(
+            titulo="Notebooks", tipo=RequisicaoContrato.TIPO_FISICA, criado_por=self.ti
+        )
+        self.orcamento = OrcamentoContrato.objects.create(
+            requisicao=self.requisicao, titulo="Loja A", valor=Decimal("100.00"), quantidade=1
+        )
+        self.suborcamento = SuborcamentoContrato.objects.create(
+            orcamento_pai=self.orcamento, titulo="Complemento", valor=Decimal("10.00"), quantidade=1
+        )
+
+    # ----- requisicao -----
+    def test_ti_edita_requisicao(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("requisicao_edit", args=[self.requisicao.id]),
+            data=json.dumps({"titulo": "Notebooks Dell", "tipo": "digital", "texto": "Atualizado"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.titulo, "Notebooks Dell")
+        self.assertEqual(self.requisicao.tipo, RequisicaoContrato.TIPO_DIGITAL)
+        self.assertEqual(self.requisicao.texto, "Atualizado")
+        self.assertTrue(
+            self.requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_EDICAO).exists()
+        )
+
+    def test_edita_requisicao_titulo_curto(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("requisicao_edit", args=[self.requisicao.id]),
+            data=json.dumps({"titulo": "N", "tipo": "fisica", "texto": ""}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.titulo, "Notebooks")
+
+    def test_common_nao_edita_requisicao(self):
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("requisicao_edit", args=[self.requisicao.id]),
+            data=json.dumps({"titulo": "Hack", "tipo": "fisica", "texto": ""}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_edita_requisicao_requires_post(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("requisicao_edit", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 405)
+
+    # ----- orcamento -----
+    def test_ti_edita_orcamento(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("orcamento_edit", args=[self.orcamento.id]),
+            data={
+                "titulo": "Loja B",
+                "loja": "Kabum",
+                "moeda": "BRL",
+                "valor": "250,50",
+                "quantidade": "3",
+                "frete": "10",
+                "desconto": "5",
+                "link": "",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.orcamento.refresh_from_db()
+        self.assertEqual(self.orcamento.titulo, "Loja B")
+        self.assertEqual(self.orcamento.loja, "Kabum")
+        self.assertEqual(self.orcamento.valor, Decimal("250.50"))
+        self.assertEqual(self.orcamento.quantidade, 3)
+
+    def test_edita_orcamento_bloqueado_apos_entregue(self):
+        self.requisicao.status = RequisicaoContrato.STATUS_ENTREGUE
+        self.requisicao.save(update_fields=["status"])
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("orcamento_edit", args=[self.orcamento.id]),
+            data={"titulo": "Nova", "moeda": "BRL", "valor": "1", "quantidade": "1"},
+        )
+        self.assertEqual(resp.status_code, 409)
+        self.orcamento.refresh_from_db()
+        self.assertEqual(self.orcamento.titulo, "Loja A")
+
+    def test_common_nao_edita_orcamento(self):
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("orcamento_edit", args=[self.orcamento.id]),
+            data={"titulo": "Nova", "moeda": "BRL", "valor": "1", "quantidade": "1"},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_edita_orcamento_remove_documento(self):
+        doc = OrcamentoDocumento.objects.create(
+            orcamento=self.orcamento,
+            arquivo=SimpleUploadedFile("orc.pdf", b"pdf", content_type="application/pdf"),
+            nome_original="orc.pdf",
+        )
+        caminho = doc.arquivo.path
+        self.assertTrue(os.path.exists(caminho))
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("orcamento_edit", args=[self.orcamento.id]),
+            data={
+                "titulo": "Loja A",
+                "moeda": "BRL",
+                "valor": "100",
+                "quantidade": "1",
+                "remover_documentos": str(doc.id),
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(OrcamentoDocumento.objects.filter(id=doc.id).exists())
+        self.assertFalse(os.path.exists(caminho))
+
+    # ----- suborcamento -----
+    def test_ti_edita_suborcamento(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("suborcamento_edit", args=[self.suborcamento.id]),
+            data={"titulo": "Complemento X", "moeda": "BRL", "valor": "20", "quantidade": "2"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.suborcamento.refresh_from_db()
+        self.assertEqual(self.suborcamento.titulo, "Complemento X")
+        self.assertEqual(self.suborcamento.valor, Decimal("20.00"))
+        self.assertEqual(self.suborcamento.quantidade, 2)
+
+    def test_edita_suborcamento_bloqueado_apos_entregue(self):
+        self.requisicao.status = RequisicaoContrato.STATUS_ENTREGUE
+        self.requisicao.save(update_fields=["status"])
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("suborcamento_edit", args=[self.suborcamento.id]),
+            data={"titulo": "Nova", "moeda": "BRL", "valor": "1", "quantidade": "1"},
+        )
+        self.assertEqual(resp.status_code, 409)
 
 
 class ContaEmailImportTests(TestCase):

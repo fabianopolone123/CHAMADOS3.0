@@ -463,11 +463,13 @@ class RequisicaoContratoEvento(models.Model):
     TIPO_APROVACAO = "aprovacao"
     TIPO_ENTREGA = "entrega"
     TIPO_STATUS = "status"
+    TIPO_EDICAO = "edicao"
     TIPO_CHOICES = [
         (TIPO_CRIACAO, "Criacao"),
         (TIPO_APROVACAO, "Aprovacao de orcamento"),
         (TIPO_ENTREGA, "Entrega"),
         (TIPO_STATUS, "Mudanca de status"),
+        (TIPO_EDICAO, "Edicao"),
     ]
 
     requisicao = models.ForeignKey(

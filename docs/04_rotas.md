@@ -26,9 +26,12 @@
 | `/contratos/` | GET | Modulo Requisicoes (exibido como "Requisicoes"; rota mantem o prefixo tecnico): lista de requisicoes (titulo + status) e botao "+ Adicionar" (apenas TI/admin) | Implementada |
 | `/contratos/requisicoes/criar/` | POST | Cria uma requisicao (titulo, tipo fisica/digital, texto); status inicial "Aberta" (apenas TI/admin) | Implementada |
 | `/contratos/requisicoes/<id>/` | GET | Detalhe (JSON) da requisicao com orcamentos, suborcamentos e totais (apenas TI/admin) | Implementada |
+| `/contratos/requisicoes/<id>/editar/` | POST | Edita os dados basicos da requisicao (titulo, tipo, texto); registra evento de edicao (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/excluir/` | POST | Exclui a requisicao e, por cascata, orcamentos, suborcamentos e documentos vinculados (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/orcamentos/criar/` | POST | Cria orcamento na requisicao (multipart: campos + foto + documentos) (apenas TI/admin) | Implementada |
+| `/contratos/orcamentos/<id>/editar/` | POST | Edita um orcamento (multipart: campos + trocar/remover foto + adicionar/remover documentos); bloqueado se a requisicao ja foi entregue (apenas TI/admin) | Implementada |
 | `/contratos/orcamentos/<id>/suborcamentos/criar/` | POST | Cria suborcamento vinculado ao orcamento (multipart) (apenas TI/admin) | Implementada |
+| `/contratos/suborcamentos/<id>/editar/` | POST | Edita um suborcamento (multipart: campos + trocar/remover foto + adicionar/remover documentos); bloqueado se a requisicao ja foi entregue (apenas TI/admin) | Implementada |
 | `/contratos/orcamentos/<id>/aprovar/` | POST | Aprova/desaprova (alterna) um orcamento; aprovacao exclusiva por requisicao, move a requisicao para "Aguardando entrega" (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/marcar-entregue/` | POST | Marca a requisicao como "Entregue" (exige orcamento aprovado); registra data/responsavel (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/orcamentos/<id>/foto/` | GET | Serve a foto do orcamento (inline, protegida) (apenas TI/admin) | Implementada |
