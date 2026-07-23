@@ -746,6 +746,54 @@ class OrcamentoAprovacaoTests(TestCase):
         resp = self.client.get(reverse("orcamento_aprovar", args=[self.orc_a.id]))
         self.assertEqual(resp.status_code, 405)
 
+    def test_desaprovar_requisicao_limpa_todos_e_volta_para_esperando(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)  # aprova A -> requisicao "Aguardando entrega"
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA)
+
+        resp = self.client.post(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 200)
+
+        self.orc_a.refresh_from_db()
+        self.orc_b.refresh_from_db()
+        self.requisicao.refresh_from_db()
+        self.assertFalse(self.orc_a.aprovado)
+        self.assertIsNone(self.orc_a.aprovado_em)
+        self.assertIsNone(self.orc_a.aprovado_por)
+        self.assertFalse(self.orc_b.aprovado)
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_EM_COTACAO)
+        self.assertTrue(
+            self.requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_APROVACAO).exists()
+        )
+
+    def test_desaprovar_sem_orcamento_aprovado_retorna_409(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 409)
+
+    def test_desaprovar_bloqueado_apos_entregue(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)
+        self.client.post(reverse("requisicao_marcar_entregue", args=[self.requisicao.id]))
+        resp = self.client.post(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 409)
+        self.orc_a.refresh_from_db()
+        self.assertTrue(self.orc_a.aprovado)  # continua aprovado
+
+    def test_common_user_cannot_desaprovar(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)
+        self.client.logout()
+        self.client.force_login(self.common)
+        resp = self.client.post(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_desaprovar_requires_post(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
+        self.assertEqual(resp.status_code, 405)
+
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
 class RequisicaoEdicaoTests(TestCase):

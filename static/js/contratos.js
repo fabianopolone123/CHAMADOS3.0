@@ -13,6 +13,7 @@
     const suborcamentoEditTpl = appElement.dataset.suborcamentoEditUrl;
     const orcamentoAprovarTpl = appElement.dataset.orcamentoAprovarUrl;
     const requisicaoMarcarEntregueTpl = appElement.dataset.requisicaoMarcarEntregueUrl;
+    const requisicaoDesaprovarTpl = appElement.dataset.requisicaoDesaprovarUrl;
 
     function buildUrl(template, id) {
         return template.replace("/0/", `/${id}/`);
@@ -468,6 +469,27 @@
         }
     }
 
+    async function desaprovarRequisicao(button) {
+        if (!requisicaoDesaprovarTpl || !currentRequisicaoId) {
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+        }
+        try {
+            const data = await sendJson(buildUrl(requisicaoDesaprovarTpl, currentRequisicaoId), {});
+            await loadRequisicaoDetail(currentRequisicaoId);
+            updateRequisicaoListBadge(data.requisicao_id, data.requisicao_status, data.requisicao_status_label);
+            showToast(data.message || "Requisicao desaprovada.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel desaprovar a requisicao.", "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+            }
+        }
+    }
+
     function renderOrcamentos(orcamentos) {
         const container = detailModalEl.querySelector("[data-orcamentos]");
         const empty = detailModalEl.querySelector("[data-orcamentos-empty]");
@@ -530,6 +552,12 @@
             statusBadge.textContent = req.status_label;
             statusBadge.className = `status-badge contrato-status contrato-status--${req.status}`;
         }
+        // Botao "Desaprovar requisicao": so quando ha orcamento aprovado
+        // (status "Aguardando entrega") e antes de entregue.
+        const desaprovarBtn = detailModalEl.querySelector("[data-desaprovar-requisicao]");
+        if (desaprovarBtn) {
+            desaprovarBtn.classList.toggle("is-hidden", req.status !== "aguardando_entrega");
+        }
         renderOrcamentos(data.orcamentos);
         renderTimeline(data.eventos);
     }
@@ -575,6 +603,11 @@
         if (currentRequisicaoId) {
             openReqEditForm();
         }
+    });
+
+    // botao "Desaprovar requisicao" dentro do detalhe
+    detailModalEl?.querySelector("[data-desaprovar-requisicao]")?.addEventListener("click", (event) => {
+        desaprovarRequisicao(event.currentTarget);
     });
 
     // ------------------------------------------------------------------

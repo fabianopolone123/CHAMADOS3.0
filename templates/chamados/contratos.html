@@ -21,6 +21,7 @@
     data-suborcamento-edit-url="{% url 'suborcamento_edit' suborcamento_id=0 %}"
     data-orcamento-aprovar-url="{% url 'orcamento_aprovar' orcamento_id=0 %}"
     data-requisicao-marcar-entregue-url="{% url 'requisicao_marcar_entregue' requisicao_id=0 %}"
+    data-requisicao-desaprovar-url="{% url 'requisicao_desaprovar' requisicao_id=0 %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="contratos" %}

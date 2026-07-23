@@ -2189,6 +2189,52 @@ def requisicao_marcar_entregue_view(request, requisicao_id: int):
     )
 
 
+@login_required
+@require_POST
+def requisicao_desaprovar_view(request, requisicao_id: int):
+    """Desaprova a requisicao inteira: remove a aprovacao de TODOS os orcamentos e
+    volta a requisicao para "Esperando aprovacao". Apenas TI/admin; POST/CSRF.
+
+    Bloqueado quando a requisicao ja foi entregue (`409`). Exige que exista ao
+    menos um orcamento aprovado. Registra um evento na timeline.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+    if requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error("Esta requisicao ja foi entregue; nao e possivel desaprovar.", status=409)
+    if not requisicao.orcamentos.filter(aprovado=True).exists():
+        return _json_error("Nenhum orcamento aprovado nesta requisicao.", status=409)
+
+    autor = _attendant_display(request.user)
+    with transaction.atomic():
+        requisicao.orcamentos.filter(aprovado=True).update(
+            aprovado=False, aprovado_em=None, aprovado_por=None
+        )
+        if requisicao.status == RequisicaoContrato.STATUS_AGUARDANDO_ENTREGA:
+            requisicao.status = RequisicaoContrato.STATUS_EM_COTACAO
+            requisicao.save(update_fields=["status", "atualizado_em"])
+        RequisicaoContratoEvento.registrar(
+            requisicao=requisicao,
+            usuario=request.user,
+            tipo=RequisicaoContratoEvento.TIPO_APROVACAO,
+            descricao=f"Requisicao desaprovada por {autor}; aprovacao de todos os orcamentos removida.",
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": "Requisicao desaprovada; nenhum orcamento aprovado.",
+            "requisicao_id": requisicao.id,
+            "requisicao_status": requisicao.status,
+            "requisicao_status_label": requisicao.status_label,
+        }
+    )
+
+
 def _serve_file(field_file, *, as_attachment: bool, filename: str):
     try:
         return FileResponse(field_file.open("rb"), as_attachment=as_attachment, filename=filename)
