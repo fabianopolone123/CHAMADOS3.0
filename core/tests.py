@@ -900,6 +900,54 @@ class RequisicaoEdicaoTests(TestCase):
         self.assertEqual(resp.status_code, 409)
 
 
+class RequisicaoRenumeracaoTests(TestCase):
+    """Migration 0042: renumera os codigos por ordem de criacao (mais recente = 51)."""
+
+    def _renumerar(self):
+        import importlib
+
+        from django.apps import apps as global_apps
+
+        mod = importlib.import_module("core.migrations.0042_renumera_codigos_requisicoes")
+        mod.renumerar_codigos(global_apps, None)
+
+    def test_renumera_por_ordem_de_criacao(self):
+        User = get_user_model()
+        ti = User.objects.create_user(username="ti", password="x")
+
+        # Cria 3 requisicoes e força datas de criacao crescentes e codigos "errados".
+        base = timezone.now()
+        antiga = RequisicaoContrato.objects.create(titulo="Antiga", criado_por=ti)
+        meio = RequisicaoContrato.objects.create(titulo="Meio", criado_por=ti)
+        recente = RequisicaoContrato.objects.create(titulo="Recente", criado_por=ti)
+        RequisicaoContrato.objects.filter(pk=antiga.pk).update(
+            criado_em=base - timezone.timedelta(days=2), codigo="REQ-00099"
+        )
+        RequisicaoContrato.objects.filter(pk=meio.pk).update(
+            criado_em=base - timezone.timedelta(days=1), codigo="REQ-00098"
+        )
+        RequisicaoContrato.objects.filter(pk=recente.pk).update(
+            criado_em=base, codigo="REQ-00097"
+        )
+
+        self._renumerar()
+
+        antiga.refresh_from_db()
+        meio.refresh_from_db()
+        recente.refresh_from_db()
+        self.assertEqual(antiga.codigo, "REQ-00049")
+        self.assertEqual(meio.codigo, "REQ-00050")
+        self.assertEqual(recente.codigo, "REQ-00051")
+
+        # A proxima requisicao continua a partir de REQ-00052.
+        proxima = RequisicaoContrato.objects.create(titulo="Proxima", criado_por=ti)
+        self.assertEqual(proxima.codigo, "REQ-00052")
+
+    def test_renumera_sem_requisicoes_nao_falha(self):
+        self._renumerar()  # banco vazio: nao deve levantar erro
+        self.assertEqual(RequisicaoContrato.objects.count(), 0)
+
+
 class ContaEmailImportTests(TestCase):
     """Importacao da lista de contas de e-mail (upsert por e-mail) e permissoes."""
 
