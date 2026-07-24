@@ -213,6 +213,7 @@
     let currentRequisicaoId = null;
     let currentRequisicaoStatus = null;
     let currentRequisicao = null;
+    let currentDetailData = null;
 
     function setDetailField(key, value) {
         const el = detailModalEl.querySelector(`[data-req-detail="${key}"]`);
@@ -540,6 +541,7 @@
         const data = await sendGet(buildUrl(requisicaoDetailTpl, id));
         const req = data.requisicao;
         currentRequisicao = req;
+        currentDetailData = data;
         currentRequisicaoStatus = req.status;
         setDetailField("codigo", req.codigo || "Requisicao");
         setDetailField("titulo", req.titulo);
@@ -604,6 +606,116 @@
             openReqEditForm();
         }
     });
+
+    // ------------------------------------------------------------------
+    // Copiar a requisicao para o WhatsApp (mensagem formatada, sem links)
+    // ------------------------------------------------------------------
+    // Formata um valor cru ("1234.56") no padrao brasileiro com o simbolo
+    // da moeda, igual ao _fmt_money do backend.
+    function fmtRawMoney(raw, moeda) {
+        const symbol = moeda === "USD" ? "US$" : "R$";
+        const n = Number(raw);
+        if (!isFinite(n)) {
+            return `${symbol} ${raw}`;
+        }
+        const txt = n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return `${symbol} ${txt}`;
+    }
+
+    // Monta a mensagem pronta para colar no WhatsApp usando a formatacao
+    // do proprio app (negrito com *asterisco*). Nao inclui links.
+    function buildWhatsappMessage(data) {
+        const req = data.requisicao;
+        const orcs = data.orcamentos || [];
+        const L = [];
+        const codigo = req.codigo ? `${req.codigo} — ` : "";
+        L.push(`*${codigo}${req.titulo}*`);
+        L.push(`Tipo: ${req.tipo_label}  |  Status: ${req.status_label}`);
+        L.push(`Solicitado por ${req.criado_por} em ${req.criado_em}`);
+        if (req.entregue_em) {
+            L.push(`Entregue em ${req.entregue_em}${req.entregue_por ? ` por ${req.entregue_por}` : ""}`);
+        }
+        if (req.texto && req.texto.trim()) {
+            L.push("");
+            L.push("📝 *Descrição*");
+            L.push(req.texto.trim());
+        }
+
+        if (orcs.length) {
+            L.push("");
+            L.push("━━━━━━━━━━━━━━━");
+            L.push(`💼 *Orçamentos (${orcs.length})*`);
+            orcs.forEach((orc, index) => {
+                L.push("");
+                const aprovado = orc.aprovado ? " ✅ Aprovado" : "";
+                L.push(`*${index + 1}. ${orc.titulo}*${aprovado}`);
+                if (orc.loja && orc.loja !== "-") {
+                    L.push(`🏪 ${orc.loja}`);
+                }
+                L.push(`Valor: ${fmtRawMoney(orc.valor, orc.moeda)}  ·  Qtd: ${orc.quantidade}`);
+                const extras = [];
+                if (Number(orc.frete)) extras.push(`Frete: ${fmtRawMoney(orc.frete, orc.moeda)}`);
+                if (Number(orc.desconto)) extras.push(`Desconto: ${fmtRawMoney(orc.desconto, orc.moeda)}`);
+                if (extras.length) L.push(extras.join("  ·  "));
+                L.push(`*Total: ${orc.total_display}*`);
+                const subs = orc.suborcamentos || [];
+                if (subs.length) {
+                    L.push(`_Total + suborçamentos: ${orc.total_com_suborcamentos_display}_`);
+                    subs.forEach((sub) => {
+                        L.push("");
+                        L.push(`   *↳ ${sub.titulo}*`);
+                        if (sub.loja && sub.loja !== "-") {
+                            L.push(`   🏪 ${sub.loja}`);
+                        }
+                        L.push(`   Valor: ${fmtRawMoney(sub.valor, sub.moeda)}  ·  Qtd: ${sub.quantidade}`);
+                        const se = [];
+                        if (Number(sub.frete)) se.push(`Frete: ${fmtRawMoney(sub.frete, sub.moeda)}`);
+                        if (Number(sub.desconto)) se.push(`Desconto: ${fmtRawMoney(sub.desconto, sub.moeda)}`);
+                        if (se.length) L.push(`   ${se.join("  ·  ")}`);
+                        L.push(`   *Total: ${sub.total_display}*`);
+                    });
+                }
+            });
+        } else {
+            L.push("");
+            L.push("_Sem orçamentos cadastrados._");
+        }
+
+        return L.join("\n");
+    }
+
+    async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+        // Fallback para contexto inseguro (HTTP) ou navegadores antigos.
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.position = "fixed";
+        area.style.top = "-1000px";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(area);
+        if (!ok) {
+            throw new Error("copy-failed");
+        }
+    }
+
+    async function copyRequisicaoWhatsapp() {
+        if (!currentDetailData) return;
+        try {
+            await copyText(buildWhatsappMessage(currentDetailData));
+            showToast("Requisicao copiada! Cole no WhatsApp para enviar.", "success");
+        } catch (error) {
+            showToast("Nao foi possivel copiar. Tente novamente.", "error");
+        }
+    }
+
+    detailModalEl?.querySelector("[data-copy-whatsapp]")?.addEventListener("click", copyRequisicaoWhatsapp);
 
     // botao "Desaprovar requisicao" dentro do detalhe
     detailModalEl?.querySelector("[data-desaprovar-requisicao]")?.addEventListener("click", (event) => {

@@ -623,7 +623,13 @@
 
 /* Rodape do detalhe: "Excluir" discreto a esquerda, "Fechar" a direita. */
 .requisicao-detail__footer {
-    justify-content: space-between;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* Botao "Copiar p/ WhatsApp" fica destacado a esquerda do rodape */
+.requisicao-detail__whatsapp {
+    margin-right: auto;
 }
 
 .create-ticket-kicker--danger {
