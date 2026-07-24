@@ -1927,11 +1927,38 @@ def requisicao_edit_view(request, requisicao_id: int):
 
 def _salvar_documentos(model_cls, fk_name, item, arquivos):
     for arquivo in arquivos:
+        # Ao reaproveitar o mesmo arquivo para varios itens (replicar em todos os
+        # orcamentos), reposiciona o ponteiro para gravar o conteudo completo.
+        try:
+            arquivo.seek(0)
+        except (AttributeError, ValueError, OSError):
+            pass
         model_cls.objects.create(
             **{fk_name: item},
             arquivo=arquivo,
             nome_original=arquivo.name,
         )
+
+
+def _criar_suborcamento(orcamento, campos, foto, documentos, user):
+    """Cria um suborcamento sob `orcamento`, com foto e documentos opcionais.
+
+    A foto e os documentos podem ser os mesmos objetos de upload reaproveitados
+    para varios orcamentos (opcao "replicar em todos"); por isso o ponteiro do
+    arquivo e reposicionado antes de cada gravacao.
+    """
+    sub = SuborcamentoContrato.objects.create(
+        orcamento_pai=orcamento, criado_por=user, **campos
+    )
+    if foto:
+        try:
+            foto.seek(0)
+        except (AttributeError, ValueError, OSError):
+            pass
+        sub.foto_produto = foto
+        sub.save(update_fields=["foto_produto", "atualizado_em"])
+    _salvar_documentos(SuborcamentoDocumento, "suborcamento", sub, documentos)
+    return sub
 
 
 def _aplicar_edicao_item(item, campos, request, doc_model, fk_name):
@@ -2030,7 +2057,7 @@ def suborcamento_create_view(request, orcamento_id: int):
     if not _is_ti(request.user):
         return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
 
-    orcamento = OrcamentoContrato.objects.filter(pk=orcamento_id).first()
+    orcamento = OrcamentoContrato.objects.select_related("requisicao").filter(pk=orcamento_id).first()
     if not orcamento:
         return _json_error("Orcamento nao encontrado.", status=404)
 
@@ -2041,22 +2068,33 @@ def suborcamento_create_view(request, orcamento_id: int):
 
     foto = request.FILES.get("foto_produto")
     documentos = request.FILES.getlist("documentos")
+    # Opcao (desmarcada por padrao): replicar o mesmo suborcamento em TODOS os
+    # orcamentos principais da requisicao, nao so no orcamento atual.
+    aplicar_todos = request.POST.get("aplicar_todos_orcamentos") in {"1", "on", "true"}
 
     with transaction.atomic():
-        suborcamento = SuborcamentoContrato.objects.create(
-            orcamento_pai=orcamento, criado_por=request.user, **campos
-        )
-        if foto:
-            suborcamento.foto_produto = foto
-            suborcamento.save(update_fields=["foto_produto", "atualizado_em"])
-        _salvar_documentos(SuborcamentoDocumento, "suborcamento", suborcamento, documentos)
+        if aplicar_todos:
+            orcamentos = list(orcamento.requisicao.orcamentos.all())
+        else:
+            orcamentos = [orcamento]
+        criados = [
+            _criar_suborcamento(o, campos, foto, documentos, request.user) for o in orcamentos
+        ]
+
+    # Suborcamento do orcamento atual (para eventual foco/uso no front).
+    principal = next((s for s in criados if s.orcamento_pai_id == orcamento.id), criados[0])
+    if aplicar_todos and len(criados) > 1:
+        message = f"Suborcamento adicionado a {len(criados)} orcamentos."
+    else:
+        message = "Suborcamento adicionado com sucesso."
 
     return JsonResponse(
         {
             "ok": True,
-            "message": "Suborcamento adicionado com sucesso.",
-            "suborcamento_id": suborcamento.id,
+            "message": message,
+            "suborcamento_id": principal.id,
             "orcamento_id": orcamento.id,
+            "criados": len(criados),
         }
     )
 

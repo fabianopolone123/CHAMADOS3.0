@@ -905,6 +905,52 @@ class RequisicaoEdicaoTests(TestCase):
             orcamento_pai=self.orcamento, titulo="Complemento", valor=Decimal("10.00"), quantidade=1
         )
 
+    # ----- criacao de suborcamento (replicar em todos) -----
+    def test_suborcamento_criado_so_no_orcamento_atual(self):
+        # Sem marcar a opcao, o suborcamento entra so no orcamento informado.
+        outro = OrcamentoContrato.objects.create(
+            requisicao=self.requisicao, titulo="Loja B", valor=Decimal("50.00"), quantidade=1
+        )
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("suborcamento_create", args=[self.orcamento.id]),
+            {"titulo": "Cabo HDMI", "moeda": "BRL", "valor": "20", "quantidade": "1"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self.orcamento.suborcamentos.filter(titulo="Cabo HDMI").count(), 1)
+        self.assertEqual(outro.suborcamentos.filter(titulo="Cabo HDMI").count(), 0)
+
+    def test_suborcamento_replicado_em_todos_os_orcamentos(self):
+        # Marcando a opcao, o mesmo suborcamento e criado em todos os orcamentos
+        # principais da requisicao (inclusive o atual).
+        outro = OrcamentoContrato.objects.create(
+            requisicao=self.requisicao, titulo="Loja B", valor=Decimal("50.00"), quantidade=1
+        )
+        mais = OrcamentoContrato.objects.create(
+            requisicao=self.requisicao, titulo="Loja C", valor=Decimal("70.00"), quantidade=1
+        )
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("suborcamento_create", args=[self.orcamento.id]),
+            {
+                "titulo": "Mouse", "moeda": "BRL", "valor": "30", "quantidade": "1",
+                "aplicar_todos_orcamentos": "1",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["criados"], 3)
+        for orc in (self.orcamento, outro, mais):
+            self.assertEqual(orc.suborcamentos.filter(titulo="Mouse").count(), 1)
+
+    def test_replicar_suborcamento_exige_ti(self):
+        self.client.force_login(self.common)
+        resp = self.client.post(
+            reverse("suborcamento_create", args=[self.orcamento.id]),
+            {"titulo": "X", "moeda": "BRL", "valor": "1", "quantidade": "1",
+             "aplicar_todos_orcamentos": "1"},
+        )
+        self.assertEqual(resp.status_code, 403)
+
     # ----- requisicao -----
     def test_ti_edita_requisicao(self):
         self.client.force_login(self.ti)

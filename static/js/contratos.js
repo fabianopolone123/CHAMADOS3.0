@@ -778,6 +778,16 @@
         const isSub = mode === "suborcamento" || mode === "suborcamento-edit";
         const isEdit = mode === "orcamento-edit" || mode === "suborcamento-edit";
         kicker.textContent = isSub ? "Suborcamento" : "Orcamento";
+
+        // "Replicar em todos os orcamentos" so faz sentido ao CRIAR um suborcamento.
+        const applyAllWrap = orcFormModalEl.querySelector("[data-sub-apply-all]");
+        const applyAllInput = orcFormModalEl.querySelector("[data-sub-apply-all-input]");
+        if (applyAllWrap) {
+            applyAllWrap.classList.toggle("is-hidden", !(isSub && !isEdit));
+        }
+        if (applyAllInput) {
+            applyAllInput.checked = false;  // sempre comeca desmarcado
+        }
         if (isEdit) {
             title.textContent = isSub ? "Editar suborcamento" : "Editar orcamento";
             submit.textContent = "Salvar alteracoes";

@@ -49,6 +49,15 @@
                         </label>
                     </div>
 
+                    {# So aparece ao criar um suborcamento (via JS) #}
+                    <div class="sub-apply-all is-hidden" data-sub-apply-all>
+                        <label class="sub-apply-all__label">
+                            <input type="checkbox" name="aplicar_todos_orcamentos" value="1" data-sub-apply-all-input>
+                            <span>Criar este suborcamento em <strong>todos os orcamentos</strong> da requisicao</span>
+                        </label>
+                        <small class="contrato-field__help">Por padrao, o suborcamento e criado so no orcamento atual. Marque para replicar o mesmo item (incluindo foto e documentos) em cada orcamento principal.</small>
+                    </div>
+
                     <div class="orcamento-form__media">
                         <div class="contrato-field">
                             <span>Foto do produto</span>
