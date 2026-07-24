@@ -2007,6 +2007,26 @@ class EmailNotificacaoTests(TestCase):
         self.assertIn("suporte@empresa.com", destinos)
         self.assertIn("ti@empresa.com", destinos)
 
+    def test_solicitante_da_ti_nao_recebe_copia_pessoal(self):
+        # Quando o solicitante e da propria TI (ex.: atendente abre/converte um
+        # chamado para si), ele so recebe pela lista da TI, sem a confirmacao
+        # pessoal — evitando dois e-mails da mesma acao.
+        from django.core import mail
+        from .emails import notificar_novo_chamado
+
+        chamado = Chamado.objects.create(
+            numero="CH-000210", titulo="Meu proprio chamado", solicitante=self.attendant,
+            solicitante_nome="TI", solicitante_email="atendente@empresa.com",
+            status=Chamado.STATUS_ABERTO,
+        )
+        mail.outbox = []
+        notificar_novo_chamado(chamado)
+        destinos = {d for m in mail.outbox for d in m.to}
+        # Recebe apenas pela lista da TI; nada de copia pessoal (um unico e-mail).
+        self.assertNotIn("atendente@empresa.com", destinos)
+        self.assertIn("suporte@empresa.com", destinos)
+        self.assertIn("ti@empresa.com", destinos)
+
     def test_notificacoes_desligadas_nao_enviam(self):
         from django.core import mail
 

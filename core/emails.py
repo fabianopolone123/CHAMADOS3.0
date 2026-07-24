@@ -55,6 +55,28 @@ def _solicitante_email(chamado: Chamado) -> str:
     return email
 
 
+def _solicitante_eh_ti(chamado: Chamado) -> bool:
+    """True quando o solicitante do chamado e da propria TI (Atendente TI/Admin)."""
+    if not chamado.solicitante_id or not chamado.solicitante:
+        return False
+    from .permissions import is_admin_user, is_attendant_user
+
+    user = chamado.solicitante
+    return is_attendant_user(user) or is_admin_user(user)
+
+
+def _email_solicitante_notificar(chamado: Chamado) -> str:
+    """E-mail do solicitante para a notificacao pessoal (confirmacao/copia).
+
+    Retorna vazio quando o solicitante e da propria TI: nesse caso ele ja recebe
+    a notificacao pela lista da TI (ex.: ti@empresa) e nao deve receber a mesma
+    acao duas vezes (uma como solicitante e outra como equipe). Cobre o cenario
+    de um atendente que abre/converte um chamado para si mesmo."""
+    if _solicitante_eh_ti(chamado):
+        return ""
+    return _solicitante_email(chamado)
+
+
 def _absolute_url(request, chamado: Chamado) -> str:
     try:
         from django.urls import reverse
@@ -138,7 +160,7 @@ def notificar_novo_chamado(chamado: Chamado, request=None) -> None:
         return
 
     link = _absolute_url(request, chamado)
-    solicitante = _solicitante_email(chamado)
+    solicitante = _email_solicitante_notificar(chamado)
     nome = chamado.solicitante_nome or "solicitante"
 
     corpo_base = (
@@ -185,7 +207,7 @@ def notificar_nova_mensagem(chamado: Chamado, mensagem, request=None) -> None:
     if autor is not None:
         autor_nome = autor.get_full_name() or autor.username
 
-    solicitante = _solicitante_email(chamado)
+    solicitante = _email_solicitante_notificar(chamado)
     eh_solicitante = bool(autor and chamado.solicitante_id == autor.id)
 
     # Notifica a outra parte + TI, sem notificar quem escreveu.
@@ -221,7 +243,7 @@ def notificar_mudanca_status(chamado: Chamado, status_anterior: str, autor_nome:
     if not config or not config.notif_mudanca_status:
         return
 
-    solicitante = _solicitante_email(chamado)
+    solicitante = _email_solicitante_notificar(chamado)
     destinatarios = list(config.destinatarios_ti())
     if solicitante:
         destinatarios.append(solicitante)
@@ -246,7 +268,7 @@ def notificar_fechamento(chamado: Chamado, autor_nome: str, descricao: str = "",
     if not config or not config.notif_fechamento:
         return
 
-    solicitante = _solicitante_email(chamado)
+    solicitante = _email_solicitante_notificar(chamado)
     destinatarios = list(config.destinatarios_ti())
     if solicitante:
         destinatarios.append(solicitante)

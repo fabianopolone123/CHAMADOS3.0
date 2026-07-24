@@ -180,6 +180,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
    - **Mudanca de status** do chamado (movimentacao no Kanban): notifica solicitante e TI.
    - **Fechamento** do chamado (acao Stop): notifica solicitante e TI, incluindo o "o que foi feito".
 4. O envio e **tolerante a falhas**: se o SMTP estiver mal configurado ou fora do ar, o erro e apenas registrado em log e **nunca impede** abrir, mover, responder ou fechar o chamado. Ha um botao de **enviar e-mail de teste** que, ao contrario, mostra o erro real do servidor para ajudar a configurar.
+5. **Solicitante que e da propria TI**: quando o solicitante do chamado e um Atendente TI/Admin (ex.: um atendente abre um chamado para si mesmo no Kanban ou converte uma pendencia que ele mesmo criou), ele **nao recebe a copia pessoal** (a confirmacao "solicitante") em nenhum dos eventos — recebe apenas pela lista de e-mails da TI. Isso evita receber a mesma acao duas vezes (uma como solicitante, no e-mail pessoal, e outra como equipe, pela lista `ti@...` que tambem chega nele). O dedup por endereco continua valendo para os demais casos.
 
 ## Regras previstas para o sistema de chamados
 

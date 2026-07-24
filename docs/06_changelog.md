@@ -1,5 +1,9 @@
 # 06 - Changelog
 
+## 2026-07-24
+
+- E-mail (notificacoes): quando o **solicitante do chamado e da propria TI** (Atendente TI/Admin), ele deixa de receber a **copia pessoal** ("Seu chamado foi aberto com sucesso" e as copias de solicitante nos demais eventos) e passa a ser notificado **apenas pela lista de e-mails da TI**. Corrige o caso do atendente que abre um chamado para si mesmo no Kanban ou converte uma pendencia que ele proprio criou e, por estar tambem na lista `ti@...` (que chega na caixa dele), recebia **dois e-mails** da mesma acao: um pessoal e outro pela TI. O dedup por endereco (que ja evitava duplicidade quando o e-mail pessoal esta literalmente na lista da TI) continua valendo. Ajuste apenas em `core/emails.py`: novos helpers `_solicitante_eh_ti` e `_email_solicitante_notificar` (retorna vazio quando o solicitante e TI), usados por `notificar_novo_chamado`, `notificar_nova_mensagem`, `notificar_mudanca_status` e `notificar_fechamento`. Sem alteracao de model, rota ou migration. Teste `test_solicitante_da_ti_nao_recebe_copia_pessoal` em `EmailNotificacaoTests`.
+
 ## 2026-07-23
 
 - Requisicoes: adicionada a acao **"Desaprovar requisicao"** (botao no rodape do detalhe, TI/admin), que aparece quando a requisicao tem um orcamento aprovado (status "Aguardando entrega"). Ao clicar, a aprovacao de **todos os orcamentos** e removida e a requisicao volta para "Esperando aprovacao", com evento na timeline. Nova rota `POST /contratos/requisicoes/<id>/desaprovar/` (name `requisicao_desaprovar`); exige ao menos um orcamento aprovado (`409` se nao houver) e e bloqueada apos a entrega (`409`). Ajustes em `core/views.py` (`requisicao_desaprovar_view`), `core/urls.py`, `templates/partials/requisicao_detail_modal.html`, `templates/chamados/contratos.html` e `static/js/contratos.js`. Testes adicionados a `OrcamentoAprovacaoTests` (desaprova limpa todos e volta o status, `409` sem aprovado, bloqueio apos entregue, permissao e metodo).
