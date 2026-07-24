@@ -7,7 +7,7 @@
     const PENDENCIA_CARD_SELECTOR = ".pendencia-card[data-pendencia-id]";
     const ACTION_SELECTOR = "[data-ticket-action]";
     const WAITING_STATUSES = ["aguardando_usuario", "aguardando_peca", "aguardando_autorizacao"];
-    const STAT_FILTER_PREVIEW_MS = 2600;  // duracao do preview ao clicar num contador
+    const STAT_FILTER_PREVIEW_MS = 20000;  // duracao do preview ao clicar num contador
 
     const appElement = document.querySelector(".tickets-app");
     const attendanceModalElement = document.getElementById(ATTENDANCE_MODAL_ID);
