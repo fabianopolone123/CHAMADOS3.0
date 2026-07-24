@@ -7,6 +7,7 @@
     const PENDENCIA_CARD_SELECTOR = ".pendencia-card[data-pendencia-id]";
     const ACTION_SELECTOR = "[data-ticket-action]";
     const WAITING_STATUSES = ["aguardando_usuario", "aguardando_peca", "aguardando_autorizacao"];
+    const STAT_FILTER_PREVIEW_MS = 2600;  // duracao do preview ao clicar num contador
 
     const appElement = document.querySelector(".tickets-app");
     const attendanceModalElement = document.getElementById(ATTENDANCE_MODAL_ID);
@@ -22,6 +23,7 @@
 
     let dragInProgress = false;
     let timerIntervalId = null;
+    let statFilterTimeoutId = null;
 
     const attendanceModal = bootstrap.Modal.getOrCreateInstance(attendanceModalElement);
 
@@ -229,6 +231,85 @@
             if (stat) {
                 stat.classList.toggle("column-stat--zero", value === 0);
             }
+        });
+    }
+
+    // --- Preview: clicar num contador mostra so os chamados daquele status --
+
+    function cardMatchesStat(card, key) {
+        const status = card.dataset.ticketStatus || "";
+        if (key === "em_atendimento") {
+            return status === "em_atendimento";
+        }
+        if (key === "aguardando") {
+            return WAITING_STATUSES.includes(status);
+        }
+        if (key === "atribuido") {
+            return status === "atribuido";
+        }
+        return true;
+    }
+
+    // Volta a visualizacao padrao: mostra todos os cards de novo e tira o
+    // destaque do contador clicado.
+    function clearStatFilter() {
+        if (statFilterTimeoutId) {
+            window.clearTimeout(statFilterTimeoutId);
+            statFilterTimeoutId = null;
+        }
+        document
+            .querySelectorAll(".ticket-card--filtered-out")
+            .forEach((card) => card.classList.remove("ticket-card--filtered-out"));
+        document
+            .querySelectorAll(".column-stat--active")
+            .forEach((stat) => stat.classList.remove("column-stat--active"));
+    }
+
+    // Filtra a coluna para mostrar so os cards do status clicado, por um tempo
+    // curto; depois volta sozinho ao padrao (ou ao clicar de novo/em outro).
+    function applyStatFilter(stat) {
+        if (!stat || stat.classList.contains("column-stat--zero")) {
+            return;  // categoria sem chamados: nada a mostrar
+        }
+        const column = stat.closest(".kanban-column");
+        const list = column ? column.querySelector(LIST_SELECTOR) : null;
+        const keyEl = stat.querySelector("[data-stat]");
+        if (!column || !list || !keyEl) {
+            return;
+        }
+
+        const alreadyActive = stat.classList.contains("column-stat--active");
+        clearStatFilter();
+        if (alreadyActive) {
+            return;  // segundo clique no mesmo contador: volta ao padrao
+        }
+
+        const key = keyEl.dataset.stat;
+        stat.classList.add("column-stat--active");
+        list.querySelectorAll(".ticket-card").forEach((card) => {
+            card.classList.toggle("ticket-card--filtered-out", !cardMatchesStat(card, key));
+        });
+        statFilterTimeoutId = window.setTimeout(clearStatFilter, STAT_FILTER_PREVIEW_MS);
+    }
+
+    function initializeColumnStatFilters() {
+        document.querySelectorAll("[data-column-breakdown]").forEach((breakdown) => {
+            breakdown.addEventListener("click", (event) => {
+                const stat = event.target.closest(".column-stat");
+                if (stat) {
+                    applyStatFilter(stat);
+                }
+            });
+            breakdown.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                }
+                const stat = event.target.closest(".column-stat");
+                if (stat) {
+                    event.preventDefault();
+                    applyStatFilter(stat);
+                }
+            });
         });
     }
 
@@ -576,6 +657,7 @@
                 onStart: () => {
                     dragInProgress = true;
                     window.__kanbanDragging = true;
+                    clearStatFilter();  // sai de qualquer preview ao arrastar
                 },
                 onEnd: handleDragEnd,
             });
@@ -1333,6 +1415,7 @@
         initializeCreateTicket();
         initializeCreatePendencia();
         initializeClosedTicketsModal();
+        initializeColumnStatFilters();
         syncInitialActiveState();
     }
 

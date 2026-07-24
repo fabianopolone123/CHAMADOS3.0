@@ -76,13 +76,13 @@
                             <span class="column-count" title="Total de chamados na coluna">{{ attendant.count }}</span>
                         </div>
                         <div class="column-breakdown" data-column-breakdown>
-                            <span class="column-stat column-stat--attn{% if not attendant.stats.em_atendimento %} column-stat--zero{% endif %}" title="Em atendimento">
+                            <span class="column-stat column-stat--attn{% if not attendant.stats.em_atendimento %} column-stat--zero{% endif %}" role="button" tabindex="0" title="Em atendimento - clique para ver so estes por instantes">
                                 <span class="column-stat__dot"></span><span data-stat="em_atendimento">{{ attendant.stats.em_atendimento }}</span> em atend.
                             </span>
-                            <span class="column-stat column-stat--wait{% if not attendant.stats.aguardando %} column-stat--zero{% endif %}" title="Aguardando (usuario/peca/autorizacao)">
+                            <span class="column-stat column-stat--wait{% if not attendant.stats.aguardando %} column-stat--zero{% endif %}" role="button" tabindex="0" title="Aguardando (usuario/peca/autorizacao) - clique para ver so estes por instantes">
                                 <span class="column-stat__dot"></span><span data-stat="aguardando">{{ attendant.stats.aguardando }}</span> aguard.
                             </span>
-                            <span class="column-stat column-stat--assigned{% if not attendant.stats.atribuido %} column-stat--zero{% endif %}" title="Atribuido (ainda sem Play)">
+                            <span class="column-stat column-stat--assigned{% if not attendant.stats.atribuido %} column-stat--zero{% endif %}" role="button" tabindex="0" title="Atribuido (ainda sem Play) - clique para ver so estes por instantes">
                                 <span class="column-stat__dot"></span><span data-stat="atribuido">{{ attendant.stats.atribuido }}</span> atrib.
                             </span>
                         </div>

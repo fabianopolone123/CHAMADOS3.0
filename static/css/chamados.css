@@ -339,6 +339,30 @@
     font-weight: 700;
     color: #475569;
     white-space: nowrap;
+    cursor: pointer;
+    padding: 0.1rem 0.4rem;
+    margin: -0.1rem -0.4rem;
+    border-radius: 999px;
+    transition: background 0.15s ease, color 0.15s ease;
+    user-select: none;
+}
+
+.column-stat:hover:not(.column-stat--zero),
+.column-stat:focus-visible:not(.column-stat--zero) {
+    background: rgba(148, 163, 184, 0.18);
+    color: #0f172a;
+    outline: none;
+}
+
+/* Contador selecionado (preview ativo): pilula destacada. */
+.column-stat--active {
+    background: rgba(37, 99, 235, 0.16);
+    color: #0f172a;
+}
+
+/* Card escondido pelo preview de um contador. */
+.ticket-card--filtered-out {
+    display: none !important;
 }
 
 .column-stat__dot {
@@ -361,9 +385,10 @@
     background: #8b5cf6; /* roxo: atribuido */
 }
 
-/* Categoria sem chamados fica bem discreta (mas continua visivel). */
+/* Categoria sem chamados fica bem discreta (mas continua visivel) e nao clicavel. */
 .column-stat--zero {
     opacity: 0.4;
+    cursor: default;
 }
 
 /* Botao "+" redondo no topo das colunas (Chamados abertos e Pendencias). */
