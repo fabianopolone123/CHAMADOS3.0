@@ -322,6 +322,50 @@
     font-weight: 700;
 }
 
+/* Quebra dos contadores por status na coluna do atendente (Em atendimento /
+   Aguardando / Atribuido), logo abaixo do cabecalho. */
+.column-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.7rem;
+    padding: 0.5rem 1.2rem 0;
+}
+
+.column-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #475569;
+    white-space: nowrap;
+}
+
+.column-stat__dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #94a3b8;
+    flex: none;
+}
+
+.column-stat--attn .column-stat__dot {
+    background: #f59e0b; /* laranja: em atendimento */
+}
+
+.column-stat--wait .column-stat__dot {
+    background: #94a3b8; /* cinza: aguardando */
+}
+
+.column-stat--assigned .column-stat__dot {
+    background: #8b5cf6; /* roxo: atribuido */
+}
+
+/* Categoria sem chamados fica bem discreta (mas continua visivel). */
+.column-stat--zero {
+    opacity: 0.4;
+}
+
 /* Botao "+" redondo no topo das colunas (Chamados abertos e Pendencias). */
 .column-header__actions {
     display: flex;
@@ -633,6 +677,19 @@
     background:
         radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 28%),
         linear-gradient(180deg, #ffffff 0%, #f4fffb 100%);
+}
+
+/* Chamados "aguardando" (usuario/peca/autorizacao) ficam esmaecidos na coluna
+   do atendente: sinalizam que estao parados esperando algo de fora. O hover/foco
+   devolve a opacidade cheia para leitura. */
+.ticket-card--waiting {
+    opacity: 0.55;
+}
+
+.ticket-card--waiting:hover,
+.ticket-card--waiting:focus-visible,
+.ticket-card--waiting:focus-within {
+    opacity: 1;
 }
 
 .ticket-card:hover {

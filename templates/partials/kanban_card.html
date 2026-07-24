@@ -1,10 +1,11 @@
 <article
-    class="ticket-card ticket-card--clickable{% if ticket.attendance.is_active %} ticket-card--active{% endif %}"
+    class="ticket-card ticket-card--clickable{% if ticket.attendance.is_active %} ticket-card--active{% endif %}{% if ticket.is_waiting %} ticket-card--waiting{% endif %}"
     tabindex="0"
     data-ticket-number="{{ ticket.number }}"
     data-ticket-title="{{ ticket.title }}"
     data-detail-url="{% url 'ticket_detail' numero=ticket.number %}"
     data-ticket-active="{{ ticket.attendance.is_active|yesno:'true,false' }}"
+    data-ticket-status="{{ ticket.status }}"
     data-ticket-started-at="{{ ticket.attendance.started_at_iso }}"
     aria-label="Abrir detalhes do chamado {{ ticket.number }}"
 >

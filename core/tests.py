@@ -235,6 +235,32 @@ class EncerramentoChamadoTests(TestCase):
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
         self.assertIsNone(self.chamado.fechado_em)
 
+    def test_dashboard_stats_por_atendente(self):
+        # A coluna do atendente traz a quebra por status: em atendimento,
+        # aguardando (soma dos 3) e atribuido. self.chamado ja esta "em_atendimento".
+        Chamado.objects.create(
+            numero="CH-000020", titulo="Peca", solicitante=self.owner,
+            status=Chamado.STATUS_AGUARDANDO_PECA, atendente_atual=self.attendant,
+        )
+        Chamado.objects.create(
+            numero="CH-000021", titulo="Usuario", solicitante=self.owner,
+            status=Chamado.STATUS_AGUARDANDO_USUARIO, atendente_atual=self.attendant,
+        )
+        Chamado.objects.create(
+            numero="CH-000022", titulo="Atribuido", solicitante=self.owner,
+            status=Chamado.STATUS_ATRIBUIDO, atendente_atual=self.attendant,
+        )
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("tickets_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        coluna = next(
+            c for c in resp.context["attendant_columns"] if c["attendant_id"] == self.attendant.id
+        )
+        self.assertEqual(coluna["count"], 4)
+        self.assertEqual(coluna["stats"]["em_atendimento"], 1)
+        self.assertEqual(coluna["stats"]["aguardando"], 2)
+        self.assertEqual(coluna["stats"]["atribuido"], 1)
+
     def test_mover_chamado_com_play_ativo_e_bloqueado(self):
         # Com um atendimento ativo (Play), o chamado nao pode ser movido: o
         # endpoint recusa com 409 e nada muda (atendente/status preservados).

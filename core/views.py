@@ -279,6 +279,7 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
         "status": chamado.status,
         "status_label": chamado.status_label,
         "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
+        "is_waiting": chamado.status in Chamado.STATUS_AGUARDANDO,
         "priority_label": chamado.prioridade_label,
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "attendance": {
@@ -289,6 +290,22 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
             "elapsed_display": _format_duration(timezone.now() - started) if is_active else "",
         },
     }
+
+
+def _column_stats(cards) -> dict:
+    """Resumo por status dos cards de uma coluna de atendente, para os contadores
+    do cabecalho (total + quebra por Em atendimento / Aguardando / Atribuido).
+    Os tres status de "aguardando" (usuario/peca/autorizacao) sao somados."""
+    stats = {"em_atendimento": 0, "aguardando": 0, "atribuido": 0}
+    for card in cards:
+        status = card.get("status")
+        if status == Chamado.STATUS_EM_ATENDIMENTO:
+            stats["em_atendimento"] += 1
+        elif status in Chamado.STATUS_AGUARDANDO:
+            stats["aguardando"] += 1
+        elif status == Chamado.STATUS_ATRIBUIDO:
+            stats["atribuido"] += 1
+    return stats
 
 
 @ti_required
@@ -355,6 +372,7 @@ def tickets_dashboard_view(request):
             "username": user.username,
             "tickets": by_attendant[user.id],
             "count": len(by_attendant[user.id]),
+            "stats": _column_stats(by_attendant[user.id]),
         }
         for user in attendants
     ]

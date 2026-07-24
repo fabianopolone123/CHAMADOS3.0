@@ -73,7 +73,18 @@
                                 <span class="column-kicker">Atendente TI</span>
                                 <h3 class="column-title">{{ attendant.name }}</h3>
                             </div>
-                            <span class="column-count">{{ attendant.count }}</span>
+                            <span class="column-count" title="Total de chamados na coluna">{{ attendant.count }}</span>
+                        </div>
+                        <div class="column-breakdown" data-column-breakdown>
+                            <span class="column-stat column-stat--attn{% if not attendant.stats.em_atendimento %} column-stat--zero{% endif %}" title="Em atendimento">
+                                <span class="column-stat__dot"></span><span data-stat="em_atendimento">{{ attendant.stats.em_atendimento }}</span> em atend.
+                            </span>
+                            <span class="column-stat column-stat--wait{% if not attendant.stats.aguardando %} column-stat--zero{% endif %}" title="Aguardando (usuario/peca/autorizacao)">
+                                <span class="column-stat__dot"></span><span data-stat="aguardando">{{ attendant.stats.aguardando }}</span> aguard.
+                            </span>
+                            <span class="column-stat column-stat--assigned{% if not attendant.stats.atribuido %} column-stat--zero{% endif %}" title="Atribuido (ainda sem Play)">
+                                <span class="column-stat__dot"></span><span data-stat="atribuido">{{ attendant.stats.atribuido }}</span> atrib.
+                            </span>
                         </div>
                         <div class="ticket-list js-ticket-list" data-column-type="atendente" data-attendant-id="{{ attendant.attendant_id }}" data-empty-text="Sem chamados em atendimento.">
                             {% for ticket in attendant.tickets %}

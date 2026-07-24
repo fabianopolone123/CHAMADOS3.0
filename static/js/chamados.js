@@ -6,6 +6,7 @@
     const PENDENCIA_LIST_SELECTOR = ".js-pendencia-list";
     const PENDENCIA_CARD_SELECTOR = ".pendencia-card[data-pendencia-id]";
     const ACTION_SELECTOR = "[data-ticket-action]";
+    const WAITING_STATUSES = ["aguardando_usuario", "aguardando_peca", "aguardando_autorizacao"];
 
     const appElement = document.querySelector(".tickets-app");
     const attendanceModalElement = document.getElementById(ATTENDANCE_MODAL_ID);
@@ -81,6 +82,16 @@
         return document.querySelector(`.ticket-card[data-ticket-number="${ticketNumber}"]`);
     }
 
+    // Mantem o status "cru" do card (data-ticket-status) e a classe de esmaecido
+    // ("aguardando") em sincronia, para o contador da coluna e o visual baterem.
+    function applyCardStatus(card, statusValue) {
+        if (!card || !statusValue) {
+            return;
+        }
+        card.dataset.ticketStatus = statusValue;
+        card.classList.toggle("ticket-card--waiting", WAITING_STATUSES.includes(statusValue));
+    }
+
     function setCardActiveState(card, startedAtIso) {
         if (!card) {
             return;
@@ -89,6 +100,8 @@
         card.classList.add("ticket-card--active");
         card.dataset.ticketActive = "true";
         card.dataset.ticketStartedAt = startedAtIso || "";
+        // Play sempre significa "em atendimento" (remove eventual esmaecido).
+        applyCardStatus(card, "em_atendimento");
 
         const state = card.querySelector("[data-ticket-state]");
         const timer = card.querySelector("[data-ticket-timer]");
@@ -187,6 +200,35 @@
             if (list && countEl) {
                 countEl.textContent = list.querySelectorAll(".ticket-card").length;
             }
+            updateColumnBreakdown(column, list);
+        });
+    }
+
+    // Recalcula a quebra por status (Em atendimento / Aguardando / Atribuido) a
+    // partir do data-ticket-status de cada card da coluna do atendente.
+    function updateColumnBreakdown(column, list) {
+        const breakdown = column.querySelector("[data-column-breakdown]");
+        if (!breakdown || !list) {
+            return;
+        }
+        const counts = { em_atendimento: 0, aguardando: 0, atribuido: 0 };
+        list.querySelectorAll(".ticket-card").forEach((card) => {
+            const status = card.dataset.ticketStatus || "";
+            if (status === "em_atendimento") {
+                counts.em_atendimento += 1;
+            } else if (WAITING_STATUSES.includes(status)) {
+                counts.aguardando += 1;
+            } else if (status === "atribuido") {
+                counts.atribuido += 1;
+            }
+        });
+        breakdown.querySelectorAll("[data-stat]").forEach((numberEl) => {
+            const value = counts[numberEl.dataset.stat] || 0;
+            numberEl.textContent = value;
+            const stat = numberEl.closest(".column-stat");
+            if (stat) {
+                stat.classList.toggle("column-stat--zero", value === 0);
+            }
         });
     }
 
@@ -281,6 +323,7 @@
             // Multiplos atendimentos ativos sao permitidos: apenas ativa este card.
             setCardActiveState(card, result.attendance.started_at_iso);
             startTimerLoop();
+            updateColumnCounts();  // atualiza a quebra (atribuido -> em atendimento)
             showToast(result.message || "Atendimento iniciado com sucesso.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel iniciar o atendimento.", "error");
@@ -315,9 +358,14 @@
             const card = getTicketCard(ticketNumber);
             setCardInactiveState(card, action === "pause" ? "Pausado" : "Atendimento encerrado");
 
-            // Se o pause marcou um status (aguardando ...), atualiza o badge do card.
+            // Se o pause marcou um status (aguardando ... / atribuido), atualiza o
+            // badge, o status cru do card (esmaecido) e a quebra da coluna.
             if (card && result.status_label) {
                 applyBadgeState(card, result.status_label, result.status_class);
+            }
+            if (card && result.status) {
+                applyCardStatus(card, result.status);
+                updateColumnCounts();
             }
 
             // Stop encerra o chamado: o card sai da coluna do atendente. A coluna
@@ -392,6 +440,7 @@
         try {
             const result = await sendJson(moveTicketUrl, payload);
             applyBadgeState(card, result.status_label, result.status_class);
+            applyCardStatus(card, result.status);
             applyAttendantState(card, result.atendente_atual);
             // Ao entrar na coluna de um atendente, o card sobe para o topo (logo
             // abaixo dos que estao com Play ativo), em vez de ficar onde foi solto.
