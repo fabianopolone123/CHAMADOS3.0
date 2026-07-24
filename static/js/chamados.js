@@ -459,6 +459,20 @@
             return;
         }
 
+        // Chamado com atendimento ativo (Play) nao pode ser movido: o periodo em
+        // andamento pertence a quem deu o Play. Devolve o card e orienta a
+        // pausar/finalizar antes (o backend tambem barra com 409).
+        if (event.item.dataset.ticketActive === "true") {
+            const card = event.item;
+            const origin = event.from;
+            const reference = origin.children[event.oldIndex] || null;
+            origin.insertBefore(card, reference);
+            updateColumnCounts();
+            refreshEmptyStates();
+            showToast("Pause ou finalize o atendimento (Play) antes de mover o chamado.", "warning");
+            return;
+        }
+
         const payload = { ticket_number: ticketNumber, target: target };
         if (target === "atendente") {
             payload.attendant_id = attendantId;

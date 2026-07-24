@@ -409,6 +409,23 @@ def move_ticket_view(request):
     if not chamado:
         return _json_error("Chamado nao encontrado.", status=404)
 
+    # Nao e possivel mover um chamado com atendimento ativo (Play). O periodo em
+    # andamento pertence a quem deu o Play; mover trocaria o atendente atual (ou
+    # devolveria para abertos) deixando o cronometro "orfao" — e o novo atendente
+    # nem conseguiria pausar/finalizar (o Play nao e dele). Exige Pause/Stop antes.
+    atendimento_ativo = (
+        AtendimentoHistorico.objects.select_related("atendente")
+        .filter(chamado=chamado, finalizado_em__isnull=True)
+        .first()
+    )
+    if atendimento_ativo:
+        dono = _attendant_display(atendimento_ativo.atendente)
+        return _json_error(
+            f"Este chamado esta em atendimento ativo (Play) por {dono}. "
+            "Pause ou finalize o atendimento antes de mover o chamado.",
+            status=409,
+        )
+
     autor = _attendant_display(request.user)
     previous_status_label = chamado.status_label
     previous_attendant = chamado.atendente_atual
@@ -430,12 +447,9 @@ def move_ticket_view(request):
         # Arrastar para um atendente apenas ATRIBUI o chamado. O status "Em
         # atendimento" so vale enquanto ha um atendimento ativo (do Play ao
         # Pause/Stop); por isso o destino da coluna do atendente e "Atribuido".
-        # Se ja houver um Play ativo neste chamado, o status "Em atendimento" e
-        # preservado (nao rebaixa para Atribuido).
-        tem_play_ativo = AtendimentoHistorico.objects.filter(
-            chamado=chamado, finalizado_em__isnull=True
-        ).exists()
-        new_status = Chamado.STATUS_EM_ATENDIMENTO if tem_play_ativo else Chamado.STATUS_ATRIBUIDO
+        # Chamados com Play ativo nao chegam aqui: o move foi barrado acima
+        # (exige Pause/Stop antes de mover).
+        new_status = Chamado.STATUS_ATRIBUIDO
     else:  # aberto (unico destino restante; fechado ja foi barrado acima)
         new_status = Chamado.STATUS_ABERTO
 

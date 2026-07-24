@@ -235,6 +235,69 @@ class EncerramentoChamadoTests(TestCase):
         self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
         self.assertIsNone(self.chamado.fechado_em)
 
+    def test_mover_chamado_com_play_ativo_e_bloqueado(self):
+        # Com um atendimento ativo (Play), o chamado nao pode ser movido: o
+        # endpoint recusa com 409 e nada muda (atendente/status preservados).
+        User = get_user_model()
+        outro = User.objects.create_user(username="ti2", password="x")
+        outro.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        self._start_attendance(self.attendant)  # Play ativo do self.attendant
+
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps(
+                {"ticket_number": self.chamado.numero, "target": "atendente", "attendant_id": outro.id}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 409)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.atendente_atual, self.attendant)  # nao mudou
+        self.assertEqual(self.chamado.status, Chamado.STATUS_EM_ATENDIMENTO)
+        # O Play continua sendo do atendente original.
+        self.assertTrue(
+            AtendimentoHistorico.objects.filter(
+                chamado=self.chamado, atendente=self.attendant, finalizado_em__isnull=True
+            ).exists()
+        )
+
+    def test_mover_para_abertos_com_play_ativo_e_bloqueado(self):
+        # A regra vale para qualquer destino: nem devolver para "Chamados abertos"
+        # e permitido enquanto ha Play ativo.
+        self._start_attendance(self.attendant)
+        self.client.force_login(self.attendant)
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps({"ticket_number": self.chamado.numero, "target": "aberto"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 409)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.atendente_atual, self.attendant)
+
+    def test_move_liberado_apos_pausar_o_atendimento(self):
+        # Depois de pausar o Play, o chamado volta a poder ser movido.
+        User = get_user_model()
+        outro = User.objects.create_user(username="ti3", password="x")
+        outro.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        self._start_attendance(self.attendant)
+        self.client.force_login(self.attendant)
+        self.assertEqual(self._finish("pause", "pausando para repassar").status_code, 200)
+
+        resp = self.client.post(
+            reverse("move_ticket"),
+            data=json.dumps(
+                {"ticket_number": self.chamado.numero, "target": "atendente", "attendant_id": outro.id}
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.atendente_atual, outro)
+        self.assertEqual(self.chamado.status, Chamado.STATUS_ATRIBUIDO)
+
     def test_stop_requires_active_attendance(self):
         # Sem Play ativo, o Stop e recusado e o chamado nao e fechado.
         self.client.force_login(self.attendant)
