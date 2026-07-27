@@ -174,6 +174,10 @@
     color: #b91c1c;
     background: #fee2e2;
 }
+.contrato-status.contrato-status--nao_aprovada {
+    color: #b91c1c;
+    background: #fee2e2;
+}
 
 /* Campos de formulario */
 .contrato-field {

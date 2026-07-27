@@ -14,6 +14,7 @@
     const orcamentoAprovarTpl = appElement.dataset.orcamentoAprovarUrl;
     const requisicaoMarcarEntregueTpl = appElement.dataset.requisicaoMarcarEntregueUrl;
     const requisicaoDesaprovarTpl = appElement.dataset.requisicaoDesaprovarUrl;
+    const requisicaoNaoAprovarTpl = appElement.dataset.requisicaoNaoAprovarUrl;
 
     function buildUrl(template, id) {
         return template.replace("/0/", `/${id}/`);
@@ -491,6 +492,43 @@
         }
     }
 
+    // Marca a requisicao como "Nao aprovada" (compra recusada) ou, se ja estiver
+    // recusada, reabre para "Esperando aprovacao". O backend alterna o estado.
+    async function naoAprovarRequisicao(button) {
+        if (!requisicaoNaoAprovarTpl || !currentRequisicaoId) {
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+        }
+        try {
+            const data = await sendJson(buildUrl(requisicaoNaoAprovarTpl, currentRequisicaoId), {});
+            await loadRequisicaoDetail(currentRequisicaoId);
+            updateRequisicaoListBadge(data.requisicao_id, data.requisicao_status, data.requisicao_status_label);
+            showToast(data.message || "Requisicao atualizada.", "success");
+        } catch (error) {
+            showToast(error.message || "Nao foi possivel atualizar a requisicao.", "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+            }
+        }
+    }
+
+    // O mesmo botao recusa e desfaz: muda o rotulo e a cor conforme o status.
+    function syncNaoAprovarButton(status) {
+        const botao = detailModalEl?.querySelector("[data-nao-aprovar-requisicao]");
+        if (!botao) {
+            return;
+        }
+        const recusada = status === "nao_aprovada";
+        botao.textContent = recusada ? "Reabrir requisicao" : "Nao aprovar";
+        botao.classList.toggle("btn-outline-dark", !recusada);
+        botao.classList.toggle("btn-outline-warning", recusada);
+        // Depois de entregue nao ha o que recusar.
+        botao.classList.toggle("is-hidden", status === "entregue");
+    }
+
     function renderOrcamentos(orcamentos) {
         const container = detailModalEl.querySelector("[data-orcamentos]");
         const empty = detailModalEl.querySelector("[data-orcamentos-empty]");
@@ -560,6 +598,7 @@
         if (desaprovarBtn) {
             desaprovarBtn.classList.toggle("is-hidden", req.status !== "aguardando_entrega");
         }
+        syncNaoAprovarButton(req.status);
         renderOrcamentos(data.orcamentos);
         renderTimeline(data.eventos);
     }
@@ -1014,6 +1053,11 @@
     // botao "Desaprovar requisicao" dentro do detalhe
     detailModalEl?.querySelector("[data-desaprovar-requisicao]")?.addEventListener("click", (event) => {
         desaprovarRequisicao(event.currentTarget);
+    });
+
+    // botao "Nao aprovar" / "Reabrir requisicao" dentro do detalhe
+    detailModalEl?.querySelector("[data-nao-aprovar-requisicao]")?.addEventListener("click", (event) => {
+        naoAprovarRequisicao(event.currentTarget);
     });
 
     // ------------------------------------------------------------------

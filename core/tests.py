@@ -1029,6 +1029,68 @@ class OrcamentoAprovacaoTests(TestCase):
         resp = self.client.post(reverse("requisicao_desaprovar", args=[self.requisicao.id]))
         self.assertEqual(resp.status_code, 403)
 
+    def _nao_aprovar(self):
+        return self.client.post(reverse("requisicao_nao_aprovar", args=[self.requisicao.id]))
+
+    def test_nao_aprovar_marca_requisicao_como_nao_aprovada(self):
+        self.client.force_login(self.ti)
+        resp = self._nao_aprovar()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["nao_aprovada"])
+        self.assertEqual(resp.json()["requisicao_status_label"], "Nao aprovada")
+
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_NAO_APROVADA)
+        self.assertTrue(
+            self.requisicao.eventos.filter(descricao__icontains="NAO APROVADA").exists()
+        )
+
+    def test_nao_aprovar_remove_aprovacao_dos_orcamentos(self):
+        # Recusar a compra desfaz qualquer aprovacao: nada sera comprado.
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)
+        self._nao_aprovar()
+
+        self.orc_a.refresh_from_db()
+        self.requisicao.refresh_from_db()
+        self.assertFalse(self.orc_a.aprovado)
+        self.assertIsNone(self.orc_a.aprovado_em)
+        self.assertIsNone(self.orc_a.aprovado_por)
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_NAO_APROVADA)
+
+    def test_nao_aprovar_de_novo_reabre_a_requisicao(self):
+        self.client.force_login(self.ti)
+        self._nao_aprovar()
+        resp = self._nao_aprovar()  # alterna: reabre
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["nao_aprovada"])
+
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_EM_COTACAO)
+        self.assertTrue(self.requisicao.eventos.filter(descricao__icontains="reaberta").exists())
+
+    def test_nao_aprovar_bloqueado_apos_entregue(self):
+        self.client.force_login(self.ti)
+        self._aprovar(self.orc_a)
+        self.client.post(reverse("requisicao_marcar_entregue", args=[self.requisicao.id]))
+        resp = self._nao_aprovar()
+        self.assertEqual(resp.status_code, 409)
+
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_ENTREGUE)
+
+    def test_nao_aprovar_exige_post_e_permissao(self):
+        self.client.force_login(self.ti)
+        self.assertEqual(
+            self.client.get(reverse("requisicao_nao_aprovar", args=[self.requisicao.id])).status_code,
+            405,
+        )
+        self.client.logout()
+        self.client.force_login(self.common)
+        self.assertEqual(self._nao_aprovar().status_code, 403)
+        self.requisicao.refresh_from_db()
+        self.assertEqual(self.requisicao.status, RequisicaoContrato.STATUS_EM_COTACAO)
+
     def test_desaprovar_requires_post(self):
         self.client.force_login(self.ti)
         resp = self.client.get(reverse("requisicao_desaprovar", args=[self.requisicao.id]))

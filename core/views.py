@@ -2391,6 +2391,64 @@ def requisicao_desaprovar_view(request, requisicao_id: int):
     )
 
 
+@login_required
+@require_POST
+def requisicao_nao_aprovar_view(request, requisicao_id: int):
+    """Marca a requisicao como "Nao aprovada" (a compra foi recusada) e desfaz.
+
+    Alterna o estado, como a aprovacao do orcamento: se a requisicao ainda nao
+    foi recusada, entra em "Nao aprovada" (removendo a aprovacao de qualquer
+    orcamento, ja que nada sera comprado); se ja estiver recusada, volta para
+    "Esperando aprovacao". Apenas TI/admin; POST/CSRF. Bloqueado quando a
+    requisicao ja foi entregue (`409`). Cada acao registra um evento na timeline.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para acessar o modulo Contratos.", status=403)
+
+    requisicao = RequisicaoContrato.objects.filter(pk=requisicao_id).first()
+    if not requisicao:
+        return _json_error("Requisicao nao encontrada.", status=404)
+    if requisicao.status == RequisicaoContrato.STATUS_ENTREGUE:
+        return _json_error(
+            "Esta requisicao ja foi entregue; nao e possivel marcar como nao aprovada.", status=409
+        )
+
+    autor = _attendant_display(request.user)
+    recusar = requisicao.status != RequisicaoContrato.STATUS_NAO_APROVADA
+    with transaction.atomic():
+        if recusar:
+            requisicao.orcamentos.filter(aprovado=True).update(
+                aprovado=False, aprovado_em=None, aprovado_por=None
+            )
+            requisicao.status = RequisicaoContrato.STATUS_NAO_APROVADA
+            descricao = f"Requisicao marcada como NAO APROVADA por {autor}."
+        else:
+            requisicao.status = RequisicaoContrato.STATUS_EM_COTACAO
+            descricao = f"Requisicao reaberta por {autor}; voltou para {requisicao.status_label}."
+        requisicao.save(update_fields=["status", "atualizado_em"])
+        RequisicaoContratoEvento.registrar(
+            requisicao=requisicao,
+            usuario=request.user,
+            tipo=RequisicaoContratoEvento.TIPO_APROVACAO,
+            descricao=descricao,
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": (
+                "Requisicao marcada como nao aprovada."
+                if recusar
+                else "Requisicao reaberta; voltou para Esperando aprovacao."
+            ),
+            "requisicao_id": requisicao.id,
+            "requisicao_status": requisicao.status,
+            "requisicao_status_label": requisicao.status_label,
+            "nao_aprovada": recusar,
+        }
+    )
+
+
 def _serve_file(field_file, *, as_attachment: bool, filename: str):
     try:
         return FileResponse(field_file.open("rb"), as_attachment=as_attachment, filename=filename)

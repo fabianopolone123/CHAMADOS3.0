@@ -387,6 +387,10 @@ class RequisicaoContrato(models.Model):
     STATUS_ENTREGUE = "entregue"
     STATUS_FINALIZADA = "finalizada"
     STATUS_CANCELADA = "cancelada"
+    # Requisicao recusada: a compra nao foi aprovada e o assunto se encerra
+    # (diferente de "desaprovar", que so tira a aprovacao de um orcamento e
+    # devolve a requisicao para "Esperando aprovacao").
+    STATUS_NAO_APROVADA = "nao_aprovada"
     STATUS_CHOICES = [
         (STATUS_ABERTA, "Aberta"),
         (STATUS_EM_COTACAO, "Esperando aprovacao"),
@@ -394,6 +398,7 @@ class RequisicaoContrato(models.Model):
         (STATUS_ENTREGUE, "Entregue"),
         (STATUS_FINALIZADA, "Finalizada"),
         (STATUS_CANCELADA, "Cancelada"),
+        (STATUS_NAO_APROVADA, "Nao aprovada"),
     ]
 
     # Codigo sequencial (REQ-00049, ...). Continua a numeracao do sistema antigo,

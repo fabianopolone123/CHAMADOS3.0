@@ -263,7 +263,7 @@ Campos atuais:
 - `titulo`
 - `tipo` (choices: `fisica`, `digital`; default `fisica`)
 - `texto`
-- `status` (choices: `aberta`, `em_cotacao` = "Esperando aprovacao", `aguardando_entrega`, `entregue`, `finalizada`, `cancelada`; default `aberta`)
+- `status` (choices: `aberta`, `em_cotacao` = "Esperando aprovacao", `aguardando_entrega`, `entregue`, `finalizada`, `cancelada`, `nao_aprovada` = "Nao aprovada" (migration `0045`); default `aberta`)
 - `entregue_em` (datetime, opcional), `entregue_por` (FK usuario, `on_delete=SET_NULL`, related_name `requisicoes_entregues`)
 - `criado_por` (FK opcional para o usuario, `on_delete=SET_NULL`)
 - `criado_em`
@@ -273,6 +273,7 @@ Regras atuais:
 
 - So Atendente TI/Admin criam/veem requisicoes (validado no backend).
 - Fluxo: `aberta` -> (aprovar um orcamento) -> `aguardando_entrega` -> (marcar entregue) -> `entregue`. Aprovar um orcamento e exclusivo por requisicao. `codigo` gerado no `save()` (migration `0036`).
+- `nao_aprovada` e o desfecho de compra recusada (botao "Nao aprovar"): remove a aprovacao dos orcamentos e encerra o assunto; a mesma acao reabre a requisicao para `em_cotacao`. Nao pode ser aplicado depois de `entregue`.
 - Todo evento relevante (criacao, aprovacao/desaprovacao, entrega, edicao) e registrado em `RequisicaoContratoEvento`.
 
 ### RequisicaoContratoEvento

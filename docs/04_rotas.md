@@ -35,6 +35,7 @@
 | `/contratos/orcamentos/<id>/aprovar/` | POST | Aprova/desaprova (alterna) um orcamento; aprovacao exclusiva por requisicao, move a requisicao para "Aguardando entrega" (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/marcar-entregue/` | POST | Marca a requisicao como "Entregue" (exige orcamento aprovado); registra data/responsavel (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/requisicoes/<id>/desaprovar/` | POST | Desaprova a requisicao inteira: remove a aprovacao de TODOS os orcamentos e volta a requisicao para "Esperando aprovacao"; exige orcamento aprovado e e bloqueado se ja entregue (`409`) (apenas TI/admin; POST/CSRF) | Implementada |
+| `/contratos/requisicoes/<id>/nao-aprovar/` | POST | Marca a requisicao como "Nao aprovada" (compra recusada), removendo a aprovacao dos orcamentos; alterna (se ja recusada, reabre para "Esperando aprovacao"); bloqueado se ja entregue (`409`) (apenas TI/admin; POST/CSRF) | Implementada |
 | `/contratos/orcamentos/<id>/foto/` | GET | Serve a foto do orcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/suborcamentos/<id>/foto/` | GET | Serve a foto do suborcamento (inline, protegida) (apenas TI/admin) | Implementada |
 | `/contratos/documentos/orcamento/<id>/` | GET | Download protegido de documento de orcamento (apenas TI/admin) | Implementada |
