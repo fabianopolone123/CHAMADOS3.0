@@ -16,6 +16,7 @@ from .models import (
     ChamadoEvento,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
+    Computador,
     CofreAuditoria,
     CofreConfig,
     CofreCredencial,
@@ -2965,3 +2966,181 @@ class KasperskyTests(TestCase):
     def test_import_exige_post(self):
         self.client.force_login(self.ti)
         self.assertEqual(self.client.get(reverse("kaspersky_import")).status_code, 405)
+
+
+class ContatosTests(TestCase):
+    """Modulo Contatos: importacao do CSV do GLPI e a lista unificada
+    (colaborador + computador + e-mail + ramal + antivirus)."""
+
+    CABECALHO = (
+        '"Nome";"Usuario";"Localizacao";"Ultima atualizacao";"Status";"Fabricante";'
+        '"Tipo";"Modelo";"Componentes - Processador";"Sistema operacional - Nome"'
+    )
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        Ramal.objects.all().delete()  # o banco de teste vem com o seed de ramais
+
+    def _linha(self, nome, usuario, local="TI", tipo="Desktop", modelo="OptiPlex 3090",
+               atualizado="2026-07-27 07:54", status="Ativo", fabricante="Dell Inc."):
+        campos = [nome, usuario, local, atualizado, status, fabricante, tipo, modelo,
+                  "Intel(R) Core(TM) i5", "Microsoft Windows 11 Pro"]
+        return ";".join(f'"{c}"' for c in campos)
+
+    def _importar(self, linhas):
+        conteudo = "\r\n".join([self.CABECALHO] + linhas)
+        arquivo = SimpleUploadedFile("glpi.csv", conteudo.encode("utf-8-sig"), content_type="text/csv")
+        return self.client.post(reverse("contatos_import"), {"arquivo": arquivo})
+
+    def test_import_cria_computadores(self):
+        self.client.force_login(self.ti)
+        resp = self._importar([
+            self._linha("CPU-010", "Barbosa Gilmar", local="Container Centro Servico"),
+            self._linha("NOT-362", "Generoso Fabio", tipo="Notebook", modelo="Vostro 3520"),
+        ])
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Computador.objects.count(), 2)
+
+        pc = Computador.objects.get(nome="CPU-010")
+        self.assertEqual(pc.usuario_glpi, "Barbosa Gilmar")
+        self.assertEqual(pc.localizacao, "Container Centro Servico")
+        self.assertEqual(pc.modelo, "OptiPlex 3090")
+        self.assertEqual(pc.tipo_slug, "desktop")
+        self.assertIsNotNone(pc.atualizado_glpi)
+        self.assertEqual(pc.atualizado_glpi_display, "27/07/2026 07:54")
+        self.assertEqual(Computador.objects.get(nome="NOT-362").tipo_slug, "notebook")
+
+    def test_import_vincula_colaborador_mesmo_com_nome_invertido(self):
+        # No GLPI o usuario vem como "Sobrenome Nome"; no ramal, "Nome Sobrenome".
+        ana = Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras", ramal="101")
+        tamara = Ramal.objects.create(colaborador="Tamara Garbuio", setor="Qualidade")
+        self.client.force_login(self.ti)
+        self._importar([
+            self._linha("CPU-246", "Gabriele Ana"),              # nome invertido
+            self._linha("CPU-300", "Garbuio Tamara Cristiane"),  # nome do meio a mais
+            self._linha("CPU-999", "Fulano Que Nao Existe"),     # sem correspondencia
+        ])
+        self.assertEqual(Computador.objects.get(nome="CPU-246").ramal, ana)
+        self.assertEqual(Computador.objects.get(nome="CPU-300").ramal, tamara)
+        self.assertIsNone(Computador.objects.get(nome="CPU-999").ramal)
+
+    def test_import_atualiza_e_mantem_vinculo_manual(self):
+        certo = Ramal.objects.create(colaborador="Maria Souza", setor="RH")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-500", "Nome Que Nao Casa")])
+        pc = Computador.objects.get(nome="CPU-500")
+        self.assertIsNone(pc.ramal)
+
+        # Vinculo feito a mao na tela...
+        self.client.post(reverse("computador_update", args=[pc.id]), {"ramal": str(certo.id)})
+        pc.refresh_from_db()
+        self.assertEqual(pc.ramal, certo)
+
+        # ... e mantido na proxima importacao, que atualiza o resto.
+        self._importar([self._linha("CPU-500", "Nome Que Nao Casa", local="Almoxarifado")])
+        pc.refresh_from_db()
+        self.assertEqual(pc.ramal, certo)
+        self.assertEqual(pc.localizacao, "Almoxarifado")
+        self.assertEqual(Computador.objects.count(), 1)
+
+    def test_import_marca_quem_saiu_do_arquivo(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-1", "A B"), self._linha("CPU-2", "C D")])
+        self._importar([self._linha("CPU-1", "A B")])
+        self.assertTrue(Computador.objects.get(nome="CPU-1").no_ultimo_import)
+        self.assertFalse(Computador.objects.get(nome="CPU-2").no_ultimo_import)
+
+    def test_import_arquivo_invalido(self):
+        self.client.force_login(self.ti)
+        arquivo = SimpleUploadedFile("x.csv", b"coluna;outra\n1;2", content_type="text/csv")
+        self.client.post(reverse("contatos_import"), {"arquivo": arquivo})
+        self.assertEqual(Computador.objects.count(), 0)
+
+    def test_lista_unifica_computador_email_ramal_e_antivirus(self):
+        ramal = Ramal.objects.create(
+            colaborador="Fabio Generoso", setor="TI", ramal="200",
+            telefone="(19) 99999-0000", email="fabio@empresa.com",
+        )
+        self.client.force_login(self.ti)
+        self._importar([self._linha("NOT-362", "Generoso Fabio", tipo="Notebook")])
+        # O antivirus e cruzado pelo NOME do computador.
+        KasperskyDispositivo.objects.create(
+            nome="NOT-362", versao_aplicativo="12.12.0.522", no_ultimo_export=True
+        )
+
+        resp = self.client.get(reverse("contatos_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        contato = next(c for c in resp.context["contatos"] if c["nome"] == "Fabio Generoso")
+        self.assertEqual(contato["computadores_label"], "NOT-362")
+        self.assertEqual(contato["email"], "fabio@empresa.com")
+        self.assertEqual(contato["ramal"], "200")
+        self.assertEqual(contato["telefone"], "(19) 99999-0000")
+        self.assertTrue(contato["tem_antivirus"])
+        self.assertEqual(contato["setor"], "TI")
+        self.assertEqual(ramal.computadores.count(), 1)
+
+    def test_computador_sem_antivirus_aparece_sem_protecao(self):
+        Ramal.objects.create(colaborador="Joao Lima", setor="PCP")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-777", "Lima Joao")])
+        KasperskyDispositivo.objects.create(
+            nome="CPU-777", versao_aplicativo="", no_ultimo_export=True  # so o agente
+        )
+        resp = self.client.get(reverse("contatos_dashboard"))
+        contato = next(c for c in resp.context["contatos"] if c["nome"] == "Joao Lima")
+        self.assertTrue(contato["tem_computador"])
+        self.assertFalse(contato["tem_antivirus"])
+
+    def test_usuario_so_do_glpi_entra_na_lista(self):
+        Ramal.objects.create(colaborador="Alguem Com Ramal", setor="TI")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-800", "Pessoa Fora Da Lista", local="Pintura")])
+
+        resp = self.client.get(reverse("contatos_dashboard"))
+        nomes = [c["nome"] for c in resp.context["contatos"]]
+        self.assertIn("Pessoa Fora Da Lista", nomes)
+        avulso = next(c for c in resp.context["contatos"] if c["nome"] == "Pessoa Fora Da Lista")
+        self.assertFalse(avulso["tem_ramal"])
+        self.assertEqual(avulso["setor"], "Pintura")
+        self.assertEqual(resp.context["sem_ramal_cadastrado"], 1)
+        self.assertEqual(resp.context["computadores_sem_dono"], 1)
+        # Quem tem ramal e nao tem maquina tambem aparece, como "sem computador".
+        self.assertEqual(resp.context["sem_computador"], 1)
+
+    def test_resumo_da_tela(self):
+        Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras", email="ana@empresa.com")
+        Ramal.objects.create(colaborador="Sem Maquina", setor="RH")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-246", "Gabriele Ana")])
+
+        resp = self.client.get(reverse("contatos_dashboard"))
+        self.assertEqual(resp.context["total_contatos"], 2)
+        self.assertEqual(resp.context["com_computador"], 1)
+        self.assertEqual(resp.context["sem_computador"], 1)
+        self.assertEqual(resp.context["com_email"], 1)
+        self.assertEqual(resp.context["total_computadores"], 1)
+
+    def test_desvincular_computador(self):
+        ramal = Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-246", "Gabriele Ana")])
+        pc = Computador.objects.get(nome="CPU-246")
+        self.assertEqual(pc.ramal, ramal)
+
+        self.client.post(reverse("computador_update", args=[pc.id]), {"ramal": ""})
+        pc.refresh_from_db()
+        self.assertIsNone(pc.ramal)
+
+    def test_permissoes(self):
+        self.client.force_login(self.common)
+        self.assertNotEqual(self.client.get(reverse("contatos_dashboard")).status_code, 200)
+        self._importar([self._linha("CPU-1", "A B")])
+        self.assertEqual(Computador.objects.count(), 0)
+
+        self.client.force_login(self.ti)
+        self.assertEqual(self.client.get(reverse("contatos_dashboard")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("contatos_import")).status_code, 405)

@@ -14,6 +14,7 @@ from .models import (
     EmailConfig,
     EnderecoIP,
     FuturaDigital,
+    Computador,
     KasperskyConfig,
     KasperskyDispositivo,
     Licenca,
@@ -306,3 +307,11 @@ class KasperskyDispositivoAdmin(admin.ModelAdmin):
 class KasperskyConfigAdmin(admin.ModelAdmin):
     list_display = ("__str__", "licencas_contratadas", "atualizado_em")
     readonly_fields = ("atualizado_em",)
+
+
+@admin.register(Computador)
+class ComputadorAdmin(admin.ModelAdmin):
+    list_display = ("nome", "usuario_glpi", "ramal", "tipo", "modelo", "localizacao", "no_ultimo_import")
+    list_filter = ("tipo", "localizacao", "no_ultimo_import")
+    search_fields = ("nome", "usuario_glpi", "modelo", "localizacao")
+    readonly_fields = ("criado_em", "atualizado_em")

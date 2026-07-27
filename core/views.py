@@ -49,6 +49,7 @@ from .models import (
     EmprestimoTI,
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
+    Computador,
     InsumoTI,
     KasperskyConfig,
     KasperskyDispositivo,
@@ -5615,3 +5616,351 @@ def kaspersky_licencas_view(request):
     config.save(update_fields=["licencas_contratadas", "atualizado_em"])
     messages.success(request, f"Licencas contratadas atualizadas para {total}.")
     return redirect("kaspersky_dashboard")
+
+
+# ----------------------------------------------------------------------------
+# Contatos: pessoa + computador (GLPI) + e-mail + ramal, em uma unica lista
+# ----------------------------------------------------------------------------
+
+# Preposicoes e abreviacoes ignoradas ao comparar nomes de pessoas.
+_NOME_IGNORAR = {"de", "da", "do", "das", "dos", "e", "ap", "jr"}
+
+
+def _tokens_nome(nome: str) -> set:
+    """Palavras significativas de um nome, sem acento e minusculas.
+
+    Usado para casar o usuario do GLPI ("Gabriele Ana") com o colaborador do
+    ramal ("Ana Gabriele"): a ordem nao importa, so o conjunto de palavras.
+    """
+    import unicodedata
+
+    texto = unicodedata.normalize("NFKD", (nome or "").strip().lower())
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    texto = texto.replace(".", " ").replace(",", " ")
+    return {p for p in texto.split() if len(p) > 1 and p not in _NOME_IGNORAR}
+
+
+def _ramal_por_nome(nome: str, ramais=None):
+    """Encontra o colaborador (Ramal) correspondente ao nome do usuario do GLPI.
+
+    1. Conjunto de palavras identico -> match direto.
+    2. Senao, um nome contido no outro (ex.: "Tamara Garbuio" x "Garbuio Tamara
+       Cristiane") com pelo menos 2 palavras em comum, e apenas UM candidato.
+    Em caso de duvida (nenhum ou mais de um candidato) devolve None e o vinculo
+    fica para ser feito a mao na tela.
+    """
+    alvo = _tokens_nome(nome)
+    if len(alvo) < 2:
+        return None
+    if ramais is None:
+        ramais = [(r, _tokens_nome(r.colaborador)) for r in Ramal.objects.exclude(colaborador="")]
+
+    exatos = [r for r, tokens in ramais if tokens == alvo]
+    if len(exatos) == 1:
+        return exatos[0]
+    if exatos:
+        return None  # homonimos: nao adivinha
+
+    candidatos = [
+        r
+        for r, tokens in ramais
+        if len(tokens & alvo) >= 2 and (tokens <= alvo or alvo <= tokens)
+    ]
+    return candidatos[0] if len(candidatos) == 1 else None
+
+
+def _parse_data_glpi(valor: str):
+    """Le a data do CSV do GLPI ("2026-07-27 07:54")."""
+    from datetime import datetime
+
+    texto = (valor or "").strip()
+    if not texto:
+        return None
+    for formato in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M", "%Y-%m-%d"):
+        try:
+            data = datetime.strptime(texto, formato)
+        except ValueError:
+            continue
+        if timezone.is_naive(data):
+            data = timezone.make_aware(data, timezone.get_current_timezone())
+        return data
+    return None
+
+
+@ti_required
+def contatos_dashboard_view(request):
+    """Lista unificada de contatos: colaborador + computador + e-mail + ramal.
+
+    A base de pessoas sao os Ramais (lista de contatos interna); os usuarios que
+    so existem no GLPI entram no fim, marcados como sem ramal cadastrado.
+    """
+    computadores = list(Computador.objects.select_related("ramal").all())
+    # O antivirus e cruzado pelo NOME do computador (mesma nomenclatura do GLPI).
+    com_antivirus = {
+        d.nome
+        for d in KasperskyDispositivo.objects.filter(no_ultimo_export=True)
+        if d.tem_antivirus
+    }
+
+    por_ramal: dict[int, list] = {}
+    sem_dono = []
+    for pc in computadores:
+        if pc.ramal_id:
+            por_ramal.setdefault(pc.ramal_id, []).append(pc)
+        else:
+            sem_dono.append(pc)
+
+    def _linha_pc(pc):
+        return {
+            "id": pc.id,
+            "nome": pc.nome,
+            "tipo": pc.tipo or "-",
+            "tipo_slug": pc.tipo_slug,
+            "modelo": pc.modelo or "-",
+            "fabricante": pc.fabricante or "-",
+            "processador": pc.processador or "-",
+            "sistema": pc.sistema_operacional or "-",
+            "localizacao": pc.localizacao or "-",
+            "status": pc.status or "-",
+            "usuario_glpi": pc.usuario_glpi or "-",
+            "ramal_id": pc.ramal_id or "",
+            "atualizado": pc.atualizado_glpi_display,
+            "antivirus": pc.nome in com_antivirus,
+            "no_ultimo_import": pc.no_ultimo_import,
+        }
+
+    contatos = []
+    for ramal in Ramal.objects.select_related("conta_email").all():
+        maquinas = [_linha_pc(pc) for pc in por_ramal.get(ramal.id, [])]
+        contatos.append(
+            {
+                "nome": ramal.colaborador or "(sem nome)",
+                "setor": ramal.setor or (maquinas[0]["localizacao"] if maquinas else "") or "Sem setor",
+                "email": ramal.email or (ramal.conta_email.email if ramal.conta_email_id else ""),
+                "ramal": ramal.ramal or "",
+                "telefone": ramal.telefone or "",
+                "computadores": maquinas,
+                "tem_ramal": True,
+            }
+        )
+
+    # Maquinas sem dono: as que tem usuario no GLPI viram um contato (pessoa que
+    # ainda nao esta na lista de ramais); as sem usuario nenhum sao agrupadas em
+    # uma linha so, para nao poluir a lista com contatos falsos.
+    sem_usuario = [pc for pc in sem_dono if not pc.usuario_glpi.strip()]
+    for pc in sem_dono:
+        if pc in sem_usuario:
+            continue
+        contatos.append(
+            {
+                "nome": pc.usuario_glpi,
+                "setor": pc.localizacao or "Sem setor",
+                "email": "",
+                "ramal": "",
+                "telefone": "",
+                "computadores": [_linha_pc(pc)],
+                "tem_ramal": False,
+            }
+        )
+    if sem_usuario:
+        contatos.append(
+            {
+                "nome": "(maquinas sem usuario no GLPI)",
+                "setor": "Sem setor",
+                "email": "",
+                "ramal": "",
+                "telefone": "",
+                "computadores": [_linha_pc(pc) for pc in sem_usuario],
+                "tem_ramal": False,
+            }
+        )
+
+    for c in contatos:
+        c["computadores_label"] = ", ".join(pc["nome"] for pc in c["computadores"]) or "-"
+        c["tem_computador"] = bool(c["computadores"])
+        c["tem_antivirus"] = any(pc["antivirus"] for pc in c["computadores"])
+
+    contatos.sort(key=lambda c: (not c["tem_ramal"], c["nome"].lower()))
+
+    setores = sorted({c["setor"] for c in contatos}, key=lambda s: (s == "Sem setor", s.lower()))
+    ultima_importacao = max((pc.importado_em for pc in computadores if pc.importado_em), default=None)
+
+    context = {
+        "page_title": "Contatos",
+        "contatos": contatos,
+        "total_contatos": len(contatos),
+        "com_computador": sum(1 for c in contatos if c["tem_computador"]),
+        "sem_computador": sum(1 for c in contatos if not c["tem_computador"]),
+        "com_email": sum(1 for c in contatos if c["email"]),
+        "com_ramal": sum(1 for c in contatos if c["ramal"]),
+        "sem_ramal_cadastrado": sum(1 for c in contatos if not c["tem_ramal"]),
+        "total_computadores": len(computadores),
+        "computadores_sem_dono": len(sem_dono),
+        "computadores_sem_usuario": len(sem_usuario),
+        "setores": setores,
+        "ramais": Ramal.objects.exclude(colaborador="").order_by("colaborador"),
+        "ultima_importacao": (
+            timezone.localtime(ultima_importacao).strftime("%d/%m/%Y %H:%M") if ultima_importacao else ""
+        ),
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/contatos.html", context)
+
+
+@login_required
+@require_POST
+def contatos_import_view(request):
+    """Importa o CSV de computadores exportado do GLPI (upsert pelo nome).
+
+    O arquivo vem separado por `;` (aceita `,` e TAB) com as colunas Nome,
+    Usuario, Localizacao, Ultima atualizacao, Status, Fabricante, Tipo, Modelo,
+    Componentes - Processador e Sistema operacional - Nome. O vinculo com o
+    colaborador e resolvido pelo nome; vinculos ja feitos a mao sao mantidos.
+    """
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para importar computadores.")
+        return redirect("contatos_dashboard")
+
+    arquivo = request.FILES.get("arquivo")
+    if not arquivo:
+        messages.error(request, "Selecione o arquivo CSV exportado do GLPI.")
+        return redirect("contatos_dashboard")
+
+    raw = arquivo.read()
+    texto = None
+    for encoding in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            texto = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        messages.error(request, "Nao foi possivel ler o arquivo. Envie o CSV exportado do GLPI.")
+        return redirect("contatos_dashboard")
+
+    primeira = texto.splitlines()[0] if texto.strip() else ""
+    delimitador = ";" if ";" in primeira else ("\t" if "\t" in primeira else ",")
+    leitor = csv.reader(io.StringIO(texto), delimiter=delimitador)
+    try:
+        cabecalhos = next(leitor)
+    except StopIteration:
+        messages.error(request, "O arquivo esta vazio.")
+        return redirect("contatos_dashboard")
+
+    # As colunas sao localizadas pelo cabecalho normalizado (sem acento).
+    indices = {}
+    for indice, titulo in enumerate(cabecalhos):
+        chave = _normalizar_cabecalho(titulo)
+        if chave.startswith("nome") and "sistema" not in chave and "computador" not in chave:
+            indices.setdefault("nome", indice)
+        elif chave.startswith("usuario"):
+            indices["usuario"] = indice
+        elif chave.startswith("localizacao"):
+            indices["localizacao"] = indice
+        elif chave.startswith("ultima atualizacao"):
+            indices["atualizado"] = indice
+        elif chave.startswith("status"):
+            indices["status"] = indice
+        elif chave.startswith("fabricante"):
+            indices["fabricante"] = indice
+        elif chave.startswith("tipo"):
+            indices["tipo"] = indice
+        elif chave.startswith("modelo"):
+            indices["modelo"] = indice
+        elif "processador" in chave:
+            indices["processador"] = indice
+        elif "sistema operacional" in chave:
+            indices["sistema"] = indice
+
+    if "nome" not in indices:
+        messages.error(
+            request,
+            "Arquivo invalido: nao encontrei a coluna 'Nome'. Envie o CSV exportado do GLPI.",
+        )
+        return redirect("contatos_dashboard")
+
+    def _campo(partes, chave):
+        indice = indices.get(chave)
+        if indice is None or indice >= len(partes):
+            return ""
+        return (partes[indice] or "").strip()
+
+    agora = timezone.now()
+    ramais = [(r, _tokens_nome(r.colaborador)) for r in Ramal.objects.exclude(colaborador="")]
+    criados = atualizados = ignorados = vinculados = 0
+    vistos = []
+
+    with transaction.atomic():
+        for partes in leitor:
+            if not any((p or "").strip() for p in partes):
+                continue
+            nome = _campo(partes, "nome")
+            if not nome:
+                ignorados += 1
+                continue
+
+            usuario = _campo(partes, "usuario")
+            defaults = {
+                "usuario_glpi": usuario,
+                "localizacao": _campo(partes, "localizacao"),
+                "status": _campo(partes, "status"),
+                "fabricante": _campo(partes, "fabricante"),
+                "tipo": _campo(partes, "tipo"),
+                "modelo": _campo(partes, "modelo"),
+                "processador": _campo(partes, "processador"),
+                "sistema_operacional": _campo(partes, "sistema"),
+                "atualizado_glpi": _parse_data_glpi(_campo(partes, "atualizado")),
+                "no_ultimo_import": True,
+                "importado_em": agora,
+            }
+            computador, criado = Computador.objects.update_or_create(nome=nome, defaults=defaults)
+            vistos.append(nome)
+            criados += 1 if criado else 0
+            atualizados += 0 if criado else 1
+
+            # Vincula ao colaborador pelo nome do usuario do GLPI. Um vinculo ja
+            # existente e mantido (pode ter sido ajustado a mao).
+            if not computador.ramal_id and usuario:
+                ramal = _ramal_por_nome(usuario, ramais)
+                if ramal:
+                    computador.ramal = ramal
+                    computador.save(update_fields=["ramal", "atualizado_em"])
+                    vinculados += 1
+
+        fora = Computador.objects.exclude(nome__in=vistos).filter(no_ultimo_import=True)
+        removidos = fora.count()
+        fora.update(no_ultimo_import=False)
+
+    partes_msg = [f"{criados} novo(s)", f"{atualizados} atualizado(s)"]
+    if vinculados:
+        partes_msg.append(f"{vinculados} vinculado(s) a colaboradores")
+    if removidos:
+        partes_msg.append(f"{removidos} fora do arquivo")
+    if ignorados:
+        partes_msg.append(f"{ignorados} linha(s) ignorada(s)")
+    messages.success(request, "Importacao concluida: " + ", ".join(partes_msg) + ".")
+    return redirect("contatos_dashboard")
+
+
+@login_required
+@require_POST
+def computador_update_view(request, computador_id: int):
+    """Ajusta a mao o colaborador dono do computador (quando o nome do GLPI nao
+    casa com a lista de ramais)."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar computadores.")
+        return redirect("contatos_dashboard")
+
+    computador = get_object_or_404(Computador, pk=computador_id)
+    ramal_id = (request.POST.get("ramal") or "").strip()
+    computador.ramal = Ramal.objects.filter(pk=ramal_id).first() if ramal_id.isdigit() else None
+    computador.save(update_fields=["ramal", "atualizado_em"])
+
+    if computador.ramal:
+        messages.success(
+            request, f"{computador.nome} vinculado a {computador.ramal.colaborador}."
+        )
+    else:
+        messages.success(request, f"{computador.nome} ficou sem colaborador vinculado.")
+    return redirect("contatos_dashboard")

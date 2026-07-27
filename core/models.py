@@ -1947,3 +1947,67 @@ class KasperskyDispositivo(models.Model):
         if not self.ultima_conexao:
             return "-"
         return timezone.localtime(self.ultima_conexao).strftime("%d/%m/%Y %H:%M")
+
+
+class Computador(models.Model):
+    """Computador do inventario do GLPI (o "nome do CPU" que a pessoa usa).
+
+    A lista e atualizada pelo CSV exportado do GLPI (upsert pelo `nome`). O
+    vinculo com o colaborador (`ramal`) e resolvido pelo nome do usuario do GLPI
+    e pode ser ajustado a mao — e ele que amarra computador + e-mail + ramal na
+    tela de Contatos. O mesmo `nome` e a chave usada pelo modulo Kaspersky
+    (CPU-010, NOT-362, ...), o que permite ver quem esta com antivirus.
+    """
+
+    nome = models.CharField(max_length=120, unique=True)
+    usuario_glpi = models.CharField(max_length=180, blank=True, default="")
+    ramal = models.ForeignKey(
+        "Ramal",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="computadores",
+    )
+    localizacao = models.CharField(max_length=180, blank=True, default="")
+    status = models.CharField(max_length=60, blank=True, default="")
+    fabricante = models.CharField(max_length=120, blank=True, default="")
+    tipo = models.CharField(max_length=60, blank=True, default="")
+    modelo = models.CharField(max_length=180, blank=True, default="")
+    processador = models.CharField(max_length=180, blank=True, default="")
+    sistema_operacional = models.CharField(max_length=180, blank=True, default="")
+    atualizado_glpi = models.DateTimeField(null=True, blank=True)
+    no_ultimo_import = models.BooleanField(default=True)
+    importado_em = models.DateTimeField(null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Computador (GLPI)"
+        verbose_name_plural = "Computadores (GLPI)"
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @property
+    def tipo_slug(self) -> str:
+        """notebook / desktop / outro, para o badge da tela."""
+        texto = (self.tipo or "").strip().lower()
+        if texto.startswith("note") or texto.startswith("portable") or texto.startswith("laptop"):
+            return "notebook"
+        if texto.startswith("desktop") or texto.startswith("torre"):
+            return "desktop"
+        return "outro"
+
+    @property
+    def usuario_display(self) -> str:
+        """Nome do colaborador vinculado ou, na falta, o usuario do GLPI."""
+        if self.ramal_id and self.ramal.colaborador:
+            return self.ramal.colaborador
+        return self.usuario_glpi or "Sem usuario"
+
+    @property
+    def atualizado_glpi_display(self) -> str:
+        if not self.atualizado_glpi:
+            return "-"
+        return timezone.localtime(self.atualizado_glpi).strftime("%d/%m/%Y %H:%M")

@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e nove modelos persistidos:
+O projeto possui quarenta modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -54,6 +54,10 @@ Modulo Licencas:
 Modulo IPs:
 
 - `EnderecoIP`
+
+Modulo Contatos:
+
+- `Computador`
 
 Modulo Kaspersky:
 
@@ -592,6 +596,17 @@ Regra de cobranca (aplicada no cadastro/edicao):
 - `valor_pago = franquia_valor + copias_excedentes * valor_copia_excedente + copias_cor * valor_copia_cor`.
 - As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
 - So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb` (producao P&B, so informativa), `*_display`. As faturas ja cadastradas NAO sao recalculadas por uma mudanca de formula (guardam o valor efetivamente pago); o recalculo so acontece ao salvar/editar a fatura.
+
+### Computador
+
+Computador do inventario do GLPI — o "nome do CPU" que a pessoa usa (migration `0047`). E a ponte entre os modulos: o mesmo `nome` e a chave do Kaspersky e o `ramal` liga a pessoa ao e-mail e ao telefone.
+
+- `nome` (unico; chave da importacao) e `usuario_glpi` (nome do usuario como vem do GLPI, no formato "Sobrenome Nome")
+- `ramal` (FK opcional para `Ramal`, `on_delete=SET_NULL`, related_name `computadores`) — resolvido pelo nome na importacao e ajustavel a mao
+- Dados do inventario: `localizacao`, `status`, `fabricante`, `tipo`, `modelo`, `processador`, `sistema_operacional`, `atualizado_glpi`
+- Controle da importacao: `no_ultimo_import`, `importado_em`, `criado_em`, `atualizado_em`
+
+Propriedades: `tipo_slug` (`notebook`/`desktop`/`outro`), `usuario_display` (colaborador vinculado ou o usuario do GLPI) e `atualizado_glpi_display`.
 
 ### KasperskyDispositivo
 

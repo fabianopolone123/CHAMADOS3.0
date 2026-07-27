@@ -180,6 +180,19 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. Qualquer edicao **regera o termo em PDF** e **descarta o termo assinado anterior** (o conteudo mudou). Se ainda houver equipamento em posse do colaborador, o status volta para "Aguardando documentacao assinada" (para colher a nova assinatura); se todos os equipamentos ficarem devolvidos, o status passa para "Devolvido". Assim como na criacao, e possivel aplicar a assinatura no novo termo informando a senha de autorizacao.
 11. Toda a validacao (permissao, senha da assinatura, obrigatoriedade de equipamento e datas) e feita no backend.
 
+## Regras atuais do modulo Contatos
+
+1. O modulo Contatos (`/contatos/`) e acessivel apenas para Administrador e Atendente TI, com a permissao validada no backend.
+2. A tela mostra **uma linha por pessoa** juntando o que hoje esta espalhado: **colaborador, setor, computador(es) (o "nome do CPU"), e-mail, ramal, telefone e antivirus**.
+3. A base de pessoas e a lista de **Ramais**; o e-mail vem do proprio ramal (ou da `ContaEmail` vinculada), e o telefone/ramal tambem.
+4. Os computadores vem do **CSV exportado do GLPI** (colunas Nome, Usuario, Localizacao, Ultima atualizacao, Status, Fabricante, Tipo, Modelo, Processador e Sistema operacional; separador `;`, `,` ou TAB). A importacao e um **upsert pelo nome do computador**.
+5. O vinculo computador -> colaborador e resolvido **pelo nome do usuario do GLPI**, comparando o **conjunto de palavras** sem acento: resolve a inversao ("Gabriele Ana" x "Ana Gabriele") e nomes do meio a mais ("Garbuio Tamara Cristiane" x "Tamara Garbuio"), exigindo pelo menos 2 palavras em comum e **um unico** candidato. Na duvida, o computador fica sem dono e o vinculo e feito a mao clicando no computador na tela.
+6. **Vinculos feitos a mao nunca sao desfeitos pela importacao**; apenas os computadores ainda sem dono sao vinculados automaticamente.
+7. O **antivirus** vem do modulo Kaspersky, cruzado pelo **nome do computador** (a nomenclatura e a mesma: CPU-010, NOT-362, ...). A pessoa aparece como "Protegido" quando alguma maquina dela tem o antivirus instalado e "Sem antivirus" quando tem maquina mas nenhuma protegida.
+8. Pessoas que aparecem no GLPI mas **nao estao na lista de ramais** entram no fim da lista com a etiqueta "so no GLPI". As maquinas **sem usuario no GLPI** nao viram contatos: sao agrupadas em uma linha unica "(maquinas sem usuario no GLPI)".
+9. Computadores que nao vierem na ultima importacao nao sao apagados: ficam marcados (aviso no detalhe) para nao sumir historico.
+10. A tela tem busca (pessoa, computador, setor, e-mail, ramal, telefone) e filtros por situacao (Com computador, Sem computador, Computador sem antivirus, Sem ramal cadastrado) e por setor. Clicar no computador abre o detalhe com os dados do GLPI, a situacao do antivirus e a troca do colaborador vinculado.
+
 ## Regras atuais do modulo Kaspersky
 
 1. O modulo Kaspersky (`/kaspersky/`) e acessivel apenas para Administrador e Atendente TI; todas as rotas validam a permissao no backend (usuario comum e redirecionado e nao consegue importar, editar nem excluir).

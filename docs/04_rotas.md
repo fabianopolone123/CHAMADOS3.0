@@ -76,6 +76,9 @@
 | `/ips/criar/` | POST | Cadastra um IP (categoria, endereco unico, nome, fabricante, MAC, acesso, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/ips/<id>/editar/` | POST | Edita um IP existente (apenas TI/admin) | Implementada |
 | `/ips/<id>/excluir/` | POST | Exclui um IP (apenas TI/admin) | Implementada |
+| `/contatos/` | GET | Lista unificada de contatos: colaborador + computador(es) do GLPI + e-mail + ramal/telefone + antivirus (cruzado com o Kaspersky pelo nome do computador), com busca e filtros por situacao e setor (apenas TI/admin) | Implementada |
+| `/contatos/importar/` | POST | Importa o CSV de computadores exportado do GLPI (upsert pelo nome do computador; vincula ao colaborador pelo nome do usuario e mantem os vinculos feitos a mao) (apenas TI/admin) | Implementada |
+| `/contatos/computadores/<id>/` | POST | Vincula/desvincula o computador a um colaborador da lista de ramais (apenas TI/admin) | Implementada |
 | `/kaspersky/` | GET | Dispositivos com antivirus: cartoes de licencas (contratadas/em uso/disponiveis), abas Dispositivos e Colaboradores, busca e filtros por situacao e setor (apenas TI/admin) | Implementada |
 | `/kaspersky/importar/` | POST | Importa o arquivo do botao "Exportar" do portal (TSV/CSV, upsert pelo nome do dispositivo; preserva setor/responsavel/observacoes) (apenas TI/admin) | Implementada |
 | `/kaspersky/licencas/` | POST | Atualiza a quantidade de licencas contratadas (apenas TI/admin) | Implementada |

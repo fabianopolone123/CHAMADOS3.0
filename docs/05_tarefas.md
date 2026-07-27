@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Criado o modulo "Contatos" (apenas TI/admin): lista unificada de colaborador + computador (CPU) + e-mail + ramal/telefone + antivirus. Importa o CSV de computadores do GLPI (upsert pelo nome, vinculo automatico ao colaborador pelo nome invertido/parcial, mantendo os vinculos manuais) e cruza o antivirus com o Kaspersky pelo nome do computador. Model `Computador` (migration `0047`), rotas sob `/contatos/`, testes `ContatosTests`
 - Criado o modulo "Kaspersky" (apenas TI/admin): importacao do export.txt do portal (upsert pelo nome, preservando setor/responsavel), controle das licencas (contratadas x em uso x disponiveis), filtros por situacao e setor, e aba "Colaboradores" cruzando a lista de ramais para ver quem esta com antivirus e quem nao esta. Models `KasperskyDispositivo`/`KasperskyConfig` (migration `0046`), rotas sob `/kaspersky/`, testes `KasperskyTests`
 - Futura Digital: corrigida a regra de cobranca (`excedentes = producao total - franquia`; as coloridas contam na franquia e ainda pagam a taxa de cor), batendo com a NF; campo renomeado para "Producao total do mes" com ajuda e o calculo ao vivo detalhando cada linha. Faturas antigas nao foram recalculadas
 - Requisicoes: botao "Nao aprovar" no detalhe (TI/admin) que marca a requisicao como "Nao aprovada" (novo status, migration `0045`), removendo a aprovacao dos orcamentos e registrando na timeline; alterna para "Reabrir requisicao" (volta para "Esperando aprovacao") e e bloqueado apos a entrega. Rota `requisicao_nao_aprovar`; testes em `OrcamentoAprovacaoTests`
