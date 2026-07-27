@@ -627,8 +627,12 @@
     gap: 0.5rem;
 }
 
-/* Botao "Copiar p/ WhatsApp" fica destacado a esquerda do rodape */
+/* Os botoes de copiar (WhatsApp e e-mail) ficam juntos, a esquerda do rodape. */
 .requisicao-detail__whatsapp {
+    margin-right: 0;
+}
+
+.requisicao-detail__email {
     margin-right: auto;
 }
 

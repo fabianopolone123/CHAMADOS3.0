@@ -717,6 +717,303 @@
 
     detailModalEl?.querySelector("[data-copy-whatsapp]")?.addEventListener("click", copyRequisicaoWhatsapp);
 
+    // ------------------------------------------------------------------
+    // Copiar a requisicao para o e-mail (HTML formatado, com as fotos)
+    // ------------------------------------------------------------------
+    // Fotos maiores que isso nao entram no corpo do e-mail (viraria uma mensagem
+    // gigante); no lugar delas fica um aviso de que a foto esta no sistema.
+    const MAX_FOTO_BYTES = 3 * 1024 * 1024;
+
+    function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        }[c]));
+    }
+
+    // Baixa a foto (rota protegida, mesma sessao) e devolve como data URI, para
+    // a imagem ir junto no corpo do e-mail em vez de virar um link quebrado para
+    // quem esta fora do sistema.
+    async function fetchFotoDataUrl(url) {
+        try {
+            const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+            if (!response.ok) {
+                return "";
+            }
+            const blob = await response.blob();
+            if (!blob.type.startsWith("image/") || blob.size > MAX_FOTO_BYTES) {
+                return "";
+            }
+            return await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ""));
+                reader.onerror = () => resolve("");
+                reader.readAsDataURL(blob);
+            });
+        } catch (error) {
+            return "";
+        }
+    }
+
+    // Baixa todas as fotos da requisicao de uma vez (orcamentos e suborcamentos)
+    // e devolve um mapa url -> data URI. Foto que falhar fica de fora.
+    async function coletarFotos(data) {
+        const urls = [];
+        (data.orcamentos || []).forEach((orc) => {
+            if (orc.foto_url) urls.push(orc.foto_url);
+            (orc.suborcamentos || []).forEach((sub) => {
+                if (sub.foto_url) urls.push(sub.foto_url);
+            });
+        });
+        const fotos = new Map();
+        const resultados = await Promise.all(urls.map(fetchFotoDataUrl));
+        urls.forEach((url, index) => {
+            if (resultados[index]) {
+                fotos.set(url, resultados[index]);
+            }
+        });
+        return fotos;
+    }
+
+    // Estilos ficam inline: cliente de e-mail (Gmail/Outlook) ignora <style>.
+    const EMAIL_STYLES = {
+        wrap: "font-family:Segoe UI,Arial,Helvetica,sans-serif;color:#0f172a;font-size:14px;line-height:1.55;max-width:680px;",
+        title: "margin:0 0 4px;font-size:20px;color:#0f172a;",
+        meta: "margin:0 0 2px;font-size:13px;color:#475569;",
+        header: "border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:8px;padding:14px 16px;margin:0 0 4px;background:#f8fafc;",
+        status: "display:inline-block;padding:2px 10px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px;font-weight:700;",
+        sectionTitle: "margin:22px 0 8px;font-size:15px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px;",
+        texto: "margin:0;white-space:pre-wrap;color:#1e293b;",
+        card: "border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:0 0 14px;background:#ffffff;",
+        cardTitle: "margin:0 0 8px;font-size:15px;color:#0f172a;",
+        aprovado: "display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700;",
+        linha: "padding:3px 10px 3px 0;font-size:13px;color:#475569;white-space:nowrap;vertical-align:top;",
+        valor: "padding:3px 0;font-size:13px;color:#0f172a;vertical-align:top;",
+        total: "padding:6px 0 0;font-size:15px;font-weight:700;color:#0f172a;",
+        foto: "display:block;margin:8px 0 12px;max-width:280px;border:1px solid #e2e8f0;border-radius:6px;",
+        sub: "border-left:3px solid #cbd5e1;margin:12px 0 0 12px;padding:8px 0 2px 12px;",
+        subTitle: "margin:0 0 6px;font-size:14px;color:#334155;",
+        docs: "margin:8px 0 0;padding-left:18px;font-size:13px;color:#475569;",
+        rodape: "margin:22px 0 0;padding-top:10px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;",
+    };
+
+    // Linhas "rotulo: valor" de um orcamento/suborcamento, em tabela (o layout
+    // mais confiavel em cliente de e-mail).
+    function emailLinhas(item) {
+        const linhas = [];
+        if (item.loja && item.loja !== "-") {
+            linhas.push(["Loja", escapeHtml(item.loja)]);
+        }
+        linhas.push(["Valor unit&aacute;rio", escapeHtml(fmtRawMoney(item.valor, item.moeda))]);
+        linhas.push(["Quantidade", escapeHtml(item.quantidade)]);
+        if (Number(item.frete)) {
+            linhas.push(["Frete", escapeHtml(fmtRawMoney(item.frete, item.moeda))]);
+        }
+        if (Number(item.desconto)) {
+            linhas.push(["Desconto", escapeHtml(fmtRawMoney(item.desconto, item.moeda))]);
+        }
+        if (item.link) {
+            const link = escapeHtml(item.link);
+            linhas.push(["Link", `<a href="${link}" style="color:#1d4ed8;">${link}</a>`]);
+        }
+        const corpo = linhas
+            .map(
+                ([rotulo, valor]) =>
+                    `<tr><td style="${EMAIL_STYLES.linha}">${rotulo}</td>`
+                    + `<td style="${EMAIL_STYLES.valor}">${valor}</td></tr>`
+            )
+            .join("");
+        return `<table cellpadding="0" cellspacing="0" border="0">${corpo}</table>`;
+    }
+
+    function emailFoto(item, fotos) {
+        if (!item.foto_url) {
+            return "";
+        }
+        const dataUrl = fotos.get(item.foto_url);
+        if (!dataUrl) {
+            return `<p style="${EMAIL_STYLES.meta}">(foto do produto dispon&iacute;vel no sistema)</p>`;
+        }
+        return `<img src="${dataUrl}" alt="Foto do produto" style="${EMAIL_STYLES.foto}">`;
+    }
+
+    function emailDocumentos(item) {
+        const docs = item.documentos || [];
+        if (!docs.length) {
+            return "";
+        }
+        const itens = docs.map((doc) => `<li>${escapeHtml(doc.nome)}</li>`).join("");
+        return `<p style="${EMAIL_STYLES.meta}">Documentos anexados:</p>`
+            + `<ul style="${EMAIL_STYLES.docs}">${itens}</ul>`;
+    }
+
+    // Monta o corpo do e-mail: cabecalho da requisicao, descricao e cada
+    // orcamento com foto, valores, link, documentos e suborcamentos.
+    function buildEmailHtml(data, fotos) {
+        const req = data.requisicao;
+        const orcs = data.orcamentos || [];
+        const partes = [];
+
+        const codigo = req.codigo ? `${escapeHtml(req.codigo)} &mdash; ` : "";
+        const cabecalho = [
+            `<h2 style="${EMAIL_STYLES.title}">${codigo}${escapeHtml(req.titulo)}</h2>`,
+            `<p style="${EMAIL_STYLES.meta}">Tipo: ${escapeHtml(req.tipo_label)}`
+            + ` &nbsp;&middot;&nbsp; <span style="${EMAIL_STYLES.status}">${escapeHtml(req.status_label)}</span></p>`,
+            `<p style="${EMAIL_STYLES.meta}">Solicitado por ${escapeHtml(req.criado_por)}`
+            + ` em ${escapeHtml(req.criado_em)}</p>`,
+        ];
+        if (req.entregue_em) {
+            const por = req.entregue_por ? ` por ${escapeHtml(req.entregue_por)}` : "";
+            cabecalho.push(
+                `<p style="${EMAIL_STYLES.meta}">Entregue em ${escapeHtml(req.entregue_em)}${por}</p>`
+            );
+        }
+        partes.push(`<div style="${EMAIL_STYLES.header}">${cabecalho.join("")}</div>`);
+
+        if (req.texto && req.texto.trim()) {
+            partes.push(`<h3 style="${EMAIL_STYLES.sectionTitle}">Descri&ccedil;&atilde;o</h3>`);
+            partes.push(`<p style="${EMAIL_STYLES.texto}">${escapeHtml(req.texto.trim())}</p>`);
+        }
+
+        partes.push(`<h3 style="${EMAIL_STYLES.sectionTitle}">Or&ccedil;amentos (${orcs.length})</h3>`);
+        if (!orcs.length) {
+            partes.push(`<p style="${EMAIL_STYLES.meta}">Sem or&ccedil;amentos cadastrados.</p>`);
+        }
+        orcs.forEach((orc, index) => {
+            const bloco = [];
+            const selo = orc.aprovado ? `<span style="${EMAIL_STYLES.aprovado}">Aprovado</span>` : "";
+            bloco.push(
+                `<h4 style="${EMAIL_STYLES.cardTitle}">${index + 1}. ${escapeHtml(orc.titulo)}${selo}</h4>`
+            );
+            bloco.push(emailFoto(orc, fotos));
+            bloco.push(emailLinhas(orc));
+            bloco.push(`<p style="${EMAIL_STYLES.total}">Total: ${escapeHtml(orc.total_display)}</p>`);
+            bloco.push(emailDocumentos(orc));
+
+            (orc.suborcamentos || []).forEach((sub) => {
+                const subBloco = [
+                    `<h5 style="${EMAIL_STYLES.subTitle}">+ ${escapeHtml(sub.titulo)}</h5>`,
+                    emailFoto(sub, fotos),
+                    emailLinhas(sub),
+                    `<p style="${EMAIL_STYLES.total}">Total: ${escapeHtml(sub.total_display)}</p>`,
+                    emailDocumentos(sub),
+                ];
+                bloco.push(`<div style="${EMAIL_STYLES.sub}">${subBloco.join("")}</div>`);
+            });
+
+            if ((orc.suborcamentos || []).length) {
+                bloco.push(
+                    `<p style="${EMAIL_STYLES.total}">Total do or&ccedil;amento + subor&ccedil;amentos: `
+                    + `${escapeHtml(orc.total_com_suborcamentos_display)}</p>`
+                );
+            }
+            partes.push(`<div style="${EMAIL_STYLES.card}">${bloco.join("")}</div>`);
+        });
+
+        partes.push(`<p style="${EMAIL_STYLES.rodape}">Portal de TI &middot; requisi&ccedil;&otilde;es de compra</p>`);
+        return `<div style="${EMAIL_STYLES.wrap}">${partes.join("")}</div>`;
+    }
+
+    // Versao em texto puro do mesmo conteudo (vai junto na area de transferencia
+    // para quem cola em um editor sem formatacao).
+    function buildEmailPlainText(data) {
+        const req = data.requisicao;
+        const orcs = data.orcamentos || [];
+        const L = [];
+        L.push(`${req.codigo ? `${req.codigo} - ` : ""}${req.titulo}`);
+        L.push(`Tipo: ${req.tipo_label} | Status: ${req.status_label}`);
+        L.push(`Solicitado por ${req.criado_por} em ${req.criado_em}`);
+        if (req.entregue_em) {
+            L.push(`Entregue em ${req.entregue_em}${req.entregue_por ? ` por ${req.entregue_por}` : ""}`);
+        }
+        if (req.texto && req.texto.trim()) {
+            L.push("", "DESCRIÇÃO", req.texto.trim());
+        }
+        L.push("", `ORÇAMENTOS (${orcs.length})`);
+        if (!orcs.length) {
+            L.push("Sem orçamentos cadastrados.");
+        }
+        const item = (it, prefixo) => {
+            if (it.loja && it.loja !== "-") L.push(`${prefixo}Loja: ${it.loja}`);
+            L.push(`${prefixo}Valor unitário: ${fmtRawMoney(it.valor, it.moeda)} | Quantidade: ${it.quantidade}`);
+            if (Number(it.frete)) L.push(`${prefixo}Frete: ${fmtRawMoney(it.frete, it.moeda)}`);
+            if (Number(it.desconto)) L.push(`${prefixo}Desconto: ${fmtRawMoney(it.desconto, it.moeda)}`);
+            if (it.link) L.push(`${prefixo}Link: ${it.link}`);
+            L.push(`${prefixo}Total: ${it.total_display}`);
+            (it.documentos || []).forEach((doc) => L.push(`${prefixo}Documento: ${doc.nome}`));
+        };
+        orcs.forEach((orc, index) => {
+            L.push("", `${index + 1}. ${orc.titulo}${orc.aprovado ? " [APROVADO]" : ""}`);
+            item(orc, "   ");
+            (orc.suborcamentos || []).forEach((sub) => {
+                L.push("", `   + ${sub.titulo}`);
+                item(sub, "      ");
+            });
+            if ((orc.suborcamentos || []).length) {
+                L.push(`   Total do orçamento + suborçamentos: ${orc.total_com_suborcamentos_display}`);
+            }
+        });
+        return L.join("\n");
+    }
+
+    // Copia HTML + texto puro. O caminho moderno (ClipboardItem) exige HTTPS;
+    // o fallback copia a selecao de um bloco oculto e funciona tambem em HTTP.
+    async function copyRich(html, text) {
+        if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    "text/html": new Blob([html], { type: "text/html" }),
+                    "text/plain": new Blob([text], { type: "text/plain" }),
+                }),
+            ]);
+            return;
+        }
+        const holder = document.createElement("div");
+        holder.setAttribute("contenteditable", "true");
+        holder.innerHTML = html;
+        holder.style.position = "fixed";
+        holder.style.top = "-10000px";
+        holder.style.opacity = "0";
+        document.body.appendChild(holder);
+        const range = document.createRange();
+        range.selectNodeContents(holder);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const ok = document.execCommand("copy");
+        selection.removeAllRanges();
+        document.body.removeChild(holder);
+        if (!ok) {
+            throw new Error("copy-failed");
+        }
+    }
+
+    async function copyRequisicaoEmail(event) {
+        if (!currentDetailData) return;
+        const botao = event?.currentTarget;
+        const rotulo = botao ? botao.textContent : "";
+        if (botao) {
+            botao.disabled = true;
+            botao.textContent = "Preparando...";  // as fotos precisam ser baixadas
+        }
+        try {
+            const fotos = await coletarFotos(currentDetailData);
+            await copyRich(
+                buildEmailHtml(currentDetailData, fotos),
+                buildEmailPlainText(currentDetailData)
+            );
+            showToast("Requisicao copiada! Cole no corpo do e-mail.", "success");
+        } catch (error) {
+            showToast("Nao foi possivel copiar. Tente novamente.", "error");
+        } finally {
+            if (botao) {
+                botao.disabled = false;
+                botao.textContent = rotulo;
+            }
+        }
+    }
+
+    detailModalEl?.querySelector("[data-copy-email]")?.addEventListener("click", copyRequisicaoEmail);
+
     // botao "Desaprovar requisicao" dentro do detalhe
     detailModalEl?.querySelector("[data-desaprovar-requisicao]")?.addEventListener("click", (event) => {
         desaprovarRequisicao(event.currentTarget);

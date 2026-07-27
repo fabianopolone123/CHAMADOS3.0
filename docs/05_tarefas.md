@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Requisicoes: botao "Copiar p/ e-mail" no detalhe (ao lado do WhatsApp) — copia a requisicao inteira em HTML formatado, com as fotos dos produtos embutidas (data URI), link do produto, documentos e suborcamentos, pronta para colar no corpo do e-mail; leva tambem a versao em texto puro. Somente frontend (`static/js/contratos.js`)
 - Kanban: encerramento de chamado em "aguardando" (usuario/peca/autorizacao) **sem precisar dar Play** — o card mostra Play + Stop, o Stop pede o "O que foi feito" e fecha o chamado registrando na linha do tempo a mudanca de status e o evento `encerramento_direto` (novo tipo em `ChamadoEvento`, migration `0044`), que tambem aparece no "Andamento do atendimento". Testes em `EncerramentoChamadoTests`
 - Kanban: corrigido o contador "em atend." que somava chamados com o status `em_atendimento` gravado sem Play ativo (dados anteriores a 16/07/2026). O card passa a ser exibido pelo status efetivo (`_status_efetivo`: sem Play ativo vira "Atribuido"/"Aberto") e a migration `0043` normaliza os registros antigos; testes em `EncerramentoChamadoTests`
 - Requisicoes: edicao de requisicao existente (titulo/tipo/texto, com evento de edicao na timeline — novo `TIPO_EDICAO`, migration `0041`) e edicao dos orcamentos/suborcamentos (campos + trocar/remover foto + adicionar/remover documentos), bloqueada apos a requisicao entregue. Rotas `requisicao_edit`, `orcamento_edit`, `suborcamento_edit`; testes `RequisicaoEdicaoTests`
