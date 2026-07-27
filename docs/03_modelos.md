@@ -2,7 +2,7 @@
 
 ## Situacao atual
 
-O projeto possui trinta e sete modelos persistidos:
+O projeto possui trinta e nove modelos persistidos:
 
 Fluxo de atendimento (Chamados):
 
@@ -54,6 +54,11 @@ Modulo Licencas:
 Modulo IPs:
 
 - `EnderecoIP`
+
+Modulo Kaspersky:
+
+- `KasperskyDispositivo`
+- `KasperskyConfig`
 
 Modulo Servicos feitos:
 
@@ -587,6 +592,27 @@ Regra de cobranca (aplicada no cadastro/edicao):
 - `valor_pago = franquia_valor + copias_excedentes * valor_copia_excedente + copias_cor * valor_copia_cor`.
 - As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
 - So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb` (producao P&B, so informativa), `*_display`. As faturas ja cadastradas NAO sao recalculadas por uma mudanca de formula (guardam o valor efetivamente pago); o recalculo so acontece ao salvar/editar a fatura.
+
+### KasperskyDispositivo
+
+Dispositivo gerenciado pelo Kaspersky Security Center, alimentado pelo arquivo do botao "Exportar" do portal (migration `0046`).
+
+- `nome` (unico; chave da importacao)
+- Organizacao interna, NUNCA sobrescrita pela importacao: `setor`, `responsavel`, `observacoes` e `ramal` (FK opcional para `Ramal`, `on_delete=SET_NULL`, related_name `dispositivos_kaspersky`)
+- Vindos do export: `status`, `agente_executando`, `versao_agente`, `versao_aplicativo`, `endereco_ip`, `grupo`, `ultima_conexao`
+- Controle da importacao: `no_ultimo_export`, `importado_em`, `criado_em`, `atualizado_em`
+
+Regras/propriedades:
+
+- `tem_antivirus`: `versao_aplicativo` preenchida. Vazia = so o Agente de Rede instalado, ou seja, **nao consome licenca**.
+- `status_slug`: `ok` / `critico` / `aviso` / `indefinido` (sem acento, para classe CSS e filtro).
+- `sem_conexao`: sem contato ha `DIAS_SEM_CONEXAO` (7) dias ou mais, ou sem data.
+- `setor_label`: o setor ou "Sem setor". `ultima_conexao_display`: data formatada.
+- So Atendente TI/Admin acessam (usuario comum e redirecionado).
+
+### KasperskyConfig
+
+Singleton (`load()`) com `licencas_contratadas` (default 100) e `atualizado_em` (migration `0046`). O consumo nao e gravado: e calculado como os dispositivos do ultimo export que tem antivirus instalado.
 
 ### Dica
 

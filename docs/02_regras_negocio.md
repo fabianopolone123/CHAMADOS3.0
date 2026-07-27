@@ -180,6 +180,19 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 10. Qualquer edicao **regera o termo em PDF** e **descarta o termo assinado anterior** (o conteudo mudou). Se ainda houver equipamento em posse do colaborador, o status volta para "Aguardando documentacao assinada" (para colher a nova assinatura); se todos os equipamentos ficarem devolvidos, o status passa para "Devolvido". Assim como na criacao, e possivel aplicar a assinatura no novo termo informando a senha de autorizacao.
 11. Toda a validacao (permissao, senha da assinatura, obrigatoriedade de equipamento e datas) e feita no backend.
 
+## Regras atuais do modulo Kaspersky
+
+1. O modulo Kaspersky (`/kaspersky/`) e acessivel apenas para Administrador e Atendente TI; todas as rotas validam a permissao no backend (usuario comum e redirecionado e nao consegue importar, editar nem excluir).
+2. A lista e alimentada pelo arquivo do botao **"Exportar"** do portal do Kaspersky (`export.txt`): TSV separado por TAB (aceita tambem `;` e `,`), UTF-8/UTF-16, com as colunas Nome, Ultima conexao, Agente de Rede em execucao, Status, Versao do Agente de Rede, Versao do aplicativo, Endereco IP e Nome completo do grupo. As colunas sao localizadas pelo cabecalho **sem acento e sem diferenciar maiusculas**, entao pequenas mudancas de acentuacao nao quebram a importacao. Sem a coluna "Nome" o arquivo e recusado.
+3. A importacao e um **upsert pelo nome do dispositivo**: quem ja existe e atualizado, quem nao existe e criado. O resultado aparece no toast ("X novo(s), Y atualizado(s)...").
+4. Os campos de organizacao interna — **setor, responsavel, observacoes e o colaborador vinculado** — sao do sistema e **nunca sao sobrescritos** pela importacao.
+5. Dispositivos que **nao vierem no arquivo** nao sao apagados: ficam marcados como "fora do export" (esmaecidos na lista, com etiqueta), deixam de consumir licenca e voltam ao normal se aparecerem numa importacao seguinte.
+6. **Licencas**: a quantidade contratada e configuravel (padrao **100**, `KasperskyConfig`, alterada clicando no cartao "Licencas contratadas"). Consome licenca o dispositivo que esta no ultimo export **e** tem o antivirus instalado (`Versao do aplicativo` preenchida). Maquina com apenas o Agente de Rede **nao** consome. Os cartoes mostram contratadas, em uso (com o percentual e uma barra), disponiveis e o total de dispositivos.
+7. Um dispositivo pode ser **vinculado a um colaborador** da lista de Ramais. Ao escolher o colaborador, o setor e o responsavel sao preenchidos a partir do ramal quando estiverem em branco.
+8. A aba **"Colaboradores"** cruza a lista de ramais com os dispositivos e mostra a situacao de cada pessoa: **Com antivirus** (tem dispositivo vinculado com o antivirus instalado), **Sem antivirus** (tem dispositivo vinculado, mas sem o antivirus) e **Sem dispositivo** (nenhum vinculado). Quem precisa de atencao aparece primeiro; ha busca e filtro por situacao.
+9. A aba "Dispositivos" tem busca (nome, setor, responsavel, IP, status, versao e observacoes), filtros por situacao (Criticos, Sem antivirus, Sem conexao, Fora do export) e por setor, alem de ordenacao por cabecalho. "Sem conexao" e o dispositivo sem contato ha 7 dias ou mais.
+10. Excluir um dispositivo apenas o tira da lista (com confirmacao); ele volta na proxima importacao se ainda estiver no portal, mas o setor/responsavel cadastrados aqui se perdem.
+
 ## Regras atuais do modulo E-mail (notificacoes)
 
 1. As notificacoes por e-mail sao configuradas em `/email-config/`, acessivel a Administrador e Atendente TI (o botao "E-mail" no menu lateral so aparece para esses perfis; as rotas validam a permissao no backend). O envio so acontece com a chave "Ativar notificacoes" ligada.

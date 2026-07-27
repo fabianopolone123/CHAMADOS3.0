@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chamados.css' %}">
+<link rel="stylesheet" href="{% static 'css/contratos.css' %}">
+<link rel="stylesheet" href="{% static 'css/ips.css' %}">
+<link rel="stylesheet" href="{% static 'css/kaspersky.css' %}">
+{% endblock %}
+
+{% block content %}
+<main
+    class="tickets-app kaspersky-app"
+    data-kaspersky-update-url="{% url 'kaspersky_update' dispositivo_id=0 %}"
+    data-kaspersky-delete-url="{% url 'kaspersky_delete' dispositivo_id=0 %}"
+>
+    {% csrf_token %}
+    {% include "partials/ti_sidebar.html" with active="kaspersky" %}
+
+    <section class="tickets-main">
+        <header class="tickets-topbar contratos-topbar">
+            <div class="contratos-topbar__text">
+                <h2 class="topbar-title">Kaspersky</h2>
+                <p class="contratos-topbar__subtitle">Dispositivos com antivirus e controle das licencas</p>
+                <p class="topbar-subtitle">
+                    Atualize a lista com o arquivo do botao "Exportar" do portal do Kaspersky.
+                    {% if ultima_importacao %}Ultima importacao em {{ ultima_importacao }}.{% endif %}
+                </p>
+            </div>
+            <button type="button" class="contratos-add-btn" id="importKasperskyButton" title="Importar export do portal">
+                <span class="contratos-add-btn__icon" aria-hidden="true">&#8593;</span>
+                <span class="contratos-add-btn__label">Importar export</span>
+            </button>
+        </header>
+
+        <section class="ips-stats ksp-stats">
+            <article class="ips-stat ips-stat--blue ksp-stat--clickable" id="ksLicencasCard" title="Alterar quantidade de licencas contratadas">
+                <span class="ips-stat__label">Licencas contratadas</span>
+                <strong class="ips-stat__value">{{ licencas_contratadas }}</strong>
+                <span class="ksp-stat__hint">clique para alterar</span>
+            </article>
+            <article class="ips-stat ips-stat--indigo">
+                <span class="ips-stat__label">Licencas em uso</span>
+                <strong class="ips-stat__value">{{ licencas_em_uso }}</strong>
+                <span class="ksp-stat__hint">{{ licencas_percentual }}% das contratadas</span>
+            </article>
+            <article class="ips-stat ips-stat--green">
+                <span class="ips-stat__label">Disponiveis</span>
+                <strong class="ips-stat__value">{{ licencas_disponiveis }}</strong>
+            </article>
+            <article class="ips-stat">
+                <span class="ips-stat__label">Dispositivos cadastrados</span>
+                <strong class="ips-stat__value">{{ total_dispositivos }}</strong>
+                <span class="ksp-stat__hint">{{ sem_antivirus }} sem antivirus</span>
+            </article>
+            <article class="ips-stat ips-stat--amber">
+                <span class="ips-stat__label">Colaboradores protegidos</span>
+                <strong class="ips-stat__value">{{ colaboradores_protegidos }}<span class="ksp-stat__of">/{{ total_colaboradores }}</span></strong>
+                <span class="ksp-stat__hint">{{ colaboradores_sem_dispositivo }} sem dispositivo vinculado</span>
+            </article>
+        </section>
+
+        <div class="ksp-gauge" role="img" aria-label="Uso de {{ licencas_em_uso }} de {{ licencas_contratadas }} licencas">
+            <div class="ksp-gauge__bar" style="width: {{ licencas_percentual }}%"></div>
+        </div>
+
+        <section class="ips-panel">
+            <div class="ksp-tabs" role="tablist" aria-label="Visao da lista">
+                <button type="button" class="ksp-tab is-active" data-tab="dispositivos" role="tab" aria-selected="true">
+                    Dispositivos <span class="ips-chip__count">{{ total_dispositivos }}</span>
+                </button>
+                <button type="button" class="ksp-tab" data-tab="colaboradores" role="tab" aria-selected="false">
+                    Colaboradores <span class="ips-chip__count">{{ total_colaboradores }}</span>
+                </button>
+            </div>
+
+            <div class="ksp-pane" data-pane="dispositivos">
+            <div class="ips-search">
+                <span class="ips-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="kspSearch"
+                    class="ips-search__input"
+                    placeholder="Pesquisar por nome, setor, responsavel, IP, status ou versao..."
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="ips-chips" id="kspStatusChips" role="tablist" aria-label="Filtrar por situacao">
+                <button type="button" class="ips-chip is-active" data-situacao="" role="tab" aria-selected="true">
+                    Todos <span class="ips-chip__count">{{ total_dispositivos }}</span>
+                </button>
+                <button type="button" class="ips-chip ksp-chip--critico" data-situacao="critico" role="tab" aria-selected="false">
+                    Criticos <span class="ips-chip__count">{{ criticos }}</span>
+                </button>
+                <button type="button" class="ips-chip ksp-chip--sem-av" data-situacao="sem-antivirus" role="tab" aria-selected="false">
+                    Sem antivirus <span class="ips-chip__count">{{ sem_antivirus }}</span>
+                </button>
+                <button type="button" class="ips-chip ksp-chip--offline" data-situacao="sem-conexao" role="tab" aria-selected="false">
+                    Sem conexao <span class="ips-chip__count">{{ sem_conexao }}</span>
+                </button>
+                <button type="button" class="ips-chip ksp-chip--fora" data-situacao="fora-export" role="tab" aria-selected="false">
+                    Fora do export <span class="ips-chip__count">{{ fora_do_export }}</span>
+                </button>
+            </div>
+
+            {% if setores %}
+            <div class="ips-chips ksp-chips--setor" id="kspSetorChips" role="tablist" aria-label="Filtrar por setor">
+                <button type="button" class="ips-chip is-active" data-setor="" role="tab" aria-selected="true">
+                    Todos os setores <span class="ips-chip__count">{{ total_dispositivos }}</span>
+                </button>
+                {% for s in setores %}
+                <button type="button" class="ips-chip" data-setor="{{ s.label }}" role="tab" aria-selected="false">
+                    {{ s.label }} <span class="ips-chip__count">{{ s.count }}</span>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <p class="ips-search__status" id="kspSearchStatus"></p>
+
+            {% if dispositivos %}
+            <div class="ips-table-wrap">
+                <table class="ips-table ksp-table" id="kspTable">
+                    <thead>
+                        <tr>
+                            <th class="ips-th" data-sort-index="0" aria-sort="none">Dispositivo <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th" data-sort-index="1" aria-sort="none">Setor <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th ips-col--hide-sm" data-sort-index="2" aria-sort="none">Responsavel <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th" data-sort-index="3" aria-sort="none">Status <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th ips-col--hide-md" data-sort-index="4" aria-sort="none">Antivirus <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th ips-col--hide-md" data-sort-index="5" data-sort-type="ip" aria-sort="none">IP <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th ips-col--hide-sm" data-sort-index="6" aria-sort="none">Ultima conexao <span class="ips-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ips-th--actions">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kspTableBody">
+                        {% for d in dispositivos %}
+                        <tr class="ips-row ksp-row{% if not d.no_ultimo_export %} ksp-row--fora{% endif %}"
+                            data-id="{{ d.id }}"
+                            data-nome="{{ d.nome }}"
+                            data-setor="{{ d.setor_label }}"
+                            data-responsavel="{{ d.responsavel }}"
+                            data-ramal="{{ d.ramal_id|default_if_none:'' }}"
+                            data-observacoes="{{ d.observacoes }}"
+                            data-status="{{ d.status_slug }}"
+                            data-antivirus="{{ d.tem_antivirus|yesno:'sim,nao' }}"
+                            data-conexao="{{ d.sem_conexao|yesno:'sem,ok' }}"
+                            data-export="{{ d.no_ultimo_export|yesno:'sim,nao' }}"
+                            data-versao-agente="{{ d.versao_agente }}"
+                            data-versao-app="{{ d.versao_aplicativo }}"
+                            data-ip="{{ d.endereco_ip }}"
+                            data-grupo="{{ d.grupo }}"
+                            data-ultima-conexao="{{ d.ultima_conexao_display }}"
+                            data-search="{{ d.nome|lower }} {{ d.setor_label|lower }} {{ d.responsavel|lower }} {{ d.endereco_ip }} {{ d.status|lower }} {{ d.versao_aplicativo }} {{ d.observacoes|lower }}">
+                            <td data-label="Dispositivo" class="ips-cell--name">
+                                {{ d.nome }}
+                                {% if not d.no_ultimo_export %}<span class="ksp-tag ksp-tag--fora">fora do export</span>{% endif %}
+                            </td>
+                            <td data-label="Setor">
+                                {% if d.setor %}<span class="ksp-setor">{{ d.setor }}</span>{% else %}<span class="ksp-setor ksp-setor--vazio">Sem setor</span>{% endif %}
+                            </td>
+                            <td data-label="Responsavel" class="ips-col--hide-sm">{{ d.responsavel|default:"-" }}</td>
+                            <td data-label="Status">
+                                <span class="ksp-badge ksp-badge--{{ d.status_slug }}">{{ d.status|default:"-" }}</span>
+                            </td>
+                            <td data-label="Antivirus" class="ips-col--hide-md">
+                                {% if d.tem_antivirus %}
+                                <span class="ksp-av ksp-av--ok" title="Consome 1 licenca">{{ d.versao_aplicativo }}</span>
+                                {% else %}
+                                <span class="ksp-av ksp-av--none" title="So o Agente de Rede: nao consome licenca">Nao instalado</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="IP" class="ips-col--hide-md ips-cell--ip">{{ d.endereco_ip|default:"-" }}</td>
+                            <td data-label="Ultima conexao" class="ips-col--hide-sm{% if d.sem_conexao %} ksp-cell--alerta{% endif %}">{{ d.ultima_conexao_display }}</td>
+                            <td data-label="Acoes" class="ips-cell--actions">
+                                <button type="button" class="ips-icon-btn js-edit-ksp" title="Editar setor/responsavel" aria-label="Editar dispositivo">&#9998;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="ips-empty is-hidden" id="kspNoResults">Nenhum dispositivo encontrado para o filtro atual.</p>
+            {% else %}
+            <div class="ips-empty-state">
+                <p class="ips-empty-state__title">Nenhum dispositivo importado ainda.</p>
+                <p class="ips-empty-state__hint">No portal do Kaspersky clique em "Exportar" e envie o arquivo aqui pelo botao "Importar export".</p>
+            </div>
+            {% endif %}
+            </div>
+
+            {# Aba Colaboradores: a lista de ramais cruzada com os dispositivos #}
+            <div class="ksp-pane is-hidden" data-pane="colaboradores">
+                <div class="ips-search">
+                    <span class="ips-search__icon" aria-hidden="true">&#128269;</span>
+                    <input
+                        type="search"
+                        id="kspColabSearch"
+                        class="ips-search__input"
+                        placeholder="Pesquisar colaborador, setor ou dispositivo..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="ips-chips" id="kspColabChips" role="tablist" aria-label="Filtrar colaboradores">
+                    <button type="button" class="ips-chip is-active" data-situacao="" role="tab" aria-selected="true">
+                        Todos <span class="ips-chip__count">{{ total_colaboradores }}</span>
+                    </button>
+                    <button type="button" class="ips-chip ksp-chip--ok" data-situacao="protegido" role="tab" aria-selected="false">
+                        Com antivirus <span class="ips-chip__count">{{ colaboradores_protegidos }}</span>
+                    </button>
+                    <button type="button" class="ips-chip ksp-chip--sem-av" data-situacao="sem-dispositivo" role="tab" aria-selected="false">
+                        Sem dispositivo <span class="ips-chip__count">{{ colaboradores_sem_dispositivo }}</span>
+                    </button>
+                </div>
+
+                <p class="ips-search__status" id="kspColabStatus"></p>
+
+                {% if colaboradores %}
+                <div class="ips-table-wrap">
+                    <table class="ips-table ksp-table">
+                        <thead>
+                            <tr>
+                                <th class="ips-th">Colaborador</th>
+                                <th class="ips-th">Setor</th>
+                                <th class="ips-th ips-col--hide-sm">Dispositivos</th>
+                                <th class="ips-th">Situacao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in colaboradores %}
+                            <tr class="ips-row ksp-colab-row"
+                                data-situacao="{{ c.situacao }}"
+                                data-search="{{ c.nome|lower }} {{ c.setor|lower }} {{ c.dispositivos|lower }} {{ c.email|lower }}">
+                                <td data-label="Colaborador" class="ips-cell--name">{{ c.nome }}</td>
+                                <td data-label="Setor"><span class="ksp-setor{% if c.setor == 'Sem setor' %} ksp-setor--vazio{% endif %}">{{ c.setor }}</span></td>
+                                <td data-label="Dispositivos" class="ips-col--hide-sm">{{ c.dispositivos }}</td>
+                                <td data-label="Situacao"><span class="ksp-badge ksp-badge--{{ c.situacao }}">{{ c.situacao_label }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="ips-empty is-hidden" id="kspColabNoResults">Nenhum colaborador encontrado para o filtro atual.</p>
+                {% else %}
+                <div class="ips-empty-state">
+                    <p class="ips-empty-state__title">Nenhum colaborador cadastrado em Ramais.</p>
+                    <p class="ips-empty-state__hint">Cadastre a lista de contatos no modulo Ramais para acompanhar quem esta protegido.</p>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+    </section>
+</main>
+
+{% include "partials/kaspersky_modal.html" %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/kaspersky.js' %}"></script>
+{% endblock %}

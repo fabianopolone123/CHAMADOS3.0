@@ -8,9 +8,11 @@ media/
 User_Download_*.csv
 lista_contatos_*.pdf
 seed/
-# Dump do sistema antigo (grande, nao versionar)
-chamados.zip
-chamados/
+# Dump do sistema antigo (grande, nao versionar). As barras iniciais sao
+# obrigatorias: sem elas, "chamados/" casava tambem com templates/chamados/ e
+# os templates novos das telas eram ignorados silenciosamente pelo Git.
+/chamados.zip
+/chamados/
 
 # Certificados/chaves TLS (nunca versionar)
 certs/

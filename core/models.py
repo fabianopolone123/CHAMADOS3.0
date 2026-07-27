@@ -1834,3 +1834,116 @@ class EmailConfig(models.Model):
             if email and email.lower() not in {v.lower() for v in vistos}:
                 vistos.append(email)
         return vistos
+
+
+class KasperskyConfig(models.Model):
+    """Configuracao do modulo Kaspersky (singleton): quantas licencas a empresa
+    contratou. O consumo e calculado a partir dos dispositivos importados."""
+
+    LICENCAS_PADRAO = 100
+
+    licencas_contratadas = models.PositiveIntegerField(default=LICENCAS_PADRAO)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Kaspersky - configuracao"
+        verbose_name_plural = "Kaspersky - configuracao"
+
+    def __str__(self) -> str:
+        return f"Kaspersky - {self.licencas_contratadas} licencas"
+
+    @classmethod
+    def load(cls) -> "KasperskyConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class KasperskyDispositivo(models.Model):
+    """Dispositivo gerenciado pelo Kaspersky Security Center.
+
+    Os campos tecnicos vem do arquivo exportado pelo portal (upsert pelo `nome`).
+    Os campos de organizacao interna (`setor`, `responsavel`, `observacoes`) sao
+    nossos e NUNCA sao sobrescritos pela importacao.
+
+    `versao_aplicativo` vazia significa que o dispositivo tem apenas o Agente de
+    Rede, sem o antivirus instalado — ou seja, nao consome licenca.
+    """
+
+    DIAS_SEM_CONEXAO = 7  # a partir daqui o dispositivo e considerado sem contato
+
+    nome = models.CharField(max_length=120, unique=True)
+    # Organizacao interna (preservada entre importacoes)
+    setor = models.CharField(max_length=120, blank=True, default="")
+    responsavel = models.CharField(max_length=120, blank=True, default="")
+    # Colaborador da lista de ramais que usa a maquina. Permite ver, do outro
+    # lado, quem ja esta com antivirus instalado e quem ainda nao esta.
+    ramal = models.ForeignKey(
+        "Ramal",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dispositivos_kaspersky",
+    )
+    observacoes = models.TextField(blank=True, default="")
+    # Dados vindos do export
+    status = models.CharField(max_length=40, blank=True, default="")
+    agente_executando = models.BooleanField(default=False)
+    versao_agente = models.CharField(max_length=40, blank=True, default="")
+    versao_aplicativo = models.CharField(max_length=40, blank=True, default="")
+    endereco_ip = models.CharField(max_length=45, blank=True, default="")
+    grupo = models.CharField(max_length=180, blank=True, default="")
+    ultima_conexao = models.DateTimeField(null=True, blank=True)
+    # Controle da importacao
+    no_ultimo_export = models.BooleanField(default=True)
+    importado_em = models.DateTimeField(null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Kaspersky - dispositivo"
+        verbose_name_plural = "Kaspersky - dispositivos"
+
+    def __str__(self) -> str:
+        return self.nome
+
+    @property
+    def tem_antivirus(self) -> bool:
+        """True quando o antivirus esta instalado (consome uma licenca)."""
+        return bool((self.versao_aplicativo or "").strip())
+
+    @property
+    def status_slug(self) -> str:
+        """Status sem acento/maiuscula, para classe CSS e filtro (ok/critico/aviso)."""
+        import unicodedata
+
+        texto = unicodedata.normalize("NFKD", (self.status or "").strip())
+        texto = "".join(c for c in texto if not unicodedata.combining(c)).lower()
+        if texto.startswith("ok"):
+            return "ok"
+        if texto.startswith("crit"):
+            return "critico"
+        if texto.startswith("avis") or texto.startswith("warn"):
+            return "aviso"
+        return "indefinido"
+
+    @property
+    def setor_label(self) -> str:
+        return self.setor.strip() or "Sem setor"
+
+    @property
+    def dias_sem_conexao(self):
+        if not self.ultima_conexao:
+            return None
+        return (timezone.now() - self.ultima_conexao).days
+
+    @property
+    def sem_conexao(self) -> bool:
+        dias = self.dias_sem_conexao
+        return dias is None or dias >= self.DIAS_SEM_CONEXAO
+
+    @property
+    def ultima_conexao_display(self) -> str:
+        if not self.ultima_conexao:
+            return "-"
+        return timezone.localtime(self.ultima_conexao).strftime("%d/%m/%Y %H:%M")

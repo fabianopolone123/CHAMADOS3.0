@@ -27,6 +27,8 @@ from .models import (
     EquipamentoEmprestimoTI,
     EnderecoIP,
     FuturaDigital,
+    KasperskyConfig,
+    KasperskyDispositivo,
     Licenca,
     LicencaSoftware,
     OrcamentoContrato,
@@ -2776,3 +2778,190 @@ class EmprestimoEdicaoTests(TestCase):
             {"colaborador_nome": "Fulano", "data_emprestimo": "2026-01-10", "equipamentos_count": "0"},
         )
         self.assertEqual(resp.status_code, 403)
+
+
+class KasperskyTests(TestCase):
+    """Modulo Kaspersky: importacao do export, licencas e cruzamento com os ramais."""
+
+    CABECALHO = (
+        "Nome\tUltima conexao com o Servidor de Administracao\tAgente de Rede em execucao\t"
+        "Status\tVersao do Agente de Rede\tVersao do aplicativo\tEndereco IP\tNome completo do grupo"
+    )
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+    def _arquivo(self, linhas, nome="export.txt"):
+        conteudo = "\r\n".join([self.CABECALHO] + linhas)
+        return SimpleUploadedFile(nome, conteudo.encode("utf-8-sig"), content_type="text/plain")
+
+    def _linha(self, nome, *, conexao="27/07/2026 15:00:48", agente="Sim", status="OK",
+               versao_agente="16.1.0.6517", versao_app="12.12.0.522", ip="192.168.22.2",
+               grupo="Dispositivos gerenciados"):
+        return "\t".join([nome, conexao, agente, status, versao_agente, versao_app, ip, grupo])
+
+    def _importar(self, linhas, **kwargs):
+        return self.client.post(
+            reverse("kaspersky_import"), {"arquivo": self._arquivo(linhas, **kwargs)}
+        )
+
+    def test_import_cria_dispositivos(self):
+        self.client.force_login(self.ti)
+        resp = self._importar([
+            self._linha("CPD-SERVER1"),
+            self._linha("CPU-010", conexao="08/06/2026 10:48:18", agente="Nao",
+                        status="Critico", versao_app="", ip="192.168.22.210"),
+        ])
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(KasperskyDispositivo.objects.count(), 2)
+
+        server = KasperskyDispositivo.objects.get(nome="CPD-SERVER1")
+        self.assertTrue(server.agente_executando)
+        self.assertEqual(server.status, "OK")
+        self.assertEqual(server.versao_aplicativo, "12.12.0.522")
+        self.assertEqual(server.endereco_ip, "192.168.22.2")
+        self.assertTrue(server.tem_antivirus)
+        self.assertEqual(server.status_slug, "ok")
+        self.assertIsNotNone(server.ultima_conexao)
+        self.assertEqual(server.ultima_conexao_display, "27/07/2026 15:00")
+
+        # Maquina so com o Agente de Rede: nao tem antivirus e nao consome licenca.
+        pc = KasperskyDispositivo.objects.get(nome="CPU-010")
+        self.assertFalse(pc.agente_executando)
+        self.assertFalse(pc.tem_antivirus)
+        self.assertEqual(pc.status_slug, "critico")
+
+    def test_import_atualiza_e_preserva_setor(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-025", versao_app="")])
+        disp = KasperskyDispositivo.objects.get(nome="CPU-025")
+        disp.setor = "Engenharia"
+        disp.responsavel = "Maria"
+        disp.observacoes = "Notebook do projeto"
+        disp.save()
+
+        # Reimportar com o antivirus instalado atualiza o tecnico e mantem o nosso.
+        self._importar([self._linha("CPU-025", versao_app="12.12.0.522")])
+        disp.refresh_from_db()
+        self.assertEqual(KasperskyDispositivo.objects.count(), 1)
+        self.assertTrue(disp.tem_antivirus)
+        self.assertEqual(disp.setor, "Engenharia")
+        self.assertEqual(disp.responsavel, "Maria")
+        self.assertEqual(disp.observacoes, "Notebook do projeto")
+
+    def test_import_marca_quem_saiu_do_export(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-001"), self._linha("CPU-002")])
+        self._importar([self._linha("CPU-001")])
+
+        self.assertTrue(KasperskyDispositivo.objects.get(nome="CPU-001").no_ultimo_export)
+        antigo = KasperskyDispositivo.objects.get(nome="CPU-002")
+        self.assertFalse(antigo.no_ultimo_export)  # nao e apagado, so marcado
+
+        # Quem saiu do export deixa de consumir licenca.
+        resp = self.client.get(reverse("kaspersky_dashboard"))
+        self.assertEqual(resp.context["licencas_em_uso"], 1)
+        self.assertEqual(resp.context["fora_do_export"], 1)
+
+    def test_import_arquivo_invalido(self):
+        self.client.force_login(self.ti)
+        arquivo = SimpleUploadedFile("qualquer.txt", b"coluna1;coluna2\na;b", content_type="text/plain")
+        self.client.post(reverse("kaspersky_import"), {"arquivo": arquivo})
+        self.assertEqual(KasperskyDispositivo.objects.count(), 0)
+
+    def test_contagem_de_licencas(self):
+        self.client.force_login(self.ti)
+        self._importar([
+            self._linha("PC-1"),
+            self._linha("PC-2"),
+            self._linha("PC-3", status="Critico", versao_app=""),
+        ])
+        resp = self.client.get(reverse("kaspersky_dashboard"))
+        self.assertEqual(resp.context["licencas_contratadas"], 100)  # padrao
+        self.assertEqual(resp.context["licencas_em_uso"], 2)
+        self.assertEqual(resp.context["licencas_disponiveis"], 98)
+        self.assertEqual(resp.context["sem_antivirus"], 1)
+        self.assertEqual(resp.context["criticos"], 1)
+        self.assertEqual(resp.context["total_dispositivos"], 3)
+
+    def test_alterar_licencas_contratadas(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("kaspersky_licencas"), {"licencas_contratadas": "150"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(KasperskyConfig.load().licencas_contratadas, 150)
+
+    def test_editar_setor_e_vincular_colaborador(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("NOT-071")])
+        disp = KasperskyDispositivo.objects.get(nome="NOT-071")
+        ramal = Ramal.objects.create(colaborador="Joao Silva", setor="Projetos", ramal="123")
+
+        resp = self.client.post(
+            reverse("kaspersky_update", args=[disp.id]),
+            {"setor": "", "responsavel": "", "observacoes": "Maquina nova", "ramal": str(ramal.id)},
+        )
+        self.assertEqual(resp.status_code, 302)
+
+        disp.refresh_from_db()
+        self.assertEqual(disp.ramal, ramal)
+        # Setor e responsavel em branco sao completados pelo ramal escolhido.
+        self.assertEqual(disp.setor, "Projetos")
+        self.assertEqual(disp.responsavel, "Joao Silva")
+        self.assertEqual(disp.observacoes, "Maquina nova")
+
+    def test_colaboradores_mostram_quem_esta_protegido(self):
+        self.client.force_login(self.ti)
+        protegido = Ramal.objects.create(colaborador="Ana", setor="Financeiro")
+        sem_av = Ramal.objects.create(colaborador="Bruno", setor="PCP")
+        Ramal.objects.create(colaborador="Carla", setor="RH")  # sem dispositivo
+
+        self._importar([self._linha("PC-ANA"), self._linha("PC-BRUNO", versao_app="")])
+        KasperskyDispositivo.objects.filter(nome="PC-ANA").update(ramal=protegido)
+        KasperskyDispositivo.objects.filter(nome="PC-BRUNO").update(ramal=sem_av)
+
+        resp = self.client.get(reverse("kaspersky_dashboard"))
+        por_nome = {c["nome"]: c for c in resp.context["colaboradores"]}
+        self.assertEqual(por_nome["Ana"]["situacao"], "protegido")
+        self.assertEqual(por_nome["Ana"]["dispositivos"], "PC-ANA")
+        self.assertEqual(por_nome["Bruno"]["situacao"], "sem-antivirus")
+        self.assertEqual(por_nome["Carla"]["situacao"], "sem-dispositivo")
+        self.assertEqual(resp.context["colaboradores_protegidos"], 1)
+        # A lista de colaboradores e a propria lista de ramais (o banco de teste
+        # ja vem com os ramais do seed), e Carla entra entre os sem dispositivo.
+        self.assertEqual(resp.context["total_colaboradores"], Ramal.objects.count())
+        self.assertGreaterEqual(resp.context["colaboradores_sem_dispositivo"], 1)
+
+    def test_setores_agrupados_para_o_filtro(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("PC-1"), self._linha("PC-2"), self._linha("PC-3")])
+        KasperskyDispositivo.objects.filter(nome__in=["PC-1", "PC-2"]).update(setor="Engenharia")
+        resp = self.client.get(reverse("kaspersky_dashboard"))
+        setores = {s["label"]: s["count"] for s in resp.context["setores"]}
+        self.assertEqual(setores, {"Engenharia": 2, "Sem setor": 1})
+
+    def test_excluir_dispositivo(self):
+        self.client.force_login(self.ti)
+        self._importar([self._linha("PC-X")])
+        disp = KasperskyDispositivo.objects.get(nome="PC-X")
+        self.client.post(reverse("kaspersky_delete", args=[disp.id]))
+        self.assertFalse(KasperskyDispositivo.objects.filter(pk=disp.id).exists())
+
+    def test_permissoes(self):
+        # Usuario comum nao ve a tela nem executa as acoes.
+        self.client.force_login(self.common)
+        self.assertNotEqual(self.client.get(reverse("kaspersky_dashboard")).status_code, 200)
+        self._importar([self._linha("PC-1")])
+        self.assertEqual(KasperskyDispositivo.objects.count(), 0)
+        self.client.post(reverse("kaspersky_licencas"), {"licencas_contratadas": "5"})
+        self.assertEqual(KasperskyConfig.load().licencas_contratadas, 100)
+
+        self.client.force_login(self.ti)
+        self.assertEqual(self.client.get(reverse("kaspersky_dashboard")).status_code, 200)
+
+    def test_import_exige_post(self):
+        self.client.force_login(self.ti)
+        self.assertEqual(self.client.get(reverse("kaspersky_import")).status_code, 405)

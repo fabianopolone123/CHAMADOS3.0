@@ -14,6 +14,8 @@ from .models import (
     EmailConfig,
     EnderecoIP,
     FuturaDigital,
+    KasperskyConfig,
+    KasperskyDispositivo,
     Licenca,
     LicencaSoftware,
     Ramal,
@@ -289,4 +291,18 @@ class EmailConfigAdmin(admin.ModelAdmin):
     # NAO expoe a senha cifrada; a configuracao e feita pela tela /email-config/.
     list_display = ("__str__", "ativo", "host", "porta", "usuario", "atualizado_em")
     exclude = ("senha_cifrada",)
+    readonly_fields = ("atualizado_em",)
+
+
+@admin.register(KasperskyDispositivo)
+class KasperskyDispositivoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "setor", "responsavel", "status", "versao_aplicativo", "endereco_ip", "no_ultimo_export")
+    list_filter = ("status", "no_ultimo_export", "setor")
+    search_fields = ("nome", "setor", "responsavel", "endereco_ip")
+    readonly_fields = ("criado_em", "atualizado_em")
+
+
+@admin.register(KasperskyConfig)
+class KasperskyConfigAdmin(admin.ModelAdmin):
+    list_display = ("__str__", "licencas_contratadas", "atualizado_em")
     readonly_fields = ("atualizado_em",)

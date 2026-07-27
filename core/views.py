@@ -50,6 +50,8 @@ from .models import (
     EquipamentoEmprestimoTI,
     FotoEquipamentoEmprestimoTI,
     InsumoTI,
+    KasperskyConfig,
+    KasperskyDispositivo,
     Licenca,
     LicencaSoftware,
     LogUsoAssinaturaTI,
@@ -5298,3 +5300,318 @@ def email_config_test_view(request):
     else:
         messages.error(request, mensagem)
     return redirect("email_config")
+
+
+# ----------------------------------------------------------------------------
+# Kaspersky: dispositivos com antivirus + controle das licencas
+# ----------------------------------------------------------------------------
+
+def _normalizar_cabecalho(texto: str) -> str:
+    """Cabecalho sem acento, minusculo e sem espacos extras (o export vem com
+    acentos e nomes longos; assim a leitura nao quebra por causa disso)."""
+    import unicodedata
+
+    texto = unicodedata.normalize("NFKD", (texto or "").strip())
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return " ".join(texto.lower().split())
+
+
+# Cada campo e localizado pelo inicio do cabecalho normalizado. "nome" tem uma
+# excecao para nao casar com "nome completo do grupo".
+_KASPERSKY_COLUNAS = (
+    ("nome", ("nome completo do grupo",), ("nome",)),
+    ("ultima_conexao", (), ("ultima conexao",)),
+    ("agente_executando", (), ("agente de rede em execucao",)),
+    ("status", (), ("status",)),
+    ("versao_agente", (), ("versao do agente",)),
+    ("versao_aplicativo", (), ("versao do aplicativo",)),
+    ("endereco_ip", (), ("endereco ip",)),
+    ("grupo", (), ("nome completo do grupo",)),
+)
+
+
+def _mapear_colunas_kaspersky(cabecalhos):
+    """Descobre em qual coluna esta cada campo. Retorna {campo: indice}."""
+    normalizados = [_normalizar_cabecalho(c) for c in cabecalhos]
+    mapa = {}
+    for campo, excecoes, prefixos in _KASPERSKY_COLUNAS:
+        for indice, titulo in enumerate(normalizados):
+            if any(titulo.startswith(e) for e in excecoes):
+                continue
+            if any(titulo.startswith(p) for p in prefixos):
+                mapa[campo] = indice
+                break
+    return mapa
+
+
+def _parse_data_kaspersky(valor: str):
+    """Le a data do export ("27/07/2026 15:00:48") como datetime com fuso."""
+    from datetime import datetime
+
+    texto = (valor or "").strip()
+    if not texto:
+        return None
+    for formato in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"):
+        try:
+            data = datetime.strptime(texto, formato)
+        except ValueError:
+            continue
+        if timezone.is_naive(data):
+            data = timezone.make_aware(data, timezone.get_current_timezone())
+        return data
+    return None
+
+
+@ti_required
+def kaspersky_dashboard_view(request):
+    """Lista os dispositivos com antivirus, o consumo de licencas e os filtros
+    por setor e por status."""
+    dispositivos = list(KasperskyDispositivo.objects.all())
+    config = KasperskyConfig.load()
+
+    # So consome licenca o dispositivo que esta no ultimo export E tem o
+    # antivirus instalado (quem so tem o Agente de Rede nao consome).
+    em_uso = sum(1 for d in dispositivos if d.no_ultimo_export and d.tem_antivirus)
+    contratadas = config.licencas_contratadas
+
+    contagem_setor = {}
+    for d in dispositivos:
+        contagem_setor[d.setor_label] = contagem_setor.get(d.setor_label, 0) + 1
+    setores = [
+        {"label": label, "count": contagem_setor[label]}
+        for label in sorted(contagem_setor, key=lambda s: (s == "Sem setor", s.lower()))
+    ]
+
+    # Sugestoes do campo setor: o que ja existe aqui + os setores dos ramais.
+    sugestoes = {d.setor.strip() for d in dispositivos if d.setor.strip()}
+    sugestoes.update(
+        s.strip() for s in Ramal.objects.exclude(setor="").values_list("setor", flat=True) if s.strip()
+    )
+
+    ultima_importacao = max((d.importado_em for d in dispositivos if d.importado_em), default=None)
+
+    # Lista de contatos (Ramais) cruzada com os dispositivos: mostra quem ja
+    # esta com o antivirus instalado, quem tem maquina sem antivirus e quem
+    # ainda nao tem nenhum dispositivo vinculado.
+    por_ramal = {}
+    for d in dispositivos:
+        if d.ramal_id:
+            por_ramal.setdefault(d.ramal_id, []).append(d)
+
+    colaboradores = []
+    for ramal in Ramal.objects.all():
+        vinculados = por_ramal.get(ramal.id, [])
+        com_av = [d for d in vinculados if d.tem_antivirus]
+        if com_av:
+            situacao, situacao_label = "protegido", "Com antivirus"
+        elif vinculados:
+            situacao, situacao_label = "sem-antivirus", "Sem antivirus"
+        else:
+            situacao, situacao_label = "sem-dispositivo", "Sem dispositivo"
+        colaboradores.append(
+            {
+                "nome": ramal.colaborador or "(sem nome)",
+                "setor": ramal.setor or "Sem setor",
+                "email": ramal.email,
+                "dispositivos": ", ".join(d.nome for d in vinculados) or "-",
+                "situacao": situacao,
+                "situacao_label": situacao_label,
+            }
+        )
+    # Quem precisa de atencao primeiro: sem dispositivo / sem antivirus no topo,
+    # os ja protegidos por ultimo.
+    colaboradores.sort(key=lambda c: (c["situacao"] == "protegido", c["nome"].lower()))
+    protegidos = sum(1 for c in colaboradores if c["situacao"] == "protegido")
+
+    context = {
+        "page_title": "Kaspersky",
+        "dispositivos": dispositivos,
+        "total_dispositivos": len(dispositivos),
+        "licencas_contratadas": contratadas,
+        "licencas_em_uso": em_uso,
+        "licencas_disponiveis": max(contratadas - em_uso, 0),
+        "licencas_percentual": min(round(em_uso * 100 / contratadas), 100) if contratadas else 0,
+        "sem_antivirus": sum(1 for d in dispositivos if not d.tem_antivirus),
+        "criticos": sum(1 for d in dispositivos if d.status_slug == "critico"),
+        "sem_conexao": sum(1 for d in dispositivos if d.sem_conexao),
+        "fora_do_export": sum(1 for d in dispositivos if not d.no_ultimo_export),
+        "setores": setores,
+        "setores_sugestoes": sorted(sugestoes, key=str.lower),
+        "colaboradores": colaboradores,
+        "total_colaboradores": len(colaboradores),
+        "colaboradores_protegidos": protegidos,
+        "colaboradores_sem_dispositivo": sum(
+            1 for c in colaboradores if c["situacao"] == "sem-dispositivo"
+        ),
+        "ramais": Ramal.objects.exclude(colaborador="").order_by("colaborador"),
+        "ultima_importacao": (
+            timezone.localtime(ultima_importacao).strftime("%d/%m/%Y %H:%M") if ultima_importacao else ""
+        ),
+        "is_admin": is_admin_user(request.user),
+        "is_attendant": is_attendant_user(request.user),
+    }
+    return render(request, "chamados/kaspersky.html", context)
+
+
+@login_required
+@require_POST
+def kaspersky_import_view(request):
+    """Importa o arquivo exportado pelo portal do Kaspersky (export.txt).
+
+    O arquivo vem separado por TAB (aceita tambem ; e ,) e a chave e o nome do
+    dispositivo: quem ja existe e atualizado, quem nao existe e criado, e o
+    setor/responsavel/observacoes cadastrados aqui sao preservados. Dispositivos
+    que nao vierem no arquivo ficam marcados como fora do ultimo export (nao sao
+    apagados) e deixam de consumir licenca.
+    """
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para importar dispositivos.")
+        return redirect("kaspersky_dashboard")
+
+    arquivo = request.FILES.get("arquivo")
+    if not arquivo:
+        messages.error(request, "Selecione o arquivo exportado do portal do Kaspersky.")
+        return redirect("kaspersky_dashboard")
+
+    raw = arquivo.read()
+    texto = None
+    for encoding in ("utf-8-sig", "utf-16", "utf-8", "latin-1"):
+        try:
+            texto = raw.decode(encoding)
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    if texto is None:
+        messages.error(request, "Nao foi possivel ler o arquivo. Envie o export do portal.")
+        return redirect("kaspersky_dashboard")
+
+    linhas = [linha for linha in texto.splitlines() if linha.strip()]
+    if not linhas:
+        messages.error(request, "O arquivo esta vazio.")
+        return redirect("kaspersky_dashboard")
+
+    separador = "\t" if "\t" in linhas[0] else (";" if ";" in linhas[0] else ",")
+    colunas = _mapear_colunas_kaspersky(linhas[0].split(separador))
+    if "nome" not in colunas:
+        messages.error(
+            request,
+            "Arquivo invalido: nao encontrei a coluna 'Nome'. Envie o arquivo do botao Exportar do portal.",
+        )
+        return redirect("kaspersky_dashboard")
+
+    def _campo(partes, chave):
+        indice = colunas.get(chave)
+        if indice is None or indice >= len(partes):
+            return ""
+        return partes[indice].strip()
+
+    agora = timezone.now()
+    criados = 0
+    atualizados = 0
+    ignorados = 0
+    vistos = []
+
+    with transaction.atomic():
+        for linha in linhas[1:]:
+            partes = linha.split(separador)
+            nome = _campo(partes, "nome")
+            if not nome:
+                ignorados += 1
+                continue
+            agente = _normalizar_cabecalho(_campo(partes, "agente_executando"))
+            defaults = {
+                "status": _campo(partes, "status"),
+                "agente_executando": agente.startswith("sim") or agente.startswith("yes"),
+                "versao_agente": _campo(partes, "versao_agente"),
+                "versao_aplicativo": _campo(partes, "versao_aplicativo"),
+                "endereco_ip": _campo(partes, "endereco_ip"),
+                "grupo": _campo(partes, "grupo"),
+                "ultima_conexao": _parse_data_kaspersky(_campo(partes, "ultima_conexao")),
+                "no_ultimo_export": True,
+                "importado_em": agora,
+            }
+            _, criado = KasperskyDispositivo.objects.update_or_create(nome=nome, defaults=defaults)
+            vistos.append(nome)
+            if criado:
+                criados += 1
+            else:
+                atualizados += 1
+
+        fora = KasperskyDispositivo.objects.exclude(nome__in=vistos).filter(no_ultimo_export=True)
+        removidos = fora.count()
+        fora.update(no_ultimo_export=False)
+
+    partes_msg = [f"{criados} novo(s)", f"{atualizados} atualizado(s)"]
+    if removidos:
+        partes_msg.append(f"{removidos} fora do export")
+    if ignorados:
+        partes_msg.append(f"{ignorados} linha(s) ignorada(s)")
+    messages.success(request, "Importacao concluida: " + ", ".join(partes_msg) + ".")
+    return redirect("kaspersky_dashboard")
+
+
+@login_required
+@require_POST
+def kaspersky_update_view(request, dispositivo_id: int):
+    """Salva os dados de organizacao interna (setor, responsavel, observacoes),
+    que a importacao nunca sobrescreve."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para editar dispositivos.")
+        return redirect("kaspersky_dashboard")
+
+    dispositivo = get_object_or_404(KasperskyDispositivo, pk=dispositivo_id)
+    dispositivo.setor = (request.POST.get("setor") or "").strip()
+    dispositivo.responsavel = (request.POST.get("responsavel") or "").strip()
+    dispositivo.observacoes = (request.POST.get("observacoes") or "").strip()
+
+    # Colaborador da lista de ramais (opcional). Escolhendo um, o nome e o setor
+    # sao completados a partir do ramal quando ficarem em branco.
+    ramal_id = (request.POST.get("ramal") or "").strip()
+    ramal = Ramal.objects.filter(pk=ramal_id).first() if ramal_id.isdigit() else None
+    dispositivo.ramal = ramal
+    if ramal:
+        dispositivo.responsavel = dispositivo.responsavel or ramal.colaborador
+        dispositivo.setor = dispositivo.setor or ramal.setor
+
+    dispositivo.save(
+        update_fields=["setor", "responsavel", "observacoes", "ramal", "atualizado_em"]
+    )
+    messages.success(request, f"Dispositivo {dispositivo.nome} atualizado.")
+    return redirect("kaspersky_dashboard")
+
+
+@login_required
+@require_POST
+def kaspersky_delete_view(request, dispositivo_id: int):
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para excluir dispositivos.")
+        return redirect("kaspersky_dashboard")
+
+    dispositivo = get_object_or_404(KasperskyDispositivo, pk=dispositivo_id)
+    nome = dispositivo.nome
+    dispositivo.delete()
+    messages.success(request, f"Dispositivo {nome} removido da lista.")
+    return redirect("kaspersky_dashboard")
+
+
+@login_required
+@require_POST
+def kaspersky_licencas_view(request):
+    """Atualiza quantas licencas a empresa tem contratadas."""
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para alterar as licencas.")
+        return redirect("kaspersky_dashboard")
+
+    try:
+        total = int(request.POST.get("licencas_contratadas") or 0)
+    except (TypeError, ValueError):
+        total = -1
+    if total < 0:
+        messages.error(request, "Informe uma quantidade de licencas valida.")
+        return redirect("kaspersky_dashboard")
+
+    config = KasperskyConfig.load()
+    config.licencas_contratadas = total
+    config.save(update_fields=["licencas_contratadas", "atualizado_em"])
+    messages.success(request, f"Licencas contratadas atualizadas para {total}.")
+    return redirect("kaspersky_dashboard")

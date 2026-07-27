@@ -76,6 +76,11 @@
 | `/ips/criar/` | POST | Cadastra um IP (categoria, endereco unico, nome, fabricante, MAC, acesso, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/ips/<id>/editar/` | POST | Edita um IP existente (apenas TI/admin) | Implementada |
 | `/ips/<id>/excluir/` | POST | Exclui um IP (apenas TI/admin) | Implementada |
+| `/kaspersky/` | GET | Dispositivos com antivirus: cartoes de licencas (contratadas/em uso/disponiveis), abas Dispositivos e Colaboradores, busca e filtros por situacao e setor (apenas TI/admin) | Implementada |
+| `/kaspersky/importar/` | POST | Importa o arquivo do botao "Exportar" do portal (TSV/CSV, upsert pelo nome do dispositivo; preserva setor/responsavel/observacoes) (apenas TI/admin) | Implementada |
+| `/kaspersky/licencas/` | POST | Atualiza a quantidade de licencas contratadas (apenas TI/admin) | Implementada |
+| `/kaspersky/<id>/editar/` | POST | Salva setor, responsavel, observacoes e o colaborador vinculado (lista de ramais) (apenas TI/admin) | Implementada |
+| `/kaspersky/<id>/excluir/` | POST | Remove o dispositivo da lista (apenas TI/admin) | Implementada |
 | `/servicos-feitos/` | GET | Modulo Servicos feitos: lista de servicos de TI executados (tabela responsiva + busca + ordenacao) e botao "Novo servico" (apenas TI/admin) | Implementada |
 | `/servicos-feitos/criar/` | POST | Cadastra um servico (nome, empresa, data, valor, descricao) com anexos opcionais (multipart); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/servicos-feitos/<id>/` | GET | Detalhe (JSON) de um servico com anexos, usado pelo modal de visualizacao (apenas TI/admin) | Implementada |
