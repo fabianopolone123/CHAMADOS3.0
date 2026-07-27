@@ -260,6 +260,21 @@ def _attendant_display(user):
     return user.get_full_name() or user.username
 
 
+def _status_efetivo(chamado: Chamado, is_active: bool) -> str:
+    """Status do chamado como ele realmente esta, para exibicao no Kanban.
+
+    "Em atendimento" so vale enquanto ha um atendimento ativo (do Play ao Pause/
+    Stop). Um chamado que ficou com esse status gravado sem nenhum Play ativo
+    (dado antigo, de quando arrastar para o atendente ja marcava "Em
+    atendimento") aparecia no badge e nos contadores da coluna como se estivesse
+    sendo atendido. Aqui ele volta a mostrar o que e de fato: "Atribuido" quando
+    tem atendente e "Aberto" quando esta sem.
+    """
+    if chamado.status == Chamado.STATUS_EM_ATENDIMENTO and not is_active:
+        return Chamado.STATUS_ATRIBUIDO if chamado.atendente_atual_id else Chamado.STATUS_ABERTO
+    return chamado.status
+
+
 def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
     """`active_map`: dict {numero: {"started", "attendant_id", "attendant"}} com os
     atendimentos ATIVOS de TODOS os atendentes (para todos verem quais chamados
@@ -270,16 +285,17 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
     is_active = info is not None
     is_mine = bool(is_active and info.get("attendant_id") == viewer_id)
     started = info["started"] if is_active else None
+    status = _status_efetivo(chamado, is_active)
     return {
         "number": chamado.numero,
         "title": chamado.titulo,
         "requester": _requester_display(chamado),
         "current_attendant": _attendant_display(chamado.atendente_atual),
         "opened_at": timezone.localtime(chamado.criado_em).strftime("%d/%m/%Y %H:%M"),
-        "status": chamado.status,
-        "status_label": chamado.status_label,
-        "status_class": _STATUS_BADGE_CLASS.get(chamado.status, "status-muted"),
-        "is_waiting": chamado.status in Chamado.STATUS_AGUARDANDO,
+        "status": status,
+        "status_label": dict(Chamado.STATUS_CHOICES).get(status, status or "-"),
+        "status_class": _STATUS_BADGE_CLASS.get(status, "status-muted"),
+        "is_waiting": status in Chamado.STATUS_AGUARDANDO,
         "priority_label": chamado.prioridade_label,
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "attendance": {

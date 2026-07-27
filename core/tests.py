@@ -237,7 +237,9 @@ class EncerramentoChamadoTests(TestCase):
 
     def test_dashboard_stats_por_atendente(self):
         # A coluna do atendente traz a quebra por status: em atendimento,
-        # aguardando (soma dos 3) e atribuido. self.chamado ja esta "em_atendimento".
+        # aguardando (soma dos 3) e atribuido. self.chamado esta "em_atendimento"
+        # com Play ativo (o status so conta como em atendimento com Play).
+        self._start_attendance(self.attendant)
         Chamado.objects.create(
             numero="CH-000020", titulo="Peca", solicitante=self.owner,
             status=Chamado.STATUS_AGUARDANDO_PECA, atendente_atual=self.attendant,
@@ -260,6 +262,43 @@ class EncerramentoChamadoTests(TestCase):
         self.assertEqual(coluna["stats"]["em_atendimento"], 1)
         self.assertEqual(coluna["stats"]["aguardando"], 2)
         self.assertEqual(coluna["stats"]["atribuido"], 1)
+
+    def test_status_em_atendimento_sem_play_conta_como_atribuido(self):
+        # Dado antigo: chamado gravado como "em_atendimento" mas sem nenhum
+        # atendimento ativo (antes, arrastar para o atendente ja marcava assim).
+        # Ele nao pode inflar o contador "em atend." da coluna nem o badge.
+        Chamado.objects.create(
+            numero="CH-000023", titulo="Legado sem play", solicitante=self.owner,
+            status=Chamado.STATUS_EM_ATENDIMENTO, atendente_atual=self.attendant,
+        )
+        self._start_attendance(self.attendant)  # so self.chamado esta em play
+
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("tickets_dashboard"))
+        coluna = next(
+            c for c in resp.context["attendant_columns"] if c["attendant_id"] == self.attendant.id
+        )
+        self.assertEqual(coluna["count"], 2)
+        self.assertEqual(coluna["stats"]["em_atendimento"], 1)  # so o que tem Play
+        self.assertEqual(coluna["stats"]["atribuido"], 1)
+
+        card = next(c for c in coluna["tickets"] if c["number"] == "CH-000023")
+        self.assertEqual(card["status"], Chamado.STATUS_ATRIBUIDO)
+        self.assertEqual(card["status_label"], "Atribuido")
+
+    def test_status_em_atendimento_sem_play_e_sem_atendente_conta_como_aberto(self):
+        # Mesmo caso, mas sem atendente atual: o chamado vive na coluna
+        # "Chamados abertos" e deve aparecer como Aberto.
+        self.chamado.atendente_atual = None
+        self.chamado.save(update_fields=["atendente_atual"])
+
+        self.client.force_login(self.attendant)
+        resp = self.client.get(reverse("tickets_dashboard"))
+        card = next(
+            c for c in resp.context["open_column"]["tickets"] if c["number"] == self.chamado.numero
+        )
+        self.assertEqual(card["status"], Chamado.STATUS_ABERTO)
+        self.assertEqual(card["status_label"], "Aberto")
 
     def test_mover_chamado_com_play_ativo_e_bloqueado(self):
         # Com um atendimento ativo (Play), o chamado nao pode ser movido: o
