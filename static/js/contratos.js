@@ -630,7 +630,7 @@
         const L = [];
         const codigo = req.codigo ? `${req.codigo} — ` : "";
         L.push(`*${codigo}${req.titulo}*`);
-        L.push(`Tipo: ${req.tipo_label}  |  Status: ${req.status_label}`);
+        // Tipo e status sao controle interno: nao entram na mensagem enviada.
         L.push(`Solicitado por ${req.criado_por} em ${req.criado_em}`);
         if (req.entregue_em) {
             L.push(`Entregue em ${req.entregue_em}${req.entregue_por ? ` por ${req.entregue_por}` : ""}`);
@@ -780,7 +780,6 @@
         title: "margin:0 0 4px;font-size:20px;color:#0f172a;",
         meta: "margin:0 0 2px;font-size:13px;color:#475569;",
         header: "border:1px solid #e2e8f0;border-left:4px solid #2563eb;border-radius:8px;padding:14px 16px;margin:0 0 4px;background:#f8fafc;",
-        status: "display:inline-block;padding:2px 10px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-size:12px;font-weight:700;",
         sectionTitle: "margin:22px 0 8px;font-size:15px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:4px;",
         texto: "margin:0;white-space:pre-wrap;color:#1e293b;",
         card: "border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin:0 0 14px;background:#ffffff;",
@@ -854,10 +853,9 @@
         const partes = [];
 
         const codigo = req.codigo ? `${escapeHtml(req.codigo)} &mdash; ` : "";
+        // Tipo e status sao controle interno: nao entram no e-mail enviado.
         const cabecalho = [
             `<h2 style="${EMAIL_STYLES.title}">${codigo}${escapeHtml(req.titulo)}</h2>`,
-            `<p style="${EMAIL_STYLES.meta}">Tipo: ${escapeHtml(req.tipo_label)}`
-            + ` &nbsp;&middot;&nbsp; <span style="${EMAIL_STYLES.status}">${escapeHtml(req.status_label)}</span></p>`,
             `<p style="${EMAIL_STYLES.meta}">Solicitado por ${escapeHtml(req.criado_por)}`
             + ` em ${escapeHtml(req.criado_em)}</p>`,
         ];
@@ -920,7 +918,6 @@
         const orcs = data.orcamentos || [];
         const L = [];
         L.push(`${req.codigo ? `${req.codigo} - ` : ""}${req.titulo}`);
-        L.push(`Tipo: ${req.tipo_label} | Status: ${req.status_label}`);
         L.push(`Solicitado por ${req.criado_por} em ${req.criado_em}`);
         if (req.entregue_em) {
             L.push(`Entregue em ${req.entregue_em}${req.entregue_por ? ` por ${req.entregue_por}` : ""}`);
