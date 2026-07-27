@@ -3135,6 +3135,55 @@ class ContatosTests(TestCase):
         pc.refresh_from_db()
         self.assertIsNone(pc.ramal)
 
+
+    def test_nomes_do_glpi_chegam_no_kaspersky(self):
+        # O nome da maquina e o mesmo nos dois sistemas: importando o GLPI, o
+        # Kaspersky passa a mostrar o colaborador e o setor sem digitar de novo.
+        ramal = Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras", ramal="101")
+        KasperskyDispositivo.objects.create(nome="CPU-246", versao_aplicativo="12.12.0.522")
+
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-246", "Gabriele Ana", local="Compras")])
+
+        disp = KasperskyDispositivo.objects.get(nome="CPU-246")
+        self.assertEqual(disp.ramal, ramal)
+        self.assertEqual(disp.responsavel, "Ana Gabriele")
+        self.assertEqual(disp.setor, "Compras")
+
+    def test_kaspersky_nao_sobrescreve_o_que_foi_ajustado_a_mao(self):
+        Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras")
+        outro = Ramal.objects.create(colaborador="Outro Dono", setor="TI")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-246", ramal=outro, responsavel="Outro Dono", setor="TI",
+            versao_aplicativo="12.12.0.522",
+        )
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-246", "Gabriele Ana", local="Compras")])
+
+        disp = KasperskyDispositivo.objects.get(nome="CPU-246")
+        self.assertEqual(disp.ramal, outro)  # vinculo manual preservado
+        self.assertEqual(disp.setor, "TI")
+
+    def test_botao_puxar_nomes_do_glpi(self):
+        # Os dois arquivos ja importados antes de existir o vinculo: o botao
+        # resolve sem precisar reimportar nada.
+        ramal = Ramal.objects.create(colaborador="Ana Gabriele", setor="Compras")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-246", "Gabriele Ana")])
+        KasperskyDispositivo.objects.create(nome="CPU-246", versao_aplicativo="12.12.0.522")
+
+        resp = self.client.post(reverse("kaspersky_sincronizar_glpi"))
+        self.assertEqual(resp.status_code, 302)
+        disp = KasperskyDispositivo.objects.get(nome="CPU-246")
+        self.assertEqual(disp.ramal, ramal)
+        self.assertEqual(disp.responsavel, "Ana Gabriele")
+
+    def test_sincronizar_exige_permissao(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.post(reverse("kaspersky_sincronizar_glpi")).status_code, 302)
+        self.client.force_login(self.ti)
+        self.assertEqual(self.client.get(reverse("kaspersky_sincronizar_glpi")).status_code, 405)
+
     def test_permissoes(self):
         self.client.force_login(self.common)
         self.assertNotEqual(self.client.get(reverse("contatos_dashboard")).status_code, 200)

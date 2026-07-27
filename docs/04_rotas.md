@@ -82,6 +82,7 @@
 | `/kaspersky/` | GET | Dispositivos com antivirus: cartoes de licencas (contratadas/em uso/disponiveis), abas Dispositivos e Colaboradores, busca e filtros por situacao e setor (apenas TI/admin) | Implementada |
 | `/kaspersky/importar/` | POST | Importa o arquivo do botao "Exportar" do portal (TSV/CSV, upsert pelo nome do dispositivo; preserva setor/responsavel/observacoes) (apenas TI/admin) | Implementada |
 | `/kaspersky/licencas/` | POST | Atualiza a quantidade de licencas contratadas (apenas TI/admin) | Implementada |
+| `/kaspersky/sincronizar-glpi/` | POST | Puxa o colaborador e o setor do inventario do GLPI para os dispositivos do Kaspersky, casando pelo nome da maquina (so preenche o que esta vazio) (apenas TI/admin) | Implementada |
 | `/kaspersky/<id>/editar/` | POST | Salva setor, responsavel, observacoes e o colaborador vinculado (lista de ramais) (apenas TI/admin) | Implementada |
 | `/kaspersky/<id>/excluir/` | POST | Remove o dispositivo da lista (apenas TI/admin) | Implementada |
 | `/servicos-feitos/` | GET | Modulo Servicos feitos: lista de servicos de TI executados (tabela responsiva + busca + ordenacao) e botao "Novo servico" (apenas TI/admin) | Implementada |

@@ -243,3 +243,15 @@
     background: #eef2ff;
     color: #3730a3;
 }
+
+/* Acoes do topo: sincronizar com o GLPI + importar o export */
+.ksp-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.ksp-sync-form {
+    margin: 0;
+}

@@ -5363,6 +5363,41 @@ def _parse_data_kaspersky(valor: str):
     return None
 
 
+def _vincular_kaspersky_pelo_glpi(nomes=None) -> int:
+    """Preenche o colaborador dos dispositivos do Kaspersky a partir do GLPI.
+
+    O nome da maquina e o mesmo nos dois sistemas (CPU-010, NOT-362, ...), entao
+    quem ja tem dono no inventario do GLPI passa a mostrar o colaborador, o setor
+    e o responsavel tambem no Kaspersky — sem precisar preencher duas vezes.
+
+    So mexe em dispositivo que ainda NAO tem colaborador vinculado, e so preenche
+    setor/responsavel quando estao em branco (o que foi ajustado a mao fica).
+    `nomes` limita a busca aos nomes recem-importados; sem ele, varre todos.
+    Devolve quantos foram vinculados.
+    """
+    dispositivos = KasperskyDispositivo.objects.filter(ramal__isnull=True)
+    computadores = Computador.objects.exclude(ramal__isnull=True).select_related("ramal")
+    if nomes:
+        dispositivos = dispositivos.filter(nome__in=nomes)
+        computadores = computadores.filter(nome__in=nomes)
+
+    por_nome = {c.nome.strip().lower(): c for c in computadores}
+    if not por_nome:
+        return 0
+
+    vinculados = 0
+    for dispositivo in dispositivos:
+        computador = por_nome.get(dispositivo.nome.strip().lower())
+        if not computador:
+            continue
+        dispositivo.ramal = computador.ramal
+        dispositivo.responsavel = dispositivo.responsavel or computador.ramal.colaborador
+        dispositivo.setor = dispositivo.setor or computador.ramal.setor or computador.localizacao
+        dispositivo.save(update_fields=["ramal", "responsavel", "setor", "atualizado_em"])
+        vinculados += 1
+    return vinculados
+
+
 @ti_required
 def kaspersky_dashboard_view(request):
     """Lista os dispositivos com antivirus, o consumo de licencas e os filtros
@@ -5542,12 +5577,43 @@ def kaspersky_import_view(request):
         removidos = fora.count()
         fora.update(no_ultimo_export=False)
 
+        # Puxa o colaborador/setor do inventario do GLPI pelo nome da maquina.
+        vinculados = _vincular_kaspersky_pelo_glpi(vistos)
+
     partes_msg = [f"{criados} novo(s)", f"{atualizados} atualizado(s)"]
+    if vinculados:
+        partes_msg.append(f"{vinculados} com colaborador do GLPI")
     if removidos:
         partes_msg.append(f"{removidos} fora do export")
     if ignorados:
         partes_msg.append(f"{ignorados} linha(s) ignorada(s)")
     messages.success(request, "Importacao concluida: " + ", ".join(partes_msg) + ".")
+    return redirect("kaspersky_dashboard")
+
+
+@login_required
+@require_POST
+def kaspersky_sincronizar_glpi_view(request):
+    """Puxa os nomes (colaborador/setor) do inventario do GLPI para o Kaspersky.
+
+    As duas importacoes ja fazem isso sozinhas; este botao serve para quando os
+    dois arquivos ja foram importados e o vinculo ainda nao existia.
+    """
+    if not _is_ti(request.user):
+        messages.error(request, "Voce nao tem permissao para sincronizar dispositivos.")
+        return redirect("kaspersky_dashboard")
+
+    vinculados = _vincular_kaspersky_pelo_glpi()
+    if vinculados:
+        messages.success(
+            request, f"{vinculados} dispositivo(s) receberam o colaborador do GLPI."
+        )
+    else:
+        messages.info(
+            request,
+            "Nenhum dispositivo novo para vincular. Importe o CSV do GLPI em Contatos "
+            "para o sistema saber quem usa cada maquina.",
+        )
     return redirect("kaspersky_dashboard")
 
 
@@ -5932,9 +5998,14 @@ def contatos_import_view(request):
         removidos = fora.count()
         fora.update(no_ultimo_import=False)
 
+        # Leva os nomes tambem para o Kaspersky (mesma nomenclatura de maquina).
+        no_kaspersky = _vincular_kaspersky_pelo_glpi(vistos)
+
     partes_msg = [f"{criados} novo(s)", f"{atualizados} atualizado(s)"]
     if vinculados:
         partes_msg.append(f"{vinculados} vinculado(s) a colaboradores")
+    if no_kaspersky:
+        partes_msg.append(f"{no_kaspersky} nome(s) levado(s) para o Kaspersky")
     if removidos:
         partes_msg.append(f"{removidos} fora do arquivo")
     if ignorados:

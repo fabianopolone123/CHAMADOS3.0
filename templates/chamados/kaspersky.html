@@ -26,13 +26,22 @@
                 <p class="contratos-topbar__subtitle">Dispositivos com antivirus e controle das licencas</p>
                 <p class="topbar-subtitle">
                     Atualize a lista com o arquivo do botao "Exportar" do portal do Kaspersky.
+                    O colaborador e o setor sao puxados do inventario do GLPI (modulo Contatos) pelo nome da maquina.
                     {% if ultima_importacao %}Ultima importacao em {{ ultima_importacao }}.{% endif %}
                 </p>
             </div>
-            <button type="button" class="contratos-add-btn" id="importKasperskyButton" title="Importar export do portal">
-                <span class="contratos-add-btn__icon" aria-hidden="true">&#8593;</span>
-                <span class="contratos-add-btn__label">Importar export</span>
-            </button>
+            <div class="ksp-topbar-actions">
+                <form method="post" action="{% url 'kaspersky_sincronizar_glpi' %}" class="ksp-sync-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-primary btn-sm" title="Puxar colaborador e setor do inventario do GLPI">
+                        Puxar nomes do GLPI
+                    </button>
+                </form>
+                <button type="button" class="contratos-add-btn" id="importKasperskyButton" title="Importar export do portal">
+                    <span class="contratos-add-btn__icon" aria-hidden="true">&#8593;</span>
+                    <span class="contratos-add-btn__label">Importar export</span>
+                </button>
+            </div>
         </header>
 
         <section class="ips-stats ksp-stats">
