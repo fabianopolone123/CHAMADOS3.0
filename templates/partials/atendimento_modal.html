@@ -17,6 +17,12 @@
 
                     <div class="attendance-modal__action-pill" id="attendanceModalActionLabel">Pause</div>
 
+                    {# Aviso do Stop direto: chamado parado em "aguardando" encerrado sem Play. #}
+                    <p class="attendance-modal__notice" id="attendanceModalNotice" hidden>
+                        Este chamado sera encerrado <strong>sem atendimento ativo</strong> (nao ha Play em andamento).
+                        O texto abaixo fica registrado na linha do tempo do chamado.
+                    </p>
+
                     <label class="attendance-modal__field" id="attendanceModalReasonField" hidden>
                         <span>Motivo da pausa</span>
                         <select id="attendanceModalReason" class="form-select">

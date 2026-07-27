@@ -141,7 +141,7 @@ Campos atuais:
 
 - `chamado` (FK para `Chamado`, `on_delete=CASCADE`, related_name `eventos`)
 - `usuario` (FK opcional para quem realizou a acao, `on_delete=SET_NULL`)
-- `tipo` (choices: `criacao`, `mudanca_status`, `atendente_alterado`, `comentario`)
+- `tipo` (choices: `criacao`, `mudanca_status`, `atendente_alterado`, `comentario`, `encerramento_direto`)
 - `descricao` (texto claro da acao)
 - `criado_em`
 
@@ -150,6 +150,8 @@ Eventos registrados atualmente:
 - Criacao do chamado (`criacao`): "Chamado aberto por X."
 - Mudanca de status (`mudanca_status`): "Status alterado de A para B por X."
 - Atendente que assumiu/movimentou (`atendente_alterado`): "Chamado assumido por X." (registrado apenas quando o `atendente_atual` muda, evitando duplicidade)
+- Encerramento pelo Stop (`atendente_alterado`): "Chamado finalizado por X. O que foi feito: ..."
+- Encerramento sem atendimento ativo (`encerramento_direto`, migration `0044`): "Chamado finalizado por X sem atendimento ativo (estava em Aguardando peca). O que foi feito: ..." — usado quando um chamado parado em "aguardando" e fechado direto pelo Stop, sem Play. Como esse fechamento nao cria periodo em `AtendimentoHistorico`, o tipo proprio permite mostra-lo tambem no "Andamento do atendimento" do detalhe do chamado.
 
 ### ChamadoAnexo
 

@@ -50,7 +50,10 @@
             <button type="button" class="ticket-action-btn ticket-action-btn--pause{% if not ticket.attendance.is_mine %} is-hidden{% endif %}" data-ticket-action="pause" aria-label="Pausar atendimento">
                 <span>Pause</span>
             </button>
-            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_mine %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar atendimento">
+            {# O Stop tambem aparece (junto do Play) em chamados parados em "aguardando"
+               sem Play ativo: da para encerrar direto, sem iniciar um atendimento so
+               para fechar. Ver `can_close_direct` em `_serialize_kanban_card`. #}
+            <button type="button" class="ticket-action-btn ticket-action-btn--stop{% if not ticket.attendance.is_mine and not ticket.can_close_direct %} is-hidden{% endif %}" data-ticket-action="stop" aria-label="Finalizar chamado">
                 <span>Stop</span>
             </button>
         </div>

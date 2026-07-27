@@ -190,11 +190,16 @@ class ChamadoEvento(models.Model):
     TIPO_STATUS = "mudanca_status"
     TIPO_ATENDENTE = "atendente_alterado"
     TIPO_COMENTARIO = "comentario"
+    # Encerramento de um chamado parado em "aguardando" feito direto pelo Stop,
+    # sem Play/atendimento ativo: nao gera periodo em `AtendimentoHistorico`, por
+    # isso tem tipo proprio e entra no andamento do chamado por este evento.
+    TIPO_ENCERRAMENTO_DIRETO = "encerramento_direto"
     TIPO_CHOICES = [
         (TIPO_CRIACAO, "Criacao"),
         (TIPO_STATUS, "Mudanca de status"),
         (TIPO_ATENDENTE, "Atendente alterado"),
         (TIPO_COMENTARIO, "Comentario"),
+        (TIPO_ENCERRAMENTO_DIRETO, "Encerramento sem atendimento ativo"),
     ]
 
     chamado = models.ForeignKey(Chamado, on_delete=models.CASCADE, related_name="eventos")

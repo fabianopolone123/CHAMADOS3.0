@@ -1347,6 +1347,18 @@
     font-size: 0.75rem;
 }
 
+/* Aviso do Stop direto (chamado em "aguardando" encerrado sem Play ativo). */
+.attendance-modal__notice {
+    margin-bottom: 1rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(217, 119, 6, 0.24);
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
 .attendance-modal__field textarea {
     width: 100%;
     min-height: 150px;

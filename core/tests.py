@@ -212,6 +212,118 @@ class EncerramentoChamadoTests(TestCase):
         self.chamado.refresh_from_db()
         self.assertEqual(self.chamado.status, Chamado.STATUS_ATRIBUIDO)
 
+    def _por_em_aguardando(self, status=Chamado.STATUS_AGUARDANDO_PECA):
+        self.chamado.status = status
+        self.chamado.save(update_fields=["status"])
+
+    def test_stop_sem_play_fecha_chamado_em_aguardando(self):
+        # Chamado parado em "aguardando peca" pode ser encerrado direto pelo Stop,
+        # sem precisar iniciar um atendimento so para fechar.
+        self._por_em_aguardando()
+        self.client.force_login(self.attendant)
+        resp = self._finish("stop", "Peca nao veio mais, usuario trocou de maquina")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertTrue(data["ticket_closed"])
+        self.assertEqual(data["status"], Chamado.STATUS_FECHADO)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_FECHADO)
+        self.assertIsNotNone(self.chamado.fechado_em)
+        # Nenhum periodo de atendimento e inventado para o fechamento.
+        self.assertEqual(AtendimentoHistorico.objects.filter(chamado=self.chamado).count(), 0)
+
+    def test_stop_sem_play_registra_tudo_na_linha_do_tempo(self):
+        self._por_em_aguardando(Chamado.STATUS_AGUARDANDO_USUARIO)
+        self.client.force_login(self.attendant)
+        self._finish("stop", "Usuario nao respondeu, chamado encerrado")
+
+        # Mudanca de status (de onde saiu) + encerramento com autor e o que foi feito.
+        self.assertTrue(
+            ChamadoEvento.objects.filter(
+                chamado=self.chamado,
+                tipo=ChamadoEvento.TIPO_STATUS,
+                descricao__icontains="Aguardando usuario",
+            ).exists()
+        )
+        encerramento = ChamadoEvento.objects.filter(
+            chamado=self.chamado, tipo=ChamadoEvento.TIPO_ENCERRAMENTO_DIRETO
+        ).first()
+        self.assertIsNotNone(encerramento)
+        self.assertIn("sem atendimento ativo", encerramento.descricao)
+        self.assertIn("Aguardando usuario", encerramento.descricao)
+        self.assertIn("O que foi feito: Usuario nao respondeu", encerramento.descricao)
+
+        # O encerramento tambem aparece no andamento do chamado (detalhe).
+        resp = self.client.get(reverse("ticket_detail", args=[self.chamado.numero]))
+        acoes = [item["action"] for item in resp.context["timeline"]]
+        self.assertIn("encerrou o chamado sem atendimento ativo", acoes)
+
+    def test_stop_sem_play_fora_de_aguardando_e_bloqueado(self):
+        # Sem Play e sem estar em "aguardando", continua valendo a regra antiga.
+        self.chamado.status = Chamado.STATUS_ATRIBUIDO
+        self.chamado.save(update_fields=["status"])
+        self.client.force_login(self.attendant)
+        resp = self._finish("stop", "tentando fechar sem play")
+        self.assertEqual(resp.status_code, 409)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_ATRIBUIDO)
+
+    def test_pause_sem_play_continua_bloqueado(self):
+        self._por_em_aguardando()
+        self.client.force_login(self.attendant)
+        resp = self._finish("pause", "tentando pausar sem play")
+        self.assertEqual(resp.status_code, 409)
+
+    def test_stop_sem_play_exige_descricao(self):
+        self._por_em_aguardando()
+        self.client.force_login(self.attendant)
+        resp = self._finish("stop", "")
+        self.assertEqual(resp.status_code, 400)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_AGUARDANDO_PECA)
+
+    def test_stop_sem_play_em_chamado_ja_fechado_e_bloqueado(self):
+        self.chamado.status = Chamado.STATUS_FECHADO
+        self.chamado.save(update_fields=["status"])
+        self.client.force_login(self.attendant)
+        resp = self._finish("stop", "fechando de novo")
+        self.assertEqual(resp.status_code, 409)
+
+    def test_usuario_comum_nao_fecha_chamado_em_aguardando(self):
+        self._por_em_aguardando()
+        self.client.force_login(self.owner)
+        resp = self._finish("stop", "tentando encerrar")
+        self.assertEqual(resp.status_code, 403)
+
+        self.chamado.refresh_from_db()
+        self.assertEqual(self.chamado.status, Chamado.STATUS_AGUARDANDO_PECA)
+
+    def test_card_em_aguardando_libera_stop_sem_play(self):
+        # O card so mostra o Stop sem Play quando esta em "aguardando".
+        self._por_em_aguardando()
+        self.client.force_login(self.attendant)
+        coluna = next(
+            c
+            for c in self.client.get(reverse("tickets_dashboard")).context["attendant_columns"]
+            if c["attendant_id"] == self.attendant.id
+        )
+        card = next(c for c in coluna["tickets"] if c["number"] == self.chamado.numero)
+        self.assertTrue(card["can_close_direct"])
+
+        # Com Play ativo o fluxo normal (Pause/Stop do atendimento) e que vale.
+        self._start_attendance(self.attendant)
+        coluna = next(
+            c
+            for c in self.client.get(reverse("tickets_dashboard")).context["attendant_columns"]
+            if c["attendant_id"] == self.attendant.id
+        )
+        card = next(c for c in coluna["tickets"] if c["number"] == self.chamado.numero)
+        self.assertFalse(card["can_close_direct"])
+
     def test_common_user_cannot_finish_attendance(self):
         self.client.force_login(self.owner)
         resp = self._finish("stop", "tentando encerrar")

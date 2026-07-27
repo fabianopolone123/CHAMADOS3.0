@@ -36,6 +36,7 @@
         submit: document.getElementById("attendanceModalSubmit"),
         reason: document.getElementById("attendanceModalReason"),
         reasonField: document.getElementById("attendanceModalReasonField"),
+        notice: document.getElementById("attendanceModalNotice"),
     };
 
     // Enter salva direto (Shift+Enter quebra linha): clica, digita, Enter e pronto.
@@ -92,6 +93,28 @@
         }
         card.dataset.ticketStatus = statusValue;
         card.classList.toggle("ticket-card--waiting", WAITING_STATUSES.includes(statusValue));
+        syncDirectCloseButton(card);
+    }
+
+    // Um chamado parado em "aguardando" pode ser encerrado sem Play: nesse caso o
+    // card mostra Play + Stop (o Pause continua oculto, porque nao ha atendimento
+    // rodando). Sem Play e fora de "aguardando", o Stop volta a ficar escondido.
+    function syncDirectCloseButton(card) {
+        const stopButton = card.querySelector('[data-ticket-action="stop"]');
+        if (!stopButton || card.dataset.ticketActive === "true") {
+            return;  // com Play ativo quem controla os botoes e o estado do atendimento
+        }
+        const podeFechar = WAITING_STATUSES.includes(card.dataset.ticketStatus || "");
+        stopButton.classList.toggle("is-hidden", !podeFechar);
+    }
+
+    // True quando o Stop do card vai encerrar o chamado sem atendimento ativo.
+    function isDirectClose(card) {
+        return Boolean(
+            card
+            && card.dataset.ticketActive !== "true"
+            && WAITING_STATUSES.includes(card.dataset.ticketStatus || "")
+        );
     }
 
     function setCardActiveState(card, startedAtIso) {
@@ -161,6 +184,8 @@
         if (stopButton) {
             stopButton.classList.add("is-hidden");
         }
+        // Chamado que ficou em "aguardando" continua podendo ser encerrado sem Play.
+        syncDirectCloseButton(card);
     }
 
     function startTimerLoop() {
@@ -373,6 +398,7 @@
         const card = getTicketCard(ticketNumber);
         const title = card ? card.dataset.ticketTitle : "Chamado";
         const actionLabel = action === "pause" ? "Pause" : "Stop";
+        const fechamentoDireto = action === "stop" && isDirectClose(card);
 
         attendanceFields.ticketNumber.value = ticketNumber;
         attendanceFields.action.value = action;
@@ -380,6 +406,12 @@
         attendanceFields.actionLabel.textContent = actionLabel;
         attendanceFields.description.value = "";
         attendanceFields.submit.textContent = action === "pause" ? "Enviar pausa" : "Finalizar chamado";
+
+        // Encerrando um chamado em "aguardando" sem Play: avisa que nao ha
+        // atendimento ativo e que o texto vai para a linha do tempo.
+        if (attendanceFields.notice) {
+            attendanceFields.notice.hidden = !fechamentoDireto;
+        }
 
         // O motivo (aguardando peca/autorizacao/usuario) so aparece no Pause.
         if (attendanceFields.reasonField) {

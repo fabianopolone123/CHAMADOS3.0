@@ -296,6 +296,10 @@ def _serialize_kanban_card(chamado: Chamado, active_map=None, viewer_id=None):
         "status_label": dict(Chamado.STATUS_CHOICES).get(status, status or "-"),
         "status_class": _STATUS_BADGE_CLASS.get(status, "status-muted"),
         "is_waiting": status in Chamado.STATUS_AGUARDANDO,
+        # Chamado parado em "aguardando" pode ser encerrado (Stop) sem precisar de
+        # um Play antes: quem esperava peca/usuario/autorizacao muitas vezes so
+        # precisa registrar o desfecho e fechar.
+        "can_close_direct": bool(not is_active and status in Chamado.STATUS_AGUARDANDO),
         "priority_label": chamado.prioridade_label,
         "priority_class": _PRIORIDADE_BADGE_CLASS.get(chamado.prioridade, "priority-medium"),
         "attendance": {
@@ -929,7 +933,9 @@ def start_attendance_view(request):
     return JsonResponse(response)
 
 
-def _close_chamado_on_stop(chamado: Chamado, user, descricao_atividade: str = "") -> bool:
+def _close_chamado_on_stop(
+    chamado: Chamado, user, descricao_atividade: str = "", sem_atendimento_ativo: bool = False
+) -> bool:
     """Fecha o chamado ao finalizar o atendimento (Stop) e registra o historico.
 
     Idempotente: se o chamado ja estiver encerrado, nao duplica eventos.
@@ -938,6 +944,10 @@ def _close_chamado_on_stop(chamado: Chamado, user, descricao_atividade: str = ""
     guarda a mudanca de status e um evento de encerramento com quem finalizou e o
     texto de "O que foi feito"; esse texto e historico tecnico, separado da
     conversa do usuario (`ChamadoMensagem`).
+
+    `sem_atendimento_ativo` marca o encerramento direto de um chamado em
+    "aguardando" (fechado sem Play). A linha do tempo registra isso de forma
+    explicita, com o status de onde o chamado saiu.
     """
     autor = _attendant_display(user)
     previous_status_label = chamado.status_label
@@ -960,13 +970,23 @@ def _close_chamado_on_stop(chamado: Chamado, user, descricao_atividade: str = ""
             descricao=f"Status alterado de {previous_status_label} para {chamado.status_label} por {autor}.",
         )
     if not previous_closed:
-        texto = f"Chamado finalizado por {autor}."
+        if sem_atendimento_ativo:
+            texto = (
+                f"Chamado finalizado por {autor} sem atendimento ativo "
+                f"(estava em {previous_status_label})."
+            )
+        else:
+            texto = f"Chamado finalizado por {autor}."
         if descricao_atividade:
             texto += f" O que foi feito: {descricao_atividade}"
         ChamadoEvento.registrar(
             chamado=chamado,
             usuario=user,
-            tipo=ChamadoEvento.TIPO_ATENDENTE,
+            tipo=(
+                ChamadoEvento.TIPO_ENCERRAMENTO_DIRETO
+                if sem_atendimento_ativo
+                else ChamadoEvento.TIPO_ATENDENTE
+            ),
             descricao=texto,
         )
     return True
@@ -1004,72 +1024,103 @@ def finish_attendance_view(request):
         .filter(atendente=request.user, chamado__numero=ticket_number, finalizado_em__isnull=True)
         .first()
     )
+
+    # Sem atendimento ativo, o Stop ainda vale para um chamado parado em
+    # "aguardando" (usuario/peca/autorizacao): o que estava sendo esperado pode
+    # simplesmente ter se resolvido, e obrigar um Play so para fechar criaria um
+    # periodo de atendimento artificial. A descricao continua obrigatoria e todo
+    # o encerramento vai para a linha do tempo do chamado.
+    chamado_direto = None
     if not attendance:
-        return _json_error("Nao existe atendimento ativo para este chamado.", status=409)
+        if action != AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
+            return _json_error("Nao existe atendimento ativo para este chamado.", status=409)
+
+        chamado_direto = Chamado.objects.select_related("atendente_atual").filter(
+            numero=ticket_number
+        ).first()
+        if not chamado_direto:
+            return _json_error("Chamado nao encontrado.", status=404)
+        if chamado_direto.status in Chamado.STATUS_ENCERRADOS:
+            return _json_error("Este chamado ja esta encerrado.", status=409)
+        if chamado_direto.status not in Chamado.STATUS_AGUARDANDO:
+            return _json_error(
+                "Inicie o atendimento (Play) antes de finalizar este chamado.", status=409
+            )
 
     ticket_closed = False
     pause_status_changed = False
     try:
         with transaction.atomic():
-            attendance.finalizar(tipo_encerramento=action, descricao_atividade=description)
-            attendance.save()
-            chamado = attendance.chamado
-            autor = _attendant_display(request.user)
-            if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
-                ticket_closed = _close_chamado_on_stop(chamado, request.user, description)
+            if chamado_direto is not None:
+                # Stop direto de um chamado em "aguardando": nao ha periodo de
+                # atendimento para encerrar, apenas o fechamento do chamado (que
+                # ja registra status e encerramento na linha do tempo).
+                chamado = chamado_direto
+                ticket_closed = _close_chamado_on_stop(
+                    chamado, request.user, description, sem_atendimento_ativo=True
+                )
             else:
-                # Pause encerra o periodo de atendimento: com motivo, marca o
-                # "aguardando" escolhido; sem motivo, volta o chamado para
-                # "Atribuido" (nao fica mais "Em atendimento" sem Play ativo),
-                # desde que nao haja outro atendimento ativo no mesmo chamado.
-                status_labels = dict(Chamado.STATUS_CHOICES)
-                if pause_reason in Chamado.STATUS_AGUARDANDO:
-                    novo_status = pause_reason
+                attendance.finalizar(tipo_encerramento=action, descricao_atividade=description)
+                attendance.save()
+                chamado = attendance.chamado
+                autor = _attendant_display(request.user)
+                if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP:
+                    ticket_closed = _close_chamado_on_stop(chamado, request.user, description)
                 else:
-                    outro_play_ativo = (
-                        AtendimentoHistorico.objects.filter(
-                            chamado=chamado, finalizado_em__isnull=True
+                    # Pause encerra o periodo de atendimento: com motivo, marca o
+                    # "aguardando" escolhido; sem motivo, volta o chamado para
+                    # "Atribuido" (nao fica mais "Em atendimento" sem Play ativo),
+                    # desde que nao haja outro atendimento ativo no mesmo chamado.
+                    status_labels = dict(Chamado.STATUS_CHOICES)
+                    if pause_reason in Chamado.STATUS_AGUARDANDO:
+                        novo_status = pause_reason
+                    else:
+                        outro_play_ativo = (
+                            AtendimentoHistorico.objects.filter(
+                                chamado=chamado, finalizado_em__isnull=True
+                            )
+                            .exclude(pk=attendance.pk)
+                            .exists()
                         )
-                        .exclude(pk=attendance.pk)
-                        .exists()
-                    )
-                    novo_status = None if outro_play_ativo else Chamado.STATUS_ATRIBUIDO
-                if (
-                    novo_status
-                    and chamado.status not in Chamado.STATUS_ENCERRADOS
-                    and chamado.status != novo_status
-                ):
-                    anterior = chamado.status_label
-                    chamado.status = novo_status
-                    chamado.save(update_fields=["status", "atualizado_em"])
-                    pause_status_changed = True
+                        novo_status = None if outro_play_ativo else Chamado.STATUS_ATRIBUIDO
+                    if (
+                        novo_status
+                        and chamado.status not in Chamado.STATUS_ENCERRADOS
+                        and chamado.status != novo_status
+                    ):
+                        anterior = chamado.status_label
+                        chamado.status = novo_status
+                        chamado.save(update_fields=["status", "atualizado_em"])
+                        pause_status_changed = True
+                        ChamadoEvento.registrar(
+                            chamado=chamado,
+                            usuario=request.user,
+                            tipo=ChamadoEvento.TIPO_STATUS,
+                            descricao=f"Status alterado de {anterior} para {chamado.status_label} por {autor}.",
+                        )
+                    texto = f"Atendimento pausado por {autor}."
+                    if pause_reason in Chamado.STATUS_AGUARDANDO:
+                        texto = f"Atendimento pausado por {autor} ({status_labels.get(pause_reason)})."
+                    if description:
+                        texto += f" O que foi feito: {description}"
                     ChamadoEvento.registrar(
                         chamado=chamado,
                         usuario=request.user,
-                        tipo=ChamadoEvento.TIPO_STATUS,
-                        descricao=f"Status alterado de {anterior} para {chamado.status_label} por {autor}.",
+                        tipo=ChamadoEvento.TIPO_ATENDENTE,
+                        descricao=texto,
                     )
-                texto = f"Atendimento pausado por {autor}."
-                if pause_reason in Chamado.STATUS_AGUARDANDO:
-                    texto = f"Atendimento pausado por {autor} ({status_labels.get(pause_reason)})."
-                if description:
-                    texto += f" O que foi feito: {description}"
-                ChamadoEvento.registrar(
-                    chamado=chamado,
-                    usuario=request.user,
-                    tipo=ChamadoEvento.TIPO_ATENDENTE,
-                    descricao=texto,
-                )
     except ValidationError as exc:
         message = exc.messages[0] if exc.messages else "Nao foi possivel encerrar o atendimento."
         return _json_error(message)
 
-    chamado = attendance.chamado
     if ticket_closed:
         autor_nome = request.user.get_full_name() or request.user.username
         notificacoes.notificar_fechamento(chamado, autor_nome, description, request)
 
-    duration_display = _format_duration(attendance.duracao)
+    # No Stop direto (sem Play) nao existe periodo de atendimento: nao ha duracao
+    # e o horario do registro e o do proprio encerramento.
+    duration_display = _format_duration(attendance.duracao) if attendance else "-"
+    registrado_em = attendance.finalizado_em if attendance else timezone.now()
     action_label = "pausado" if action == AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE else "finalizado"
 
     response = {
@@ -1081,7 +1132,7 @@ def finish_attendance_view(request):
         "ticket_closed": ticket_closed,
         "history_entry": {
             "author": request.user.get_full_name() or request.user.username,
-            "timestamp": timezone.localtime(attendance.finalizado_em).strftime("%d/%m/%Y %H:%M"),
+            "timestamp": timezone.localtime(registrado_em).strftime("%d/%m/%Y %H:%M"),
             "message": description,
             "kind": "comment",
         },
@@ -1138,6 +1189,9 @@ def _serialize_my_ticket(chamado: Chamado):
 
 
 def _serialize_ticket_timeline(chamado: Chamado):
+    """Andamento do chamado: os periodos de atendimento (Play -> Pause/Stop) mais
+    os encerramentos feitos sem atendimento ativo (Stop direto de um chamado em
+    "aguardando"), que nao geram periodo mas fazem parte do que aconteceu."""
     timeline = []
     for item in chamado.atendimentos.select_related("atendente").order_by("iniciado_em"):
         author = item.atendente.get_full_name() or item.atendente.username
@@ -1158,9 +1212,25 @@ def _serialize_ticket_timeline(chamado: Chamado):
                 "author": author,
                 "action": action,
                 "message": message,
-                "timestamp": timestamp.strftime("%d/%m/%Y %H:%M"),
+                "timestamp": timestamp,
             }
         )
+
+    for evento in chamado.eventos.select_related("usuario").filter(
+        tipo=ChamadoEvento.TIPO_ENCERRAMENTO_DIRETO
+    ):
+        timeline.append(
+            {
+                "author": _attendant_display(evento.usuario) or "Sistema",
+                "action": "encerrou o chamado sem atendimento ativo",
+                "message": evento.descricao,
+                "timestamp": timezone.localtime(evento.criado_em),
+            }
+        )
+
+    timeline.sort(key=lambda entrada: entrada["timestamp"])
+    for entrada in timeline:
+        entrada["timestamp"] = entrada["timestamp"].strftime("%d/%m/%Y %H:%M")
     return timeline
 
 
