@@ -574,7 +574,7 @@ Fatura mensal da locacao de impressoras (Futura Digital), migrada do banco antig
 
 - `mes_referencia` (data; sempre normalizada para o 1o dia do mes)
 - `nota_fiscal`
-- `copias_total`, `copias_cor`
+- `copias_total` (PRODUCAO TOTAL do mes na memoria de calculo da Futura: todos os contadores somados, coloridas incluidas), `copias_cor`
 - `franquia_copias` (default 23000), `franquia_valor` (default 1610,00)
 - `valor_copia_excedente` (default 0,07), `valor_copia_cor` (default 0,75)
 - `copias_excedentes` e `valor_pago` (calculados no backend)
@@ -583,10 +583,10 @@ Fatura mensal da locacao de impressoras (Futura Digital), migrada do banco antig
 
 Regra de cobranca (aplicada no cadastro/edicao):
 
-- `copias_excedentes = max(copias_total - copias_cor - franquia_copias, 0)` (excedente conta so as copias P&B alem da franquia).
+- `copias_excedentes = max(copias_total - franquia_copias, 0)`. As coloridas NAO saem da base do excedente: elas ja estao na producao, contam no volume da franquia e ainda pagam a taxa de cor por cima. Conferido com a memoria de calculo/NF (producao 56.141, franquia 23.000, coloridas 498 -> 33.141 excedentes e R$ 4.303,37) e com a fatura de 05/2026. (Ate 27/07/2026 a formula subtraia as coloridas, o que gerava valor menor que a NF.)
 - `valor_pago = franquia_valor + copias_excedentes * valor_copia_excedente + copias_cor * valor_copia_cor`.
 - As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
-- So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb`, `*_display`.
+- So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb` (producao P&B, so informativa), `*_display`. As faturas ja cadastradas NAO sao recalculadas por uma mudanca de formula (guardam o valor efetivamente pago); o recalculo so acontece ao salvar/editar a fatura.
 
 ### Dica
 

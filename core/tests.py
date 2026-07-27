@@ -1938,29 +1938,52 @@ class FuturaDigitalTests(TestCase):
         Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
         self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
 
+    def _criar(self, mes, total, cor, **extra):
+        dados = {
+            "mes_referencia": mes,
+            "copias_total": str(total),
+            "copias_cor": str(cor),
+            "franquia_copias": "23000",
+            "franquia_valor": "1610,00",
+            "valor_copia_excedente": "0,07",
+            "valor_copia_cor": "0,75",
+        }
+        dados.update(extra)
+        return self.client.post(reverse("futura_digital_create"), dados)
+
     def test_billing_rule(self):
         """valor = franquia + excedentes*rate_exc + cor*rate_cor;
-        excedentes = (total - cor) - franquia."""
+        excedentes = producao total - franquia (as coloridas NAO saem da base:
+        elas contam no volume da franquia e ainda pagam a taxa de cor)."""
         self.client.force_login(self.ti)
-        resp = self.client.post(
-            reverse("futura_digital_create"),
-            {
-                "mes_referencia": "2026-07",
-                "copias_total": "34744",
-                "copias_cor": "317",
-                "franquia_copias": "23000",
-                "franquia_valor": "1610,00",
-                "valor_copia_excedente": "0,07",
-                "valor_copia_cor": "0,75",
-            },
-        )
+        # Numeros da memoria de calculo/NF: producao 56.141, coloridas 498.
+        resp = self._criar("2026-07", 56141, 498)
         self.assertEqual(resp.status_code, 302)
+
         f = FuturaDigital.objects.get(mes_referencia="2026-07-01")
-        # (34744 - 317) - 23000 = 11427
-        self.assertEqual(f.copias_excedentes, 11427)
-        # 1610 + 11427*0.07 + 317*0.75 = 2647.64
-        self.assertEqual(str(f.valor_pago), "2647.64")
+        # 56141 - 23000 = 33141 (as 498 coloridas continuam na conta)
+        self.assertEqual(f.copias_excedentes, 33141)
+        # 1610 + 33141*0.07 + 498*0.75 = 4303.37 (valor da NF)
+        self.assertEqual(str(f.valor_pago), "4303.37")
         self.assertEqual(f.criado_por, self.ti)
+        # A producao P&B fica so como informacao, fora do calculo.
+        self.assertEqual(f.copias_pb, 55643)
+
+    def test_billing_rule_bate_com_a_fatura_de_maio(self):
+        # Fatura 05/2026 (producao 44.436, coloridas 204) = R$ 3.263,52.
+        self.client.force_login(self.ti)
+        self._criar("2026-08", 44436, 204)
+        f = FuturaDigital.objects.get(mes_referencia="2026-08-01")
+        self.assertEqual(f.copias_excedentes, 21436)
+        self.assertEqual(str(f.valor_pago), "3263.52")
+
+    def test_producao_abaixo_da_franquia_nao_gera_excedente(self):
+        self.client.force_login(self.ti)
+        self._criar("2026-09", 20000, 300)
+        f = FuturaDigital.objects.get(mes_referencia="2026-09-01")
+        self.assertEqual(f.copias_excedentes, 0)
+        # So franquia + coloridas: 1610 + 300*0.75 = 1835.00
+        self.assertEqual(str(f.valor_pago), "1835.00")
 
     def test_month_normalized_to_first_day(self):
         self.client.force_login(self.ti)
@@ -1996,8 +2019,8 @@ class FuturaDigitalTests(TestCase):
             {"mes_referencia": "2027-01", "copias_total": "60000", "copias_cor": "500", "franquia_copias": "23000"},
         )
         f.refresh_from_db()
-        # (60000 - 500) - 23000 = 36500
-        self.assertEqual(f.copias_excedentes, 36500)
+        # 60000 - 23000 = 37000 (as 500 coloridas continuam na base do excedente)
+        self.assertEqual(f.copias_excedentes, 37000)
 
     def test_delete(self):
         self.client.force_login(self.ti)

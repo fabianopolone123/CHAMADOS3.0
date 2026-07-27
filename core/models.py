@@ -1409,7 +1409,14 @@ class FuturaDigital(models.Model):
     Regra: valor_pago = franquia_valor
                         + copias_excedentes * valor_copia_excedente
                         + copias_cor * valor_copia_cor
-    onde copias_excedentes = max(copias_total - copias_cor - franquia_copias, 0).
+    onde copias_excedentes = max(copias_total - franquia_copias, 0).
+
+    `copias_total` e a PRODUCAO TOTAL do mes na memoria de calculo da Futura
+    (todos os contadores somados, coloridas incluidas). As coloridas NAO saem da
+    base do excedente: elas contam no volume da franquia e ainda pagam a taxa de
+    cor por cima. Conferido com a memoria de calculo/NF (producao 56.141,
+    franquia 23.000, coloridas 498 -> excedentes 33.141 e R$ 4.303,37) e com a
+    fatura de 05/2026.
     """
 
     FRANQUIA_COPIAS_PADRAO = 23000
@@ -1447,7 +1454,9 @@ class FuturaDigital(models.Model):
         return f"Futura Digital - {self.mes_referencia:%m/%Y}"
 
     def calcular_excedentes(self) -> int:
-        return max(int(self.copias_total) - int(self.copias_cor) - int(self.franquia_copias), 0)
+        # Producao total menos a franquia: as coloridas ja estao dentro da
+        # producao e nao sao descontadas daqui (elas so somam a taxa de cor).
+        return max(int(self.copias_total) - int(self.franquia_copias), 0)
 
     def calcular_valor(self) -> Decimal:
         excedentes = Decimal(self.copias_excedentes or 0)

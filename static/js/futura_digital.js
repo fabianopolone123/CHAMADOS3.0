@@ -37,7 +37,7 @@
 
     const METRICS = {
         valor: { label: "Valor pago", fmt: (v) => nfBRL.format(v), cls: "fd-bar--valor" },
-        copias: { label: "Copias", fmt: (v) => nfInt.format(v), cls: "fd-bar--copias" },
+        copias: { label: "Producao", fmt: (v) => nfInt.format(v), cls: "fd-bar--copias" },
         excedentes: { label: "Copias excedentes", fmt: (v) => nfInt.format(v), cls: "fd-bar--excedentes" },
     };
     let metric = "valor";
@@ -114,16 +114,22 @@
         const franqV = parseNum(document.getElementById("faturaFranquiaValor")?.value);
         const rExc = parseNum(document.getElementById("faturaRateExc")?.value);
         const rCor = parseNum(document.getElementById("faturaRateCor")?.value);
-        const exc = Math.max(total - cor - franqC, 0);
+        // Excedente = producao total - franquia. As coloridas ja estao dentro da
+        // producao (contam na franquia) e ainda pagam a taxa de cor por cima.
+        const exc = Math.max(total - franqC, 0);
+        const pb = Math.max(total - cor, 0);  // so informativo
         const vExc = exc * rExc;
         const vCor = cor * rCor;
         const totalPagar = franqV + vExc + vCor;
         const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+        set("calcPb", nfInt.format(pb));
         set("calcExcedentes", nfInt.format(exc));
         set("calcFranquia", nfBRL.format(franqV));
         set("calcExcValor", nfBRL.format(vExc));
         set("calcCorValor", nfBRL.format(vCor));
         set("calcTotal", nfBRL.format(totalPagar));
+        const ci2 = document.getElementById("calcExcContaInfo");
+        if (ci2) ci2.textContent = `(${nfInt.format(total)} - ${nfInt.format(franqC)})`;
         const ei = document.getElementById("calcExcInfo");
         if (ei) ei.textContent = `(${nfInt.format(exc)} x ${nfBRL.format(rExc)})`;
         const ci = document.getElementById("calcCorInfo");

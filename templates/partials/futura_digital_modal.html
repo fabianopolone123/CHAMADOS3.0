@@ -27,12 +27,14 @@
                             <input type="text" class="form-control" name="nota_fiscal" id="faturaNota" maxlength="80" placeholder="Ex.: 6131">
                         </label>
                         <label class="contrato-field">
-                            <span>Total de copias no mes</span>
+                            <span>Producao total do mes</span>
                             <input type="number" class="form-control" name="copias_total" id="faturaTotal" min="0" value="0" required>
+                            <small class="contrato-field__help">Producao total da memoria de calculo da Futura (todos os contadores somados, ja incluindo as coloridas). Nao desconte nada aqui.</small>
                         </label>
                         <label class="contrato-field">
                             <span>Copias coloridas</span>
                             <input type="number" class="form-control" name="copias_cor" id="faturaCor" min="0" value="0">
+                            <small class="contrato-field__help">Quantas da producao total foram coloridas (pagam a taxa de cor por cima).</small>
                         </label>
                         <label class="contrato-field">
                             <span>Franquia de copias</span>
@@ -59,7 +61,11 @@
 
                     <div class="fd-calc" aria-live="polite">
                         <div class="fd-calc__row">
-                            <span>Copias P&amp;B excedentes</span>
+                            <span>Producao P&amp;B <em>(informativo)</em></span>
+                            <strong id="calcPb">0</strong>
+                        </div>
+                        <div class="fd-calc__row">
+                            <span>Copias excedentes <em id="calcExcContaInfo"></em></span>
                             <strong id="calcExcedentes">0</strong>
                         </div>
                         <div class="fd-calc__row">
@@ -78,7 +84,7 @@
                             <span>Valor a pagar</span>
                             <strong id="calcTotal">R$ 0,00</strong>
                         </div>
-                        <p class="fd-calc__hint">Excedentes = (total &minus; coloridas) &minus; franquia. Calculo automatico; conferido no backend ao salvar.</p>
+                        <p class="fd-calc__hint">Excedentes = producao total &minus; franquia. As coloridas contam no volume da franquia e ainda pagam a taxa de cor. Calculo automatico; conferido no backend ao salvar.</p>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Futura Digital: corrigida a regra de cobranca (`excedentes = producao total - franquia`; as coloridas contam na franquia e ainda pagam a taxa de cor), batendo com a NF; campo renomeado para "Producao total do mes" com ajuda e o calculo ao vivo detalhando cada linha. Faturas antigas nao foram recalculadas
 - Requisicoes: botao "Nao aprovar" no detalhe (TI/admin) que marca a requisicao como "Nao aprovada" (novo status, migration `0045`), removendo a aprovacao dos orcamentos e registrando na timeline; alterna para "Reabrir requisicao" (volta para "Esperando aprovacao") e e bloqueado apos a entrega. Rota `requisicao_nao_aprovar`; testes em `OrcamentoAprovacaoTests`
 - Requisicoes: botao "Copiar p/ e-mail" no detalhe (ao lado do WhatsApp) — copia a requisicao inteira em HTML formatado, com as fotos dos produtos embutidas (data URI), link do produto, documentos e suborcamentos, pronta para colar no corpo do e-mail; leva tambem a versao em texto puro. Somente frontend (`static/js/contratos.js`)
 - Kanban: encerramento de chamado em "aguardando" (usuario/peca/autorizacao) **sem precisar dar Play** — o card mostra Play + Stop, o Stop pede o "O que foi feito" e fecha o chamado registrando na linha do tempo a mudanca de status e o evento `encerramento_direto` (novo tipo em `ChamadoEvento`, migration `0044`), que tambem aparece no "Andamento do atendimento". Testes em `EncerramentoChamadoTests`
