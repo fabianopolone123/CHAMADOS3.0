@@ -16,7 +16,7 @@ Colunas (linha 7 do modelo):
 | B   | Data             | inicio do periodo (hora do Play)                      |
 | C   | Contato          | solicitante do chamado                                |
 | D   | Setor            | setor do solicitante, casado com a lista de Ramais    |
-| E   | Notificacao      | o pedido: descricao do chamado (titulo se faltar)     |
+| E   | Notificacao      | titulo do chamado                                     |
 | F   | Prioridade       | "Programada" (trabalho da TI) ou "Baixa"              |
 | G   | Falha            | "N/A"                                                 |
 | H   | Acao / Correcao  | o que foi feito no periodo (descricao do Pause/Stop)  |
@@ -105,13 +105,19 @@ def _prioridade_planilha(chamado: Chamado) -> str:
 
 
 def _notificacao(chamado: Chamado) -> str:
-    """O pedido como o usuario escreveu (a planilha a mao usa a descricao).
+    """O **titulo** do chamado.
 
-    Cai para o titulo quando nao ha descricao. Remove os metadados que a migracao
-    do sistema antigo anexou no fim do texto.
+    Nas planilhas antigas essa coluna levava a descricao inteira (o texto que o
+    usuario escreveu), porque o sistema antigo nao tinha titulo separado. No
+    sistema novo o titulo e o resumo do pedido e e o que vai na planilha.
+
+    So cai para a descricao se o titulo estiver vazio - nesse caso removendo os
+    metadados que a migracao do sistema antigo anexou ao fim do texto.
     """
-    texto = _META_LEGADO.sub("", (chamado.descricao or "").strip()).strip()
-    return texto or chamado.titulo
+    titulo = (chamado.titulo or "").strip()
+    if titulo:
+        return titulo
+    return _META_LEGADO.sub("", (chamado.descricao or "").strip()).strip()
 
 
 def _copiar_estilo_linha(ws, origem: int, destino: int) -> None:
