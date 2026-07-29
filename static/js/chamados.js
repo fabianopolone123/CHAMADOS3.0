@@ -756,7 +756,10 @@
                 return;
             }
 
-            if (card.dataset.ticketActive !== "true") {
+            // Sem Play ativo o Pause nao existe, mas o Stop ainda vale para um
+            // chamado parado em "aguardando" (encerramento direto) - mesma regra
+            // que o backend aplica em finish_attendance_view.
+            if (card.dataset.ticketActive !== "true" && !(action === "stop" && isDirectClose(card))) {
                 showToast("Este chamado nao possui atendimento ativo para voce.", "warning");
                 return;
             }
