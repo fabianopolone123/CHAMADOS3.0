@@ -16,7 +16,7 @@ Colunas (linha 7 do modelo):
 | B   | Data             | inicio do periodo (hora do Play)                      |
 | C   | Contato          | solicitante do chamado                                |
 | D   | Setor            | setor do solicitante, casado com a lista de Ramais    |
-| E   | Notificacao      | titulo do chamado                                     |
+| E   | Notificacao      | descricao do chamado (titulo se nao houver)            |
 | F   | Prioridade       | "Programada" (trabalho da TI) ou "Baixa"              |
 | G   | Falha            | "N/A"                                                 |
 | H   | Acao / Correcao  | o que foi feito no periodo (descricao do Pause/Stop)  |
@@ -105,19 +105,16 @@ def _prioridade_planilha(chamado: Chamado) -> str:
 
 
 def _notificacao(chamado: Chamado) -> str:
-    """O **titulo** do chamado.
+    """A **descricao** do chamado: o pedido como o usuario escreveu.
 
-    Nas planilhas antigas essa coluna levava a descricao inteira (o texto que o
-    usuario escreveu), porque o sistema antigo nao tinha titulo separado. No
-    sistema novo o titulo e o resumo do pedido e e o que vai na planilha.
-
-    So cai para a descricao se o titulo estiver vazio - nesse caso removendo os
-    metadados que a migracao do sistema antigo anexou ao fim do texto.
+    Vale para todos os chamados, migrados e novos - e o texto completo do pedido
+    que interessa a quem le a planilha, nao o resumo. Cai para o titulo quando o
+    chamado nao tem descricao. Os metadados que a migracao do sistema antigo
+    anexou ao fim do texto ("Tipo legado: ... | Falha legado: ...",
+    "[ERP-TI-ID:n]") sao removidos.
     """
-    titulo = (chamado.titulo or "").strip()
-    if titulo:
-        return titulo
-    return _META_LEGADO.sub("", (chamado.descricao or "").strip()).strip()
+    descricao = _META_LEGADO.sub("", (chamado.descricao or "").strip()).strip()
+    return descricao or (chamado.titulo or "").strip()
 
 
 def _copiar_estilo_linha(ws, origem: int, destino: int) -> None:
