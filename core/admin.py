@@ -27,6 +27,7 @@ from .models import (
     LogUsoAssinaturaTI,
     OrcamentoContrato,
     OrcamentoDocumento,
+    PausaAutomatica,
     RequisicaoContrato,
     RetiradaInsumoTI,
     ServicoFeito,
@@ -315,3 +316,22 @@ class ComputadorAdmin(admin.ModelAdmin):
     list_filter = ("tipo", "localizacao", "no_ultimo_import")
     search_fields = ("nome", "usuario_glpi", "modelo", "localizacao")
     readonly_fields = ("criado_em", "atualizado_em")
+
+
+@admin.register(PausaAutomatica)
+class PausaAutomaticaAdmin(admin.ModelAdmin):
+    """Pausas do fim do expediente. Serve para conferir quem esta com pendencia
+    (e, se necessario, liberar alguem na mao)."""
+
+    list_display = ("__str__", "chamado", "atendente", "criado_em", "complementado_em", "complementado_por")
+    list_filter = ("complementado_em",)
+    search_fields = ("atendimento__chamado__numero", "atendimento__atendente__username")
+    readonly_fields = ("criado_em",)
+
+    @admin.display(description="Chamado", ordering="atendimento__chamado__numero")
+    def chamado(self, obj):
+        return obj.atendimento.chamado.numero
+
+    @admin.display(description="Atendente", ordering="atendimento__atendente__username")
+    def atendente(self, obj):
+        return obj.atendimento.atendente

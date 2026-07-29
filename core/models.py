@@ -194,12 +194,18 @@ class ChamadoEvento(models.Model):
     # sem Play/atendimento ativo: nao gera periodo em `AtendimentoHistorico`, por
     # isso tem tipo proprio e entra no andamento do chamado por este evento.
     TIPO_ENCERRAMENTO_DIRETO = "encerramento_direto"
+    # Pausa em lote no fim do expediente (17:45) e o complemento que o atendente
+    # preenche no dia seguinte dizendo o que foi feito naquele periodo.
+    TIPO_PAUSA_AUTOMATICA = "pausa_automatica"
+    TIPO_COMPLEMENTO_PAUSA = "complemento_pausa"
     TIPO_CHOICES = [
         (TIPO_CRIACAO, "Criacao"),
         (TIPO_STATUS, "Mudanca de status"),
         (TIPO_ATENDENTE, "Atendente alterado"),
         (TIPO_COMENTARIO, "Comentario"),
         (TIPO_ENCERRAMENTO_DIRETO, "Encerramento sem atendimento ativo"),
+        (TIPO_PAUSA_AUTOMATICA, "Pausa automatica no fim do expediente"),
+        (TIPO_COMPLEMENTO_PAUSA, "Complemento da pausa automatica"),
     ]
 
     chamado = models.ForeignKey(Chamado, on_delete=models.CASCADE, related_name="eventos")
@@ -364,6 +370,67 @@ class AtendimentoHistorico(models.Model):
         self.descricao_atividade = descricao_atividade.strip()
         self.duracao = self.calcular_duracao()
         self.full_clean()
+
+
+class PausaAutomatica(models.Model):
+    """Pausa aplicada em lote no fim do expediente, aguardando o complemento.
+
+    O atendimento que fica com o Play aberto na virada do expediente e pausado
+    automaticamente (comando `pausar_expediente`), para o relatorio nao contar a
+    noite e o fim de semana como tempo trabalhado. Como o atendente nao estava la
+    para dizer o que foi feito, o periodo nasce **sem descricao** e gera este
+    registro: uma pendencia que ele precisa preencher no proximo acesso.
+
+    Enquanto houver pendencia, o atendente **nao consegue dar Play, pausar nem
+    fechar chamado** - a regra e validada no backend e sinalizada no Kanban.
+    """
+
+    atendimento = models.OneToOneField(
+        AtendimentoHistorico, on_delete=models.CASCADE, related_name="pausa_automatica"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    complementado_em = models.DateTimeField(null=True, blank=True)
+    complementado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pausas_complementadas",
+    )
+
+    class Meta:
+        ordering = ["criado_em", "id"]
+        verbose_name = "Pausa automatica"
+        verbose_name_plural = "Pausas automaticas"
+
+    def __str__(self) -> str:
+        situacao = "complementada" if self.complementado_em else "pendente"
+        return f"Pausa automatica #{self.pk} ({situacao})"
+
+    @property
+    def pendente(self) -> bool:
+        return self.complementado_em is None
+
+    @classmethod
+    def pendentes_de(cls, usuario):
+        """Pausas que o atendente ainda precisa complementar (mais antigas primeiro)."""
+        return (
+            cls.objects.filter(atendimento__atendente=usuario, complementado_em__isnull=True)
+            .select_related("atendimento", "atendimento__chamado")
+            .order_by("atendimento__iniciado_em", "id")
+        )
+
+    def complementar(self, *, descricao: str, usuario):
+        """Grava o que foi feito no periodo pausado e encerra a pendencia."""
+        texto = (descricao or "").strip()
+        if not texto:
+            raise ValidationError("Descreva o que foi feito no atendimento pausado.")
+        atendimento = self.atendimento
+        atendimento.descricao_atividade = texto
+        atendimento.save(update_fields=["descricao_atividade", "atualizado_em"])
+        self.complementado_em = timezone.now()
+        self.complementado_por = usuario
+        self.save(update_fields=["complementado_em", "complementado_por"])
 
 
 # ==========================================================================

@@ -68,6 +68,7 @@ from .models import (
     LogUsoAssinaturaTI,
     OrcamentoContrato,
     OrcamentoDocumento,
+    PausaAutomatica,
     PendenciaTI,
     Ramal,
     RequisicaoContrato,
@@ -428,6 +429,11 @@ def tickets_dashboard_view(request):
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "pendencia_prioridades": PendenciaTI.prioridade_opcoes(),
         "attendant_columns": attendant_columns,
+        # Pausas do fim do expediente que ESTE atendente precisa complementar:
+        # enquanto houver, o Play/Pause/Stop dele fica bloqueado no backend.
+        "pausas_pendentes": [
+            _serializar_pausa_pendente(p) for p in PausaAutomatica.pendentes_de(request.user)
+        ],
         "closed_column": {"count": closed_count, "recent": closed_recent},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
@@ -869,11 +875,42 @@ def _is_ticket_in_attendant_column(chamado: Chamado) -> bool:
     )
 
 
+def _bloqueio_por_pausa_pendente(usuario):
+    """Erro JSON quando o atendente tem pausa automatica sem complemento.
+
+    Regra de uso: o que ficou pausado no fim do expediente precisa ser explicado
+    antes de qualquer novo controle de tempo. Enquanto houver pendencia, o Play, o
+    Pause e o Stop ficam bloqueados - senao o atendente segue trabalhando e o
+    periodo do dia anterior fica para sempre sem descricao (a planilha e o
+    historico ficam com um buraco).
+    """
+    pendentes = PausaAutomatica.pendentes_de(usuario)
+    total = pendentes.count()
+    if not total:
+        return None
+    primeiro = pendentes.first()
+    numeros = ", ".join(p.atendimento.chamado.numero for p in pendentes[:3])
+    if total > 3:
+        numeros += ", ..."
+    return _json_error(
+        f"Voce tem {total} atendimento(s) pausado(s) automaticamente no fim do expediente "
+        f"aguardando o que foi feito ({numeros}). Preencha para voltar a usar o Play, "
+        f"o Pause e o Stop.",
+        status=409,
+        pausas_pendentes=total,
+        pausa_pendente_id=primeiro.id if primeiro else None,
+    )
+
+
 @login_required
 @require_POST
 def start_attendance_view(request):
     if not (is_admin_user(request.user) or is_attendant_user(request.user)):
         return _json_error("Voce nao tem permissao para iniciar atendimentos.", status=403)
+
+    bloqueio = _bloqueio_por_pausa_pendente(request.user)
+    if bloqueio is not None:
+        return bloqueio
 
     payload = _load_request_payload(request)
     if payload is None:
@@ -1015,6 +1052,10 @@ def _close_chamado_on_stop(
 def finish_attendance_view(request):
     if not (is_admin_user(request.user) or is_attendant_user(request.user)):
         return _json_error("Voce nao tem permissao para encerrar chamados.", status=403)
+
+    bloqueio = _bloqueio_por_pausa_pendente(request.user)
+    if bloqueio is not None:
+        return bloqueio
 
     payload = _load_request_payload(request)
     if payload is None:
@@ -1664,6 +1705,84 @@ def _meses_com_atendimento(atendentes):
             opcoes.insert(0, {"valor": atual, "rotulo": rotulo_atual, "total": 0})
         por_atendente[atendente.id] = opcoes
     return por_atendente
+
+
+def _serializar_pausa_pendente(pausa: PausaAutomatica):
+    atendimento = pausa.atendimento
+    inicio = timezone.localtime(atendimento.iniciado_em)
+    fim = timezone.localtime(atendimento.finalizado_em) if atendimento.finalizado_em else None
+    return {
+        "id": pausa.id,
+        "ticket_number": atendimento.chamado.numero,
+        "ticket_title": atendimento.chamado.titulo,
+        "dia": inicio.strftime("%d/%m/%Y"),
+        "inicio": inicio.strftime("%H:%M"),
+        "fim": fim.strftime("%H:%M") if fim else "",
+        "duracao": _format_duration(atendimento.duracao),
+    }
+
+
+@login_required
+def pausas_pendentes_view(request):
+    """Lista (JSON) as pausas automaticas que o atendente precisa complementar."""
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Sem permissao.", status=403)
+
+    pendentes = list(PausaAutomatica.pendentes_de(request.user))
+    return JsonResponse(
+        {
+            "ok": True,
+            "total": len(pendentes),
+            "pausas": [_serializar_pausa_pendente(p) for p in pendentes],
+        }
+    )
+
+
+@login_required
+@require_POST
+def pausa_complementar_view(request, pausa_id: int):
+    """Grava o que foi feito no periodo pausado automaticamente.
+
+    Cada pendencia e do proprio atendente: ninguem complementa a pausa de outro
+    (o texto vai para o historico e para a planilha com o nome dele).
+    """
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        return _json_error("Sem permissao.", status=403)
+
+    pausa = (
+        PausaAutomatica.objects.select_related("atendimento", "atendimento__chamado")
+        .filter(pk=pausa_id, atendimento__atendente=request.user)
+        .first()
+    )
+    if not pausa:
+        return _json_error("Pausa nao encontrada.", status=404)
+    if not pausa.pendente:
+        return _json_error("Esta pausa ja foi complementada.", status=409)
+
+    payload = _load_request_payload(request) or {}
+    descricao = (payload.get("description") or "").strip()
+    if not descricao:
+        return _json_error("Descreva o que foi feito no atendimento pausado.")
+
+    autor = _attendant_display(request.user)
+    with transaction.atomic():
+        pausa.complementar(descricao=descricao, usuario=request.user)
+        ChamadoEvento.registrar(
+            chamado=pausa.atendimento.chamado,
+            usuario=request.user,
+            tipo=ChamadoEvento.TIPO_COMPLEMENTO_PAUSA,
+            descricao=f"Complemento da pausa automatica por {autor}: {descricao}",
+        )
+
+    restantes = PausaAutomatica.pendentes_de(request.user).count()
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Complemento salvo no chamado {pausa.atendimento.chamado.numero}.",
+            "restantes": restantes,
+            "liberado": restantes == 0,
+        }
+    )
 
 
 def _setor_por_solicitante(chamados_ids_por_user):

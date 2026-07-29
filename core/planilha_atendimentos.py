@@ -95,7 +95,9 @@ def periodos_do_mes(atendente, ano: int, mes: int):
     """
     inicio = date(ano, mes, 1)
     return (
-        AtendimentoHistorico.objects.select_related("chamado", "chamado__solicitante")
+        AtendimentoHistorico.objects.select_related(
+            "chamado", "chamado__solicitante", "pausa_automatica"
+        )
         .filter(atendente=atendente, iniciado_em__date__gte=inicio, iniciado_em__date__lt=_fim_do_mes(ano, mes))
         .order_by("iniciado_em", "id")
     )
@@ -147,6 +149,22 @@ def _preencher_resumo(ws, contagem: dict, total: int) -> None:
     ws[CELULA_TOTAL] = total
 
 
+def _acao_correcao(periodo) -> str:
+    """O que foi feito no periodo.
+
+    Periodo pausado automaticamente no fim do expediente nasce **sem descricao**:
+    ela vem do complemento que o atendente preenche no proximo acesso. Enquanto
+    isso nao acontece, a planilha diz claramente que falta - em vez de sair com a
+    celula vazia, que parece esquecimento de preenchimento.
+    """
+    texto = (periodo.descricao_atividade or "").strip()
+    if texto:
+        return texto
+    if periodo.tipo_encerramento == "pause" and hasattr(periodo, "pausa_automatica"):
+        return "Pausa automatica no fim do expediente (pendente de complemento)"
+    return ""
+
+
 def _copiar_estilo_linha(ws, origem: int, destino: int) -> None:
     """Replica o estilo de uma linha do modelo em outra (meses mais cheios)."""
     for col in range(1, 12):
@@ -192,7 +210,7 @@ def gerar_planilha(atendente, ano: int, mes: int, setor_por_solicitante=None, te
         ws.cell(row=linha, column=6, value=prioridade)
         contagem[prioridade] = contagem.get(prioridade, 0) + 1
         ws.cell(row=linha, column=7, value="N/A")
-        ws.cell(row=linha, column=8, value=periodo.descricao_atividade or "")
+        ws.cell(row=linha, column=8, value=_acao_correcao(periodo))
 
         # Periodo ainda em andamento (Play aberto): "Fechado" e "Tempo" ficam em
         # branco - nao ha duracao para informar.

@@ -440,6 +440,15 @@
             showToast(result.message || "Atendimento iniciado com sucesso.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel iniciar o atendimento.", "error");
+            avisarPausaPendente(error);
+        }
+    }
+
+    // O backend recusa Play/Pause/Stop com `pausas_pendentes` quando falta
+    // complemento: em vez de so mostrar o toast, abre o modal onde se resolve.
+    function avisarPausaPendente(error) {
+        if (error && error.pausas_pendentes && typeof window.abrirPausasPendentes === "function") {
+            window.abrirPausasPendentes();
         }
     }
 
@@ -495,6 +504,8 @@
             showToast(result.message || "Atendimento registrado com sucesso.", "success");
         } catch (error) {
             showToast(error.message || "Nao foi possivel registrar o atendimento.", "error");
+            avisarPausaPendente(error);
+            attendanceModal.hide();
         } finally {
             attendanceFields.submit.disabled = false;
         }
@@ -1519,6 +1530,149 @@
         });
     }
 
+    // ------------------------------------------------------------------
+    // Pausa do fim do expediente: complemento obrigatorio
+    // ------------------------------------------------------------------
+    // O que ficou com o Play aberto e pausado automaticamente as 17:45 e nasce
+    // sem descricao. Enquanto o atendente nao disser o que foi feito, o backend
+    // recusa Play/Pause/Stop (409). Aqui a tela deixa isso obvio: aviso pulsante,
+    // notificacao do navegador e um modal com um campo por atendimento pausado.
+    function initializePausasPendentes() {
+        const modalElement = document.getElementById("pausasPendentesModal");
+        const listaUrl = appElement.dataset.pausasUrl;
+        const complementarTpl = appElement.dataset.pausaComplementarUrl;
+        if (!modalElement || !listaUrl || !complementarTpl) {
+            return;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+        const lista = modalElement.querySelector("[data-pausa-lista]");
+        const restantesEl = modalElement.querySelector("[data-pausa-restantes]");
+        const vazioEl = modalElement.querySelector("[data-pausa-vazio]");
+        const alerta = document.getElementById("pausaAlerta");
+        const pendentesIniciais = Number(appElement.dataset.pausasPendentes || 0);
+
+        // A URL vem com o id zerado ("/chamados/pausas-pendentes/0/complementar/").
+        function urlDoComplemento(id) {
+            return complementarTpl.replace("/0/", `/${id}/`);
+        }
+
+        function atualizarContagem(restantes) {
+            if (restantesEl) {
+                restantesEl.textContent = restantes
+                    ? `${restantes} atendimento(s) aguardando o que foi feito.`
+                    : "";
+            }
+            if (vazioEl) {
+                vazioEl.classList.toggle("is-hidden", restantes !== 0);
+            }
+            if (alerta) {
+                // Some o aviso quando zera: o bloqueio tambem caiu no backend.
+                alerta.classList.toggle("is-hidden", restantes === 0);
+                const titulo = alerta.querySelector(".pausa-alerta__titulo");
+                if (titulo && restantes) {
+                    titulo.textContent =
+                        `${restantes} atendimento${restantes > 1 ? "s" : ""} pausado${restantes > 1 ? "s" : ""} no fim do expediente`;
+                }
+            }
+        }
+
+        function montarItem(pausa) {
+            const item = document.createElement("form");
+            item.className = "pausa-item";
+            item.dataset.pausaId = pausa.id;
+            item.innerHTML = `
+                <div class="pausa-item__head">
+                    <span class="pausa-item__ticket">${pausa.ticket_number}</span>
+                    <span class="pausa-item__title"></span>
+                </div>
+                <p class="pausa-item__periodo">
+                    ${pausa.dia} &middot; ${pausa.inicio} &rarr; ${pausa.fim} (${pausa.duracao})
+                </p>
+                <label class="pausa-item__label" for="pausaTexto${pausa.id}">O que foi feito neste periodo?</label>
+                <textarea id="pausaTexto${pausa.id}" class="form-control" rows="2"
+                          placeholder="Ex.: levantamento do servidor, continua amanha." required></textarea>
+                <div class="pausa-item__actions">
+                    <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+                </div>
+            `;
+            // titulo por textContent para nao interpretar HTML do usuario
+            item.querySelector(".pausa-item__title").textContent = pausa.ticket_title;
+
+            item.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                const campo = item.querySelector("textarea");
+                const botao = item.querySelector("button[type=submit]");
+                const texto = campo.value.trim();
+                if (!texto) {
+                    showToast("Descreva o que foi feito no atendimento pausado.", "warning");
+                    campo.focus();
+                    return;
+                }
+                botao.disabled = true;
+                try {
+                    const dados = await sendJson(urlDoComplemento(pausa.id), { description: texto });
+                    item.remove();
+                    atualizarContagem(dados.restantes);
+                    showToast(dados.message || "Complemento salvo.", "success");
+                    if (dados.liberado) {
+                        showToast("Tudo preenchido: Play, Pause e Stop liberados.", "success");
+                        window.setTimeout(() => modal.hide(), 900);
+                    }
+                } catch (erro) {
+                    showToast(erro.message || "Nao foi possivel salvar o complemento.", "error");
+                } finally {
+                    botao.disabled = false;
+                }
+            });
+            return item;
+        }
+
+        async function carregar() {
+            try {
+                const resposta = await fetch(listaUrl, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+                const dados = await resposta.json();
+                if (!lista) return 0;
+                lista.innerHTML = "";
+                (dados.pausas || []).forEach((pausa) => lista.appendChild(montarItem(pausa)));
+                atualizarContagem(dados.total || 0);
+                return dados.total || 0;
+            } catch (erro) {
+                showToast("Nao foi possivel carregar as pausas pendentes.", "error");
+                return 0;
+            }
+        }
+
+        async function abrir() {
+            await carregar();
+            modal.show();
+            const primeiro = lista?.querySelector("textarea");
+            if (primeiro) window.setTimeout(() => primeiro.focus(), 200);
+        }
+
+        document.getElementById("abrirPausasPendentes")?.addEventListener("click", abrir);
+
+        // Expoe para o clique bloqueado no card abrir direto o modal.
+        window.abrirPausasPendentes = abrir;
+
+        if (pendentesIniciais > 0) {
+            // Notificacao do navegador (quando permitida) + abre na cara: e um
+            // bloqueio, nao um aviso que pode passar batido.
+            if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+                try {
+                    new Notification("Chamados aguardando o que foi feito", {
+                        body: `${pendentesIniciais} atendimento(s) pausado(s) no fim do expediente. `
+                            + "O Play fica bloqueado ate voce preencher.",
+                        tag: "pausas-pendentes",
+                    });
+                } catch (erro) {
+                    /* navegador sem suporte ou contexto inseguro: o aviso na tela basta */
+                }
+            }
+            window.setTimeout(abrir, 600);
+        }
+    }
+
     function initialize() {
         attendanceForm.addEventListener("submit", handleAttendanceSubmit);
         initializeDragAndDrop();
@@ -1529,6 +1683,7 @@
         initializeClosedTicketsModal();
         initializeColumnStatFilters();
         initializePlanilhaDownload();
+        initializePausasPendentes();
         syncInitialActiveState();
     }
 

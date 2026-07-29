@@ -19,11 +19,30 @@
     data-closed-search-url="{% url 'closed_tickets_search' %}"
     data-closed-detail-url="{% url 'closed_ticket_detail' numero='__NUM__' %}"
     data-planilha-url="{% url 'atendimentos_planilha' attendant_id=0 %}"
+    data-pausas-url="{% url 'pausas_pendentes' %}"
+    data-pausa-complementar-url="{% url 'pausa_complementar' pausa_id=0 %}"
+    data-pausas-pendentes="{{ pausas_pendentes|length }}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="chamados" %}
 
     <section class="tickets-main">
+        {% if pausas_pendentes %}
+        {# Trava visivel: sem complemento da pausa, o Play/Pause/Stop dele esta bloqueado. #}
+        <div class="pausa-alerta" id="pausaAlerta" role="alert">
+            <span class="pausa-alerta__pulso" aria-hidden="true"></span>
+            <div class="pausa-alerta__texto">
+                <strong class="pausa-alerta__titulo">
+                    {{ pausas_pendentes|length }} atendimento{{ pausas_pendentes|length|pluralize }} pausado{{ pausas_pendentes|length|pluralize }} no fim do expediente
+                </strong>
+                <span class="pausa-alerta__detalhe">
+                    Diga o que foi feito em cada um. O Play, o Pause e o Stop ficam bloqueados ate voce preencher.
+                </span>
+            </div>
+            <button type="button" class="pausa-alerta__btn" id="abrirPausasPendentes">Preencher agora</button>
+        </div>
+        {% endif %}
+
         <section class="kanban-wrapper">
             <div class="kanban-columns">
                 {# Coluna fixa: Chamados abertos #}
@@ -150,6 +169,7 @@
 {% include "partials/pendencia_detail_modal.html" %}
 {% include "partials/closed_tickets_modal.html" %}
 {% include "partials/planilha_atendimentos_modal.html" %}
+{% include "partials/pausas_pendentes_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

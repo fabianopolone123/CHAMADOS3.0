@@ -35,6 +35,7 @@ from .models import (
     LicencaSoftware,
     OrcamentoContrato,
     OrcamentoDocumento,
+    PausaAutomatica,
     PendenciaTI,
     Ramal,
     RequisicaoContrato,
@@ -3936,3 +3937,312 @@ class TemplatesLintTests(TestCase):
                 if "{#" in linha and "#}" not in linha:
                     problemas.append(f"{caminho.relative_to(raiz)}:{numero}: {linha.strip()[:60]}")
         self.assertEqual(problemas, [], "comentario {# #} em varias linhas: " + "; ".join(problemas))
+
+
+class PausaAutomaticaTests(TestCase):
+    """Pausa em lote no fim do expediente (17:45) e o complemento obrigatorio.
+
+    Regra de uso: o que fica com o Play aberto e pausado automaticamente e nasce
+    sem descricao; enquanto o atendente nao disser o que foi feito, ele nao usa
+    Play, Pause nem Stop.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x", first_name="Fabiano")
+        self.outro = User.objects.create_user(username="outro.ti", password="x", first_name="Marina")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        grupo = Group.objects.get(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(grupo)
+        self.outro.groups.add(grupo)
+
+    def _chamado(self, titulo="Chamado do dia", atendente=None):
+        return Chamado.objects.create(
+            numero=Chamado.gerar_numero(),
+            titulo=titulo,
+            solicitante=self.common,
+            atendente_atual=atendente or self.ti,
+            status=Chamado.STATUS_EM_ATENDIMENTO,
+        )
+
+    def _play_aberto(self, chamado, hora=16, minuto=0, atendente=None):
+        """Atendimento com Play em aberto (sem fim), como fica no fim do dia."""
+        inicio = timezone.localtime().replace(hour=hora, minute=minuto, second=0, microsecond=0)
+        return AtendimentoHistorico.objects.create(
+            chamado=chamado, atendente=atendente or self.ti, iniciado_em=inicio
+        )
+
+    def _pausar(self, **opcoes):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        saida = StringIO()
+        call_command("pausar_expediente", stdout=saida, **opcoes)
+        return saida.getvalue()
+
+    # ----- o comando -----
+    def test_pausa_o_play_aberto_no_horario_do_expediente(self):
+        chamado = self._chamado()
+        atendimento = self._play_aberto(chamado, hora=16, minuto=0)
+        self._pausar()
+
+        atendimento.refresh_from_db()
+        fim = timezone.localtime(atendimento.finalizado_em)
+        self.assertEqual(fim.strftime("%H:%M:%S"), "17:45:00")  # usa o corte, nao a hora do cron
+        self.assertEqual(atendimento.tipo_encerramento, AtendimentoHistorico.TIPO_ENCERRAMENTO_PAUSE)
+        self.assertEqual(atendimento.descricao_atividade, "")  # e o que sera complementado
+        self.assertEqual(atendimento.duracao.total_seconds(), 105 * 60)  # 16:00 -> 17:45
+
+        self.assertTrue(
+            PausaAutomatica.objects.filter(atendimento=atendimento, complementado_em__isnull=True).exists()
+        )
+        evento = chamado.eventos.filter(tipo=ChamadoEvento.TIPO_PAUSA_AUTOMATICA).first()
+        self.assertIsNotNone(evento)
+        self.assertIn("17:45", evento.descricao)
+        self.assertIn("Pendente de complemento", evento.descricao)
+
+        chamado.refresh_from_db()
+        self.assertEqual(chamado.status, Chamado.STATUS_ATRIBUIDO)
+
+    def test_play_iniciado_depois_do_corte_fica_aberto(self):
+        chamado = self._chamado()
+        atendimento = self._play_aberto(chamado, hora=19, minuto=30)
+        self._pausar()
+        atendimento.refresh_from_db()
+        self.assertIsNone(atendimento.finalizado_em)
+        self.assertFalse(PausaAutomatica.objects.exists())
+
+    def test_dry_run_nao_grava(self):
+        atendimento = self._play_aberto(self._chamado())
+        saida = self._pausar(dry_run=True)
+        atendimento.refresh_from_db()
+        self.assertIsNone(atendimento.finalizado_em)
+        self.assertFalse(PausaAutomatica.objects.exists())
+        self.assertIn("dry-run", saida)
+
+    def test_pausa_todos_os_atendentes_de_uma_vez(self):
+        self._play_aberto(self._chamado("Do Fabiano"), atendente=self.ti)
+        self._play_aberto(self._chamado("Da Marina", atendente=self.outro), atendente=self.outro)
+        self._pausar()
+        self.assertEqual(PausaAutomatica.objects.count(), 2)
+        self.assertEqual(PausaAutomatica.pendentes_de(self.ti).count(), 1)
+        self.assertEqual(PausaAutomatica.pendentes_de(self.outro).count(), 1)
+
+    def test_horario_configuravel(self):
+        atendimento = self._play_aberto(self._chamado(), hora=15)
+        self._pausar(hora="16:30")
+        atendimento.refresh_from_db()
+        self.assertEqual(timezone.localtime(atendimento.finalizado_em).strftime("%H:%M"), "16:30")
+
+    # ----- o bloqueio -----
+    def _pendencia_para_o_ti(self):
+        atendimento = self._play_aberto(self._chamado("Pendente"))
+        self._pausar()
+        return PausaAutomatica.objects.get(atendimento=atendimento)
+
+    def test_sem_play_enquanto_houver_pausa_pendente(self):
+        self._pendencia_para_o_ti()
+        outro_chamado = self._chamado("Outro chamado")
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("start_attendance"),
+            data=json.dumps({"ticket_number": outro_chamado.numero}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 409)
+        dados = resp.json()
+        self.assertEqual(dados["pausas_pendentes"], 1)
+        self.assertIn("pausado", dados["message"].lower())
+        self.assertFalse(
+            AtendimentoHistorico.objects.filter(chamado=outro_chamado, finalizado_em__isnull=True).exists()
+        )
+
+    def test_sem_pause_nem_stop_enquanto_houver_pausa_pendente(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        for acao in ("pause", "stop"):
+            resp = self.client.post(
+                reverse("finish_attendance"),
+                data=json.dumps(
+                    {"ticket_number": pausa.atendimento.chamado.numero, "action": acao, "description": "algo"}
+                ),
+                content_type="application/json",
+            )
+            self.assertEqual(resp.status_code, 409, acao)
+            self.assertEqual(resp.json()["pausas_pendentes"], 1)
+
+    def test_pendencia_de_um_nao_bloqueia_o_outro(self):
+        self._pendencia_para_o_ti()
+        chamado = self._chamado("Da Marina", atendente=self.outro)
+        self.client.force_login(self.outro)
+        resp = self.client.post(
+            reverse("start_attendance"),
+            data=json.dumps({"ticket_number": chamado.numero}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    # ----- o complemento -----
+    def test_complementar_grava_no_atendimento_e_libera(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("pausa_complementar", args=[pausa.id]),
+            data=json.dumps({"description": "Levantamento do servidor, continua amanha."}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        dados = resp.json()
+        self.assertEqual(dados["restantes"], 0)
+        self.assertTrue(dados["liberado"])
+
+        pausa.refresh_from_db()
+        self.assertFalse(pausa.pendente)
+        self.assertEqual(pausa.complementado_por, self.ti)
+        self.assertEqual(
+            pausa.atendimento.descricao_atividade, "Levantamento do servidor, continua amanha."
+        )
+        evento = pausa.atendimento.chamado.eventos.filter(
+            tipo=ChamadoEvento.TIPO_COMPLEMENTO_PAUSA
+        ).first()
+        self.assertIsNotNone(evento)
+        self.assertIn("Complemento da pausa automatica por Fabiano", evento.descricao)
+        self.assertIn("Levantamento do servidor", evento.descricao)
+
+        resp = self.client.post(
+            reverse("start_attendance"),
+            data=json.dumps({"ticket_number": pausa.atendimento.chamado.numero}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    def test_complemento_exige_texto(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("pausa_complementar", args=[pausa.id]),
+            data=json.dumps({"description": "   "}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        pausa.refresh_from_db()
+        self.assertTrue(pausa.pendente)
+
+    def test_nao_complementa_pausa_de_outro_atendente(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.outro)
+        resp = self.client.post(
+            reverse("pausa_complementar", args=[pausa.id]),
+            data=json.dumps({"description": "nao e minha"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_nao_complementa_duas_vezes(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        corpo = json.dumps({"description": "feito"})
+        self.assertEqual(
+            self.client.post(
+                reverse("pausa_complementar", args=[pausa.id]), data=corpo, content_type="application/json"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("pausa_complementar", args=[pausa.id]), data=corpo, content_type="application/json"
+            ).status_code,
+            409,
+        )
+
+    def test_listagem_json_das_pendencias(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        dados = self.client.get(reverse("pausas_pendentes")).json()
+        self.assertEqual(dados["total"], 1)
+        item = dados["pausas"][0]
+        self.assertEqual(item["ticket_number"], pausa.atendimento.chamado.numero)
+        self.assertEqual(item["fim"], "17:45")
+        self.assertEqual(item["inicio"], "16:00")
+
+    def test_usuario_comum_nao_acessa(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self.client.get(reverse("pausas_pendentes")).status_code, 403)
+
+    # ----- tela e planilha -----
+    def test_kanban_mostra_o_aviso_pulsante(self):
+        self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("tickets_dashboard")).content.decode()
+        self.assertIn('id="pausaAlerta"', html)
+        self.assertIn('data-pausas-pendentes="1"', html)
+        self.assertIn('id="pausasPendentesModal"', html)
+        self.assertIn("Play, o Pause e o Stop ficam bloqueados", html)
+
+    def test_kanban_sem_pendencia_nao_mostra_aviso(self):
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("tickets_dashboard")).content.decode()
+        self.assertNotIn('id="pausaAlerta"', html)
+        self.assertIn('data-pausas-pendentes="0"', html)
+
+    def test_planilha_avisa_quando_falta_o_complemento(self):
+        pausa = self._pendencia_para_o_ti()
+        self.client.force_login(self.ti)
+        hoje = timezone.localdate()
+
+        import io as _io
+
+        import openpyxl
+
+        resp = self.client.get(
+            reverse("atendimentos_planilha", args=[self.ti.id]), {"mes": f"{hoje.year}-{hoje.month:02d}"}
+        )
+        ws = openpyxl.load_workbook(_io.BytesIO(resp.content)).active
+        self.assertEqual(
+            ws["H8"].value, "Pausa automatica no fim do expediente (pendente de complemento)"
+        )
+
+        pausa.complementar(descricao="Feito o levantamento", usuario=self.ti)
+        resp = self.client.get(
+            reverse("atendimentos_planilha", args=[self.ti.id]), {"mes": f"{hoje.year}-{hoje.month:02d}"}
+        )
+        ws = openpyxl.load_workbook(_io.BytesIO(resp.content)).active
+        self.assertEqual(ws["H8"].value, "Feito o levantamento")
+
+    def test_uma_linha_por_dia_na_planilha(self):
+        # O ciclo real: pausa as 17:45, Play de novo no dia seguinte, pausa outra
+        # vez. Cada pedaco e um periodo e sai como uma linha.
+        chamado = self._chamado("Tarefa de dois dias")
+        # Dias fixos do mes corrente: usar "ontem" quebraria o teste no dia 1o,
+        # quando o dia anterior cai no mes passado e sai da planilha.
+        agora = timezone.localtime()
+        for dia_do_mes, (h1, m1, h2, m2) in ((10, (14, 0, 17, 45)), (11, (8, 0, 10, 30))):
+            base = agora.replace(day=dia_do_mes)
+            inicio = base.replace(hour=h1, minute=m1, second=0, microsecond=0)
+            fim = base.replace(hour=h2, minute=m2, second=0, microsecond=0)
+            AtendimentoHistorico.objects.create(
+                chamado=chamado,
+                atendente=self.ti,
+                iniciado_em=inicio,
+                finalizado_em=fim,
+                duracao=fim - inicio,
+                tipo_encerramento="pause",
+                descricao_atividade=f"Parte de {h1}h",
+            )
+        self.client.force_login(self.ti)
+        hoje = timezone.localdate()
+
+        import io as _io
+
+        import openpyxl
+
+        resp = self.client.get(
+            reverse("atendimentos_planilha", args=[self.ti.id]), {"mes": f"{hoje.year}-{hoje.month:02d}"}
+        )
+        ws = openpyxl.load_workbook(_io.BytesIO(resp.content)).active
+        titulos = [ws.cell(row=r, column=5).value for r in (8, 9)]
+        self.assertEqual(titulos, ["Tarefa de dois dias"] * 2)
+        self.assertEqual(ws["H8"].value, "Parte de 14h")
+        self.assertEqual(ws["H9"].value, "Parte de 8h")

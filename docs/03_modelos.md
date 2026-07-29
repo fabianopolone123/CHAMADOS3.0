@@ -13,6 +13,7 @@ Fluxo de atendimento (Chamados):
 - `ChamadoMensagemAnexo`
 - `PendenciaTI`
 - `AtendimentoHistorico`
+- `PausaAutomatica`
 
 Modulo Requisicoes (exibido como "Requisicoes" na interface; os models mantem o prefixo tecnico `Contrato`):
 
@@ -160,6 +161,8 @@ Eventos registrados atualmente:
 - Mudanca de status (`mudanca_status`): "Status alterado de A para B por X."
 - Atendente que assumiu/movimentou (`atendente_alterado`): "Chamado assumido por X." (registrado apenas quando o `atendente_atual` muda, evitando duplicidade)
 - Encerramento pelo Stop (`atendente_alterado`): "Chamado finalizado por X. O que foi feito: ..."
+- Pausa automatica no fim do expediente (`pausa_automatica`, migration `0049`): "Atendimento pausado automaticamente no fim do expediente (17:45). Pendente de complemento no proximo acesso."
+- Complemento da pausa (`complemento_pausa`, migration `0049`): "Complemento da pausa automatica por X: <o que foi feito>"
 - Encerramento sem atendimento ativo (`encerramento_direto`, migration `0044`): "Chamado finalizado por X sem atendimento ativo (estava em Aguardando peca). O que foi feito: ..." — usado quando um chamado parado em "aguardando" e fechado direto pelo Stop, sem Play. Como esse fechamento nao cria periodo em `AtendimentoHistorico`, o tipo proprio permite mostra-lo tambem no "Andamento do atendimento" do detalhe do chamado.
 
 ### ChamadoAnexo
@@ -261,6 +264,20 @@ Regras atuais:
 - `tipo_encerramento` usa inicialmente os valores `pause` e `stop`.
 - `descricao_atividade` e obrigatoria no encerramento do periodo.
 - `duracao` e calculada ao pausar ou finalizar.
+
+### PausaAutomatica
+
+Pausa aplicada em lote no fim do expediente, aguardando o complemento do atendente (migration `0049`).
+
+- `atendimento` (OneToOne para `AtendimentoHistorico`, `on_delete=CASCADE`, related_name `pausa_automatica`)
+- `criado_em`, `complementado_em` (nulo enquanto pendente), `complementado_por` (FK usuario, `on_delete=SET_NULL`)
+
+Regras/propriedades:
+
+- `pendente`: `complementado_em` vazio. `pendentes_de(usuario)`: as pausas que aquele atendente ainda precisa explicar, mais antigas primeiro.
+- `complementar(descricao, usuario)`: grava o texto no `descricao_atividade` do atendimento e fecha a pendencia.
+- Enquanto houver pendencia, o atendente **nao consegue dar Play, pausar nem fechar chamado** (validado no backend, ver `docs/02_regras_negocio.md`).
+- O periodo pausado nasce com `tipo_encerramento="pause"` e **sem descricao**: e o complemento que a preenche. Por isso o comando grava com `save(update_fields=...)` em vez de `full_clean()`, que exigiria a descricao.
 
 ### RequisicaoContrato
 

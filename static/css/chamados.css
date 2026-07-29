@@ -428,6 +428,148 @@
     outline-offset: 2px;
 }
 
+/* ---------------------------------------------------------------------------
+   Pausa do fim do expediente: aviso de bloqueio
+   O Play/Pause/Stop esta travado no backend enquanto houver pausa sem
+   complemento, entao o aviso precisa ser impossivel de ignorar - mas sem virar
+   um susto: ambar (nao vermelho de erro) e o pulso so no ponto.
+   --------------------------------------------------------------------------- */
+.pausa-alerta {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin: 0 0 0.9rem;
+    padding: 0.85rem 1.1rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(217, 119, 6, 0.35);
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    box-shadow: 0 10px 24px rgba(180, 83, 9, 0.14);
+}
+
+.pausa-alerta__pulso {
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: #d97706;
+    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.55);
+    animation: pausa-pulso 1.6s ease-out infinite;
+}
+
+@keyframes pausa-pulso {
+    to {
+        box-shadow: 0 0 0 0.85rem rgba(217, 119, 6, 0);
+    }
+}
+
+/* Respeita quem pediu menos animacao no sistema. */
+@media (prefers-reduced-motion: reduce) {
+    .pausa-alerta__pulso {
+        animation: none;
+    }
+}
+
+.pausa-alerta__texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.pausa-alerta__titulo {
+    font-size: 0.95rem;
+    color: #92400e;
+}
+
+.pausa-alerta__detalhe {
+    font-size: 0.84rem;
+    color: #a16207;
+}
+
+.pausa-alerta__btn {
+    appearance: none;
+    margin-left: auto;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 0.7rem;
+    padding: 0.55rem 1rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    cursor: pointer;
+    transition: transform 0.16s ease, filter 0.16s ease;
+}
+
+.pausa-alerta__btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+}
+
+/* ----- Modal de complemento das pausas ----- */
+.pausa-item {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 0.9rem;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.75rem;
+    background: #fff;
+}
+
+.pausa-item__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.pausa-item__ticket {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 800;
+    font-size: 0.78rem;
+    color: #2563eb;
+    background: #eff6ff;
+    border-radius: 0.5rem;
+    padding: 0.15rem 0.45rem;
+}
+
+.pausa-item__title {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.pausa-item__periodo {
+    margin: 0.35rem 0 0.6rem;
+    font-size: 0.84rem;
+    color: #64748b;
+}
+
+.pausa-item__label {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.3rem;
+}
+
+.pausa-item__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.6rem;
+}
+
+.pausa-lista__status {
+    margin: 0 0 0.7rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #b45309;
+}
+
+.pausa-lista__vazio {
+    margin: 0.4rem 0 0;
+    font-size: 0.9rem;
+    color: #15803d;
+}
+
 /* Botao discreto de baixar a planilha de atendimentos do atendente. Fica ao
    lado do contador da coluna e nao deve competir com o "+" de criar chamado. */
 .column-sheet-btn {

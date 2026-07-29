@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- Pausa automatica no fim do expediente (17:45) com complemento obrigatorio: comando `pausar_expediente`, model `PausaAutomatica` (migration `0049`), travamento de Play/Pause/Stop enquanto houver pendencia, aviso pulsante + notificacao + modal no Kanban, e a planilha avisando quando falta o complemento. Testes `PausaAutomaticaTests` (18 casos)
+
 - Kaspersky: a tela ficou **so com o campo de pesquisa** (sairam os chips de situacao e de setor das duas abas), com a busca cobrindo tambem as palavras das situacoes; e a aba **Colaboradores** passou a considerar o inventario do GLPI - quem tem computador no GLPI mas nada no Kaspersky agora aparece como **"Sem antivirus"** (com o nome da maquina) em vez de "Sem dispositivo". Testes `KasperskyColaboradoresTests` e `KasperskyBuscaTests`
 - Adicionado `TemplatesLintTests`: quebra a build se algum `{# ... #}` do Django ficar em mais de uma linha (nesse caso ele nao e comentario e o texto aparece na tela do usuario)
 - Importados os **886 periodos de atendimento do sistema antigo** (migration `0048`, lendo `seed/chamados_legado.sqlite3`), que a migracao original nao havia trazido: a planilha mensal e o Historico passam a ter fev-jun/2026, nao so julho. Importador em `core/importa_atendimentos_legado.py`, idempotente e sem tocar em nenhum campo de `Chamado`; testes `ImportaAtendimentosLegadoTests`

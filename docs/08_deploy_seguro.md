@@ -178,3 +178,26 @@ a execucao em andamento.
 - Se precisar trocar a `VAULT_ENCRYPTION_KEY`, e necessario re-cifrar as
   credenciais (decifrar com a chave antiga e cifrar com a nova) — planeje uma
   rotina de rekey antes de trocar a chave em producao.
+
+## Agendamento da pausa no fim do expediente
+
+O comando `pausar_expediente` precisa rodar todo dia util no horario de
+encerramento. Ele fecha os atendimentos com Play aberto e abre a pendencia de
+complemento (ver `docs/02_regras_negocio.md`).
+
+Com cron, no usuario da aplicacao (`crontab -e`):
+
+```cron
+# Pausa os atendimentos abertos as 17:45, de segunda a sexta
+45 17 * * 1-5 cd /opt/chamados && /opt/chamados/.venv/bin/python manage.py pausar_expediente >> /var/log/chamados/pausar_expediente.log 2>&1
+```
+
+O `.env` do projeto e carregado pelo proprio `settings.py`, entao o cron nao
+precisa exportar variavel nenhuma. Antes de deixar valendo, confira sem gravar:
+
+```bash
+cd /opt/chamados && .venv/bin/python manage.py pausar_expediente --dry-run
+```
+
+Se preferir systemd timer, o `ExecStart` e o mesmo comando, com
+`WorkingDirectory=/opt/chamados` e `User=` o usuario da aplicacao.

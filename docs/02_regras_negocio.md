@@ -110,6 +110,19 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
    e o modal de fechados, nao a planilha). A conferencia da importacao aceita as duas leituras justamente para nao
    depender disso.
 
+## Regras atuais da pausa no fim do expediente
+
+1. Todo dia no fim do expediente (**17:45** por padrao) o comando `pausar_expediente` **pausa em lote** os atendimentos que ficaram com o **Play aberto**. O fim gravado e o proprio horario do corte (17:45), nao a hora em que o comando rodou.
+2. **Por que existe:** sem isso, um Play esquecido conta a noite e o fim de semana como tempo trabalhado. Na base de producao havia 14 periodos de mais de 24h - o maior com **7 dias (169h)** - inflando o relatorio mensal. Com a pausa diaria, cada dia trabalhado vira um periodo, e a planilha ganha **uma linha por dia**.
+3. O periodo pausado nasce **sem descricao**, porque o atendente nao estava la para dizer o que foi feito. Cada pausa gera uma **pendencia de complemento** (`PausaAutomatica`).
+4. **Travamento:** enquanto o atendente tiver pendencia, ele **nao consegue dar Play, pausar nem fechar chamado** - o backend recusa as tres acoes com `409` e a resposta traz `pausas_pendentes`, o que faz a tela abrir direto o modal de preenchimento. A trava e por atendente: a pendencia de um nao bloqueia o outro.
+5. **Como o atendente ve:** ao abrir o Kanban com pendencia, aparece um **aviso ambar com ponto pulsante** no topo ("N atendimentos pausados no fim do expediente - o Play, o Pause e o Stop ficam bloqueados ate voce preencher"), uma **notificacao do navegador** (quando permitida) e o **modal abre sozinho**. O modal lista um bloco por atendimento (chamado, dia, periodo e duracao) com um campo obrigatorio "O que foi feito neste periodo?" e um botao Salvar por item; a contagem cai a cada um e, ao zerar, avisa que Play/Pause/Stop foram liberados.
+6. O chamado volta para **"Atribuido"** na pausa automatica (nao e espera por terceiros, entao nao entra em "Aguardando").
+7. Um Play **iniciado depois do corte** (alguem trabalhando fora do horario) nao e pausado - senao o fim ficaria antes do inicio.
+8. **Historico:** a pausa registra `Atendimento pausado automaticamente no fim do expediente (17:45). Pendente de complemento no proximo acesso.` (tipo `pausa_automatica`) e o complemento registra `Complemento da pausa automatica por <atendente>: <texto>` (tipo `complemento_pausa`). Sao os mesmos textos do sistema antigo, para o historico importado e o novo ficarem comparaveis.
+9. **Na planilha**, o periodo pausado aparece com a coluna Acao/Correcao preenchida pelo complemento. Enquanto ele nao vier, a celula mostra `Pausa automatica no fim do expediente (pendente de complemento)` - em vez de sair vazia, o que pareceria esquecimento.
+10. Nao existe **retomada automatica** no dia seguinte: o atendente da Play quando volta ao chamado. Criar o Play sozinho lancaria horas em dias que ninguem tocou no chamado, que e justamente o problema que a pausa resolve.
+
 ## Regras atuais de permissao
 
 1. O usuario `fabiano.polone` deve ser administrador principal do sistema.

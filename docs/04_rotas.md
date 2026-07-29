@@ -18,6 +18,8 @@
 | `/chamados/pendencias/<id>/prioridade/` | POST | Altera a prioridade/cor da pendencia (1..5) e retorna a nova cor/rotulo (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/converter/` | POST | Converte a pendencia em chamado ao ser arrastada para um atendente (apenas TI/admin) | Implementada |
 | `/chamados/planilha/<attendant_id>/` | GET | Baixa a planilha mensal de atendimentos do atendente (.xlsx); `?mes=AAAA-MM` (padrao o mes atual). Uma linha por periodo Play -> Pause/Stop (apenas TI/admin; qualquer atendente baixa de qualquer um) | Implementada |
+| `/chamados/pausas-pendentes/` | GET | Lista (JSON) as pausas do fim do expediente que o atendente logado precisa complementar (apenas TI/admin) | Implementada |
+| `/chamados/pausas-pendentes/<pausa_id>/complementar/` | POST | Grava o que foi feito no periodo pausado automaticamente; libera Play/Pause/Stop quando zera (apenas TI/admin, so as proprias pausas) | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe do chamado com conversa, anexos, historico tecnico (recolhido) e timeline de atendimentos | Implementada |
@@ -320,6 +322,12 @@
 - Periodo ainda em andamento (Play aberto no momento do download) entra com a Data preenchida e **Fechado/Tempo em branco** (a formula sem o fim daria resultado negativo).
 - **Chamado encerrado direto pelo Stop (sem Play) nao gera linha**, porque nao cria periodo em `AtendimentoHistorico` (decisao de uso). O mesmo vale para chamado aberto no mes que nunca recebeu Play.
 - Meses com mais de 145 atendimentos: as linhas extras herdam o estilo da primeira linha de dados do modelo.
+
+## Regras da pausa no fim do expediente
+
+- O comando `python manage.py pausar_expediente` (agendado no servidor para 17:45) fecha os atendimentos com Play aberto, grava o fim no proprio horario do corte, deixa a descricao vazia e abre uma `PausaAutomatica` pendente. Opcoes: `--hora HH:MM` e `--dry-run`.
+- Enquanto o atendente tiver pausa pendente, `/chamados/atendimento/iniciar/` e `/chamados/atendimento/encerrar/` (Pause e Stop) respondem `409` com `pausas_pendentes` e `pausa_pendente_id` no JSON; o frontend usa isso para abrir o modal de preenchimento em vez de so mostrar o aviso. A trava e por atendente.
+- `/chamados/pausas-pendentes/` devolve `total` e a lista (chamado, titulo, dia, inicio, fim, duracao). `/chamados/pausas-pendentes/<id>/complementar/` aceita `POST` JSON com `description` (obrigatorio), grava no atendimento, registra o evento `complemento_pausa` e devolve `restantes`/`liberado`. Cada atendente so complementa as **proprias** pausas (`404` para as de outro) e uma pausa ja complementada responde `409`.
 
 ## Regras das rotas de historico
 
