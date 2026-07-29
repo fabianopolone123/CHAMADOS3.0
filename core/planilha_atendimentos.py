@@ -21,8 +21,16 @@ Colunas (linha 7 do modelo):
 | G   | Falha            | "N/A"                                                 |
 | H   | Acao / Correcao  | o que foi feito no periodo (descricao do Pause/Stop)  |
 | I   | Fechado          | fim do periodo (hora do Pause/Stop)                   |
-| J   | Tempo            | formula `=I{n}-B{n}`                                  |
+| J   | Tempo            | duracao (fim - inicio), no formato de hora do modelo  |
 | K   | Acao Eficaz      | vazio (preenchido a mao)                              |
+
+Os numeros vao **calculados**, nao como formula. O modelo trazia `=I{n}-B{n}` no
+Tempo e `COUNTIF`/`SUM` no bloco de resumo, mas o openpyxl grava formula sem valor
+em cache (`<f>...</f><v/>`): o Excel abria mostrando as celulas em branco e o
+grafico do resumo lia zero, mesmo com `fullCalcOnLoad` ligado no arquivo. Gravando
+o valor pronto, a planilha abre certa em qualquer leitor (Excel, LibreOffice,
+Sheets) sem depender de recalculo. Em troca, editar uma linha a mao nao atualiza
+mais o Tempo nem os contadores sozinho.
 """
 
 from __future__ import annotations
@@ -66,6 +74,11 @@ MESES_PT = [
 ]
 
 FORMATO_DATA = "dd/mm/yyyy hh:mm"
+
+# Tempo decorrido: os colchetes fazem as horas passarem de 24 em vez de dar a
+# volta. O modelo trazia "[$-F400]h:mm:ss AM/PM", que mostraria um atendimento de
+# 169h como "1:37:03 AM" (e ainda com um AM/PM sem sentido para duracao).
+FORMATO_DURACAO = "[h]:mm:ss"
 
 
 def _fim_do_mes(ano: int, mes: int) -> date:
@@ -117,6 +130,23 @@ def _notificacao(chamado: Chamado) -> str:
     return descricao or (chamado.titulo or "").strip()
 
 
+# Bloco de resumo do modelo: a celula de contagem de cada rotulo de prioridade
+# (o rotulo em si fica na coluna G da mesma linha) e o total em E2 (merge E2:E5).
+LINHA_RESUMO = {"Alta": 2, "Media": 3, PRIORIDADE_USUARIO: 4, PRIORIDADE_TI: 5}
+CELULA_TOTAL = "E2"
+
+
+def _preencher_resumo(ws, contagem: dict, total: int) -> None:
+    """Grava os contadores do cabecalho com o valor pronto (sem COUNTIF/SUM).
+
+    O modelo traz as formulas, mas o openpyxl as grava sem valor em cache e o
+    Excel abre o bloco em branco (e o grafico do resumo lê zero).
+    """
+    for rotulo, linha in LINHA_RESUMO.items():
+        ws.cell(row=linha, column=6, value=contagem.get(rotulo, 0))
+    ws[CELULA_TOTAL] = total
+
+
 def _copiar_estilo_linha(ws, origem: int, destino: int) -> None:
     """Replica o estilo de uma linha do modelo em outra (meses mais cheios)."""
     for col in range(1, 12):
@@ -145,6 +175,7 @@ def gerar_planilha(atendente, ano: int, mes: int, setor_por_solicitante=None, te
     ws["A5"] = f"{nome_atendente} {telefone_atendente}".strip()
 
     linha = PRIMEIRA_LINHA
+    contagem = {PRIORIDADE_TI: 0, PRIORIDADE_USUARIO: 0}
     for periodo in periodos_do_mes(atendente, ano, mes):
         if linha > ULTIMA_LINHA_MODELO:
             _copiar_estilo_linha(ws, PRIMEIRA_LINHA, linha)
@@ -157,18 +188,25 @@ def gerar_planilha(atendente, ano: int, mes: int, setor_por_solicitante=None, te
         ws.cell(row=linha, column=3, value=_contato(chamado))
         ws.cell(row=linha, column=4, value=setor_por_solicitante.get(solicitante_id, ""))
         ws.cell(row=linha, column=5, value=_notificacao(chamado))
-        ws.cell(row=linha, column=6, value=_prioridade_planilha(chamado))
+        prioridade = _prioridade_planilha(chamado)
+        ws.cell(row=linha, column=6, value=prioridade)
+        contagem[prioridade] = contagem.get(prioridade, 0) + 1
         ws.cell(row=linha, column=7, value="N/A")
         ws.cell(row=linha, column=8, value=periodo.descricao_atividade or "")
 
         # Periodo ainda em andamento (Play aberto): "Fechado" e "Tempo" ficam em
-        # branco - a formula de tempo sem o fim daria resultado negativo.
+        # branco - nao ha duracao para informar.
         if periodo.finalizado_em:
             ws.cell(row=linha, column=9, value=timezone.localtime(periodo.finalizado_em).replace(tzinfo=None))
             ws.cell(row=linha, column=9).number_format = FORMATO_DATA
-            ws.cell(row=linha, column=10, value=f"=I{linha}-B{linha}")
+            # Duracao em dias (como o Excel guarda hora), em tempo decorrido.
+            segundos = (periodo.finalizado_em - periodo.iniciado_em).total_seconds()
+            ws.cell(row=linha, column=10, value=max(segundos, 0) / 86400)
+            ws.cell(row=linha, column=10).number_format = FORMATO_DURACAO
 
         linha += 1
+
+    _preencher_resumo(ws, contagem, total=linha - PRIMEIRA_LINHA)
 
     buffer = io.BytesIO()
     wb.save(buffer)

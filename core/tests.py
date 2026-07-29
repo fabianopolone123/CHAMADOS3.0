@@ -3371,7 +3371,10 @@ class PlanilhaAtendimentosTests(TestCase):
         # Data = Play, Fechado = Stop, Tempo = formula
         self.assertEqual(ws["B8"].value.strftime("%d/%m/%Y %H:%M"), "05/05/2026 08:12")
         self.assertEqual(ws["I8"].value.strftime("%d/%m/%Y %H:%M"), "05/05/2026 17:45")
-        self.assertEqual(ws["J8"].value, "=I8-B8")
+        # O Tempo vai calculado (nao como formula): o openpyxl grava formula
+        # sem valor em cache e o Excel abria a celula em branco.
+        self.assertEqual(ws["J8"].value, timezone.timedelta(hours=9, minutes=33))
+        self.assertEqual(ws["J8"].number_format, "[h]:mm:ss")
 
     def test_colunas_contato_setor_falha_e_tk(self):
         chamado = self._chamado("Preciso de um fone")
@@ -3474,6 +3477,36 @@ class PlanilhaAtendimentosTests(TestCase):
         self.assertIn(f'data-planilha-atendente="{self.ti.id}"', html)
         self.assertIn('id="planilhaAtendimentosModal"', html)
         self.assertIn('id="planilhaMes"', html)
+
+    def test_resumo_do_cabecalho_vem_calculado(self):
+        # O modelo traz COUNTIF/SUM, mas o openpyxl grava formula sem valor em
+        # cache: o Excel abria o bloco em branco e o grafico lia zero.
+        for i in range(3):
+            self._periodo(self._chamado(f"Do usuario {i}"), self._dt(5, 9 + i, 0), self._dt(5, 10 + i, 0))
+        interno = self._chamado("Tarefa da TI", origem="Kanban TI", solicitante=self.ti)
+        self._periodo(interno, self._dt(6, 9, 0), self._dt(6, 10, 0))
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertEqual(ws["E2"].value, 4)  # total de linhas
+        self.assertEqual(ws["F2"].value, 0)  # Alta
+        self.assertEqual(ws["F3"].value, 0)  # Media
+        self.assertEqual(ws["F4"].value, 3)  # Baixa (usuario)
+        self.assertEqual(ws["F5"].value, 1)  # Programada (TI)
+        # os rotulos do modelo continuam na coluna G
+        self.assertEqual(ws["G4"].value, "Baixa")
+        self.assertEqual(ws["G5"].value, "Programada")
+
+    def test_atendimento_de_mais_de_24h_nao_da_a_volta_no_relogio(self):
+        # Existem periodos reais de dias (Play esquecido aberto): com o formato
+        # do modelo ("h:mm:ss AM/PM") 169h apareceriam como "1:37 AM".
+        chamado = self._chamado("Play esquecido aberto")
+        self._periodo(chamado, self._dt(5, 8, 0), self._dt(12, 9, 30))
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertEqual(ws["J8"].value, timezone.timedelta(days=7, hours=1, minutes=30))
+        self.assertEqual(ws["J8"].number_format, "[h]:mm:ss")
 
     def test_modal_oferece_apenas_meses_com_atendimento(self):
         # O sistema so tem historico desde que o controle de tempo entrou em uso:
