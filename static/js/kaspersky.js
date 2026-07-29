@@ -128,57 +128,36 @@
     const statusEl = document.getElementById("kspSearchStatus");
     const noResults = document.getElementById("kspNoResults");
     const rows = Array.from(document.querySelectorAll(".ksp-row"));
-    const statusChips = Array.from(document.querySelectorAll("#kspStatusChips .ips-chip"));
-    const setorChips = Array.from(document.querySelectorAll("#kspSetorChips .ips-chip"));
-    let situacao = "";
-    let setorAtivo = "";
 
-    function matchSituacao(row) {
-        if (!situacao) return true;
-        if (situacao === "critico") return row.dataset.status === "critico";
-        if (situacao === "sem-antivirus") return row.dataset.antivirus === "nao";
-        if (situacao === "sem-conexao") return row.dataset.conexao === "sem";
-        if (situacao === "fora-export") return row.dataset.export === "nao";
-        return true;
-    }
-
+    // Sem chips de filtro: so a busca. O `data-search` de cada linha leva os
+    // dados e tambem as palavras das situacoes ("critico", "sem antivirus",
+    // "sem conexao", "fora do export"), entao digitar qualquer uma delas - ou um
+    // setor, ou o nome do colaborador - filtra a lista. Aceita varias palavras.
     function applyFilters() {
-        const termo = normalize(searchInput?.value).trim();
+        const termos = normalize(searchInput?.value).trim().split(/\s+/).filter(Boolean);
         let visiveis = 0;
         rows.forEach((row) => {
-            const okTexto = !termo || normalize(row.dataset.search).includes(termo);
-            const okSetor = !setorAtivo || row.dataset.setor === setorAtivo;
-            const mostrar = okTexto && okSetor && matchSituacao(row);
+            const alvo = normalize(row.dataset.search);
+            const mostrar = termos.every((termo) => alvo.includes(termo));
             row.classList.toggle("is-hidden", !mostrar);
             if (mostrar) visiveis += 1;
         });
         if (noResults) noResults.classList.toggle("is-hidden", visiveis !== 0 || rows.length === 0);
         if (statusEl) {
-            const filtrando = termo || setorAtivo || situacao;
-            statusEl.textContent = filtrando
+            statusEl.textContent = termos.length
                 ? `${visiveis} de ${rows.length} dispositivo(s) encontrado(s).`
                 : `${rows.length} dispositivo(s) no total.`;
         }
     }
 
     searchInput?.addEventListener("input", applyFilters);
-
-    function ligarChips(chips, aoEscolher) {
-        chips.forEach((chip) => {
-            chip.addEventListener("click", () => {
-                chips.forEach((c) => {
-                    const ativo = c === chip;
-                    c.classList.toggle("is-active", ativo);
-                    c.setAttribute("aria-selected", ativo ? "true" : "false");
-                });
-                aoEscolher(chip);
-                applyFilters();
-            });
-        });
-    }
-
-    ligarChips(statusChips, (chip) => { situacao = chip.dataset.situacao || ""; });
-    ligarChips(setorChips, (chip) => { setorAtivo = chip.dataset.setor || ""; });
+    searchInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && searchInput.value) {
+            event.preventDefault();
+            searchInput.value = "";
+            applyFilters();
+        }
+    });
     applyFilters();
 
     // ------------------------------------------------------------------
@@ -188,39 +167,34 @@
     const colabSearch = document.getElementById("kspColabSearch");
     const colabStatus = document.getElementById("kspColabStatus");
     const colabNoResults = document.getElementById("kspColabNoResults");
-    const colabChips = Array.from(document.querySelectorAll("#kspColabChips .ips-chip"));
-    let colabSituacao = "";
 
+    // So busca, como na aba Dispositivos: o `data-search` da linha leva nome,
+    // setor, computadores, e-mail e a **situacao** ("com antivirus", "sem
+    // antivirus", "sem dispositivo"), entao digitar a situacao filtra a lista.
     function applyColabFilters() {
-        const termo = normalize(colabSearch?.value).trim();
+        const termos = normalize(colabSearch?.value).trim().split(/\s+/).filter(Boolean);
         let visiveis = 0;
         colabRows.forEach((row) => {
-            const okTexto = !termo || normalize(row.dataset.search).includes(termo);
-            const okSituacao = !colabSituacao || row.dataset.situacao === colabSituacao;
-            const mostrar = okTexto && okSituacao;
+            const alvo = normalize(row.dataset.search);
+            const mostrar = termos.every((termo) => alvo.includes(termo));
             row.classList.toggle("is-hidden", !mostrar);
             if (mostrar) visiveis += 1;
         });
         if (colabNoResults) colabNoResults.classList.toggle("is-hidden", visiveis !== 0 || colabRows.length === 0);
         if (colabStatus) {
-            const filtrando = termo || colabSituacao;
-            colabStatus.textContent = filtrando
+            colabStatus.textContent = termos.length
                 ? `${visiveis} de ${colabRows.length} colaborador(es) encontrado(s).`
                 : `${colabRows.length} colaborador(es) na lista de ramais.`;
         }
     }
 
     colabSearch?.addEventListener("input", applyColabFilters);
-    colabChips.forEach((chip) => {
-        chip.addEventListener("click", () => {
-            colabChips.forEach((c) => {
-                const ativo = c === chip;
-                c.classList.toggle("is-active", ativo);
-                c.setAttribute("aria-selected", ativo ? "true" : "false");
-            });
-            colabSituacao = chip.dataset.situacao || "";
+    colabSearch?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && colabSearch.value) {
+            event.preventDefault();
+            colabSearch.value = "";
             applyColabFilters();
-        });
+        }
     });
     applyColabFilters();
 

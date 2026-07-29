@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- Kaspersky: a tela ficou **so com o campo de pesquisa** (sairam os chips de situacao e de setor das duas abas), com a busca cobrindo tambem as palavras das situacoes; e a aba **Colaboradores** passou a considerar o inventario do GLPI - quem tem computador no GLPI mas nada no Kaspersky agora aparece como **"Sem antivirus"** (com o nome da maquina) em vez de "Sem dispositivo". Testes `KasperskyColaboradoresTests` e `KasperskyBuscaTests`
+- Adicionado `TemplatesLintTests`: quebra a build se algum `{# ... #}` do Django ficar em mais de uma linha (nesse caso ele nao e comentario e o texto aparece na tela do usuario)
 - Importados os **886 periodos de atendimento do sistema antigo** (migration `0048`, lendo `seed/chamados_legado.sqlite3`), que a migracao original nao havia trazido: a planilha mensal e o Historico passam a ter fev-jun/2026, nao so julho. Importador em `core/importa_atendimentos_legado.py`, idempotente e sem tocar em nenhum campo de `Chamado`; testes `ImportaAtendimentosLegadoTests`
 - Planilha de atendimentos: o seletor de mes oferece apenas os meses com atendimento daquele atendente (mais o mes atual), com a contagem no rotulo, em vez de 12 meses fixos que saiam em branco. Script `scripts/diagnostico_planilha.py` (somente leitura) para conferir a base no servidor
 - Criada a planilha mensal de atendimentos por atendente (.xlsx no modelo que a TI ja usava): botao no cabecalho da coluna do Kanban, modal com o mes (atual por padrao) e uma linha por periodo Play -> Pause/Stop. Gerador em `core/planilha_atendimentos.py` sobre `core/planilhas/modelo_atendimentos.xlsx`, rota `atendimentos_planilha`, setor/telefone vindos dos Ramais; testes `PlanilhaAtendimentosTests`

@@ -3,6 +3,7 @@ import os
 import tempfile
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -3030,13 +3031,24 @@ class KasperskyTests(TestCase):
         self.assertEqual(resp.context["total_colaboradores"], Ramal.objects.count())
         self.assertGreaterEqual(resp.context["colaboradores_sem_dispositivo"], 1)
 
-    def test_setores_agrupados_para_o_filtro(self):
+    def test_setor_do_dispositivo_entra_no_texto_pesquisavel(self):
+        # Os chips de filtro por setor sairam da tela: agora o setor e achado
+        # digitando na busca, pelo `data-search` da linha.
         self.client.force_login(self.ti)
         self._importar([self._linha("PC-1"), self._linha("PC-2"), self._linha("PC-3")])
         KasperskyDispositivo.objects.filter(nome__in=["PC-1", "PC-2"]).update(setor="Engenharia")
-        resp = self.client.get(reverse("kaspersky_dashboard"))
-        setores = {s["label"]: s["count"] for s in resp.context["setores"]}
-        self.assertEqual(setores, {"Engenharia": 2, "Sem setor": 1})
+        html = self.client.get(reverse("kaspersky_dashboard")).content.decode()
+        self.assertNotIn('id="kspSetorChips"', html)
+
+        import re
+
+        buscas = {
+            m.group(1): m.group(2).lower()
+            for m in re.finditer(r'data-nome="([^"]+)".*?data-search="([^"]*)"', html, re.DOTALL)
+        }
+        self.assertIn("engenharia", buscas["PC-1"])
+        self.assertIn("engenharia", buscas["PC-2"])
+        self.assertIn("sem setor", buscas["PC-3"])
 
     def test_excluir_dispositivo(self):
         self.client.force_login(self.ti)
@@ -3793,3 +3805,134 @@ class ImportaAtendimentosLegadoTests(TestCase):
         # 11:38->14:42 UTC no banco antigo = 08:38->11:42 na planilha (hora local)
         self.assertEqual(ws["B8"].value.strftime("%d/%m/%Y %H:%M"), "20/05/2026 08:38")
         self.assertEqual(ws["I8"].value.strftime("%d/%m/%Y %H:%M"), "20/05/2026 11:42")
+
+
+class KasperskyColaboradoresTests(TestCase):
+    """Aba Colaboradores: quem tem computador no GLPI mas nada no Kaspersky
+    aparecia como "Sem dispositivo", escondendo maquina sem antivirus."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        # O banco de teste ja vem com os ramais do seed (migration 0013): limpa
+        # para os contadores desta classe serem exatos.
+        Ramal.objects.all().delete()
+        KasperskyDispositivo.objects.all().delete()
+        Computador.objects.all().delete()
+
+        # 1) protegido: dispositivo no Kaspersky com o antivirus instalado
+        self.protegido = Ramal.objects.create(colaborador="Ana Protegida", setor="TI")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-001", ramal=self.protegido, versao_aplicativo="12.12.0.522", no_ultimo_export=True
+        )
+        # 2) dispositivo no Kaspersky so com Agente de Rede (sem antivirus)
+        self.so_agente = Ramal.objects.create(colaborador="Bruno Agente", setor="RH")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-002", ramal=self.so_agente, versao_aplicativo="", no_ultimo_export=True
+        )
+        # 3) tem computador no GLPI que o Kaspersky NAO conhece
+        self.so_glpi = Ramal.objects.create(colaborador="Carla Glpi", setor="PCP")
+        Computador.objects.create(nome="CPU-146", ramal=self.so_glpi)
+        # 4) nao tem maquina em nenhum dos dois
+        self.sem_nada = Ramal.objects.create(colaborador="Davi Sem Maquina", setor="Portaria")
+
+    def _colaboradores(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("kaspersky_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        return {c["nome"]: c for c in resp.context["colaboradores"]}, resp
+
+    def test_computador_do_glpi_sem_kaspersky_conta_como_sem_antivirus(self):
+        colaboradores, _ = self._colaboradores()
+        carla = colaboradores["Carla Glpi"]
+        self.assertEqual(carla["situacao"], "sem-antivirus")
+        self.assertEqual(carla["situacao_label"], "Sem antivirus")
+        # e a maquina aparece, marcada de onde veio
+        self.assertIn("CPU-146", carla["dispositivos"])
+        self.assertIn("so no GLPI", carla["dispositivos"])
+
+    def test_sem_dispositivo_fica_so_para_quem_nao_tem_maquina(self):
+        colaboradores, _ = self._colaboradores()
+        self.assertEqual(colaboradores["Davi Sem Maquina"]["situacao"], "sem-dispositivo")
+        self.assertEqual(colaboradores["Davi Sem Maquina"]["dispositivos"], "-")
+
+    def test_classificacao_dos_demais_nao_muda(self):
+        colaboradores, _ = self._colaboradores()
+        self.assertEqual(colaboradores["Ana Protegida"]["situacao"], "protegido")
+        self.assertEqual(colaboradores["Bruno Agente"]["situacao"], "sem-antivirus")
+
+    def test_contadores_do_cartao(self):
+        _, resp = self._colaboradores()
+        self.assertEqual(resp.context["colaboradores_protegidos"], 1)
+        self.assertEqual(resp.context["colaboradores_sem_antivirus"], 2)  # so-agente + so-glpi
+        self.assertEqual(resp.context["colaboradores_sem_dispositivo"], 1)
+
+    def test_computador_do_glpi_que_existe_no_kaspersky_nao_duplica(self):
+        # Mesmo nome nos dois lados: vale o registro do Kaspersky.
+        ramal = Ramal.objects.create(colaborador="Eva Dois Lados", setor="Fiscal")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-500", ramal=ramal, versao_aplicativo="12.12.0.522", no_ultimo_export=True
+        )
+        Computador.objects.create(nome="cpu-500", ramal=ramal)  # nome em minusculas
+        colaboradores, _ = self._colaboradores()
+        eva = colaboradores["Eva Dois Lados"]
+        self.assertEqual(eva["situacao"], "protegido")
+        self.assertEqual(eva["dispositivos"], "CPU-500")
+        self.assertNotIn("GLPI", eva["dispositivos"])
+
+
+class KasperskyBuscaTests(TestCase):
+    """A tela ficou apenas com o campo de busca: os chips de situacao e de setor
+    sairam, e a busca passou a cobrir tambem essas palavras."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        Ramal.objects.all().delete()
+        KasperskyDispositivo.objects.all().delete()
+        ramal = Ramal.objects.create(colaborador="Ana Souza", setor="Projetos")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-010", setor="Projetos", ramal=ramal, status="Critico",
+            versao_aplicativo="", no_ultimo_export=False, endereco_ip="192.168.22.9",
+        )
+
+    def test_chips_de_filtro_sairam_da_tela(self):
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("kaspersky_dashboard")).content.decode()
+        self.assertNotIn('id="kspStatusChips"', html)
+        self.assertNotIn('id="kspSetorChips"', html)
+        self.assertNotIn('id="kspColabChips"', html)
+        self.assertIn('id="kspSearch"', html)  # a busca continua
+        self.assertIn('id="kspColabSearch"', html)
+        self.assertNotIn("{#", html)  # comentario de template nao vaza para a tela
+
+    def test_texto_pesquisavel_cobre_situacao_setor_e_colaborador(self):
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("kaspersky_dashboard")).content.decode()
+        inicio = html.find('data-search="', html.find("ksp-row"))
+        alvo = html[inicio : html.find('"', inicio + 13)].lower()
+        for palavra in ("cpu-010", "projetos", "ana souza", "192.168.22.9", "sem antivirus", "fora do export"):
+            self.assertIn(palavra, alvo, f"esperava {palavra!r} no texto pesquisavel")
+
+class TemplatesLintTests(TestCase):
+    """Erros de template que passam calados e aparecem na tela do usuario."""
+
+    def test_nenhum_comentario_django_em_varias_linhas(self):
+        # `{# ... #}` e comentario de UMA linha: quebrado em duas, o Django nao o
+        # trata como comentario e o texto vai renderizado na pagina (ou dentro de
+        # uma tag, virando lixo no HTML). Para varias linhas existe
+        # `{% comment %}...{% endcomment %}`.
+        from pathlib import Path
+
+        raiz = Path(settings.BASE_DIR) / "templates"
+        problemas = []
+        for caminho in raiz.rglob("*.html"):
+            for numero, linha in enumerate(caminho.read_text(encoding="utf-8").splitlines(), start=1):
+                if "{#" in linha and "#}" not in linha:
+                    problemas.append(f"{caminho.relative_to(raiz)}:{numero}: {linha.strip()[:60]}")
+        self.assertEqual(problemas, [], "comentario {# #} em varias linhas: " + "; ".join(problemas))

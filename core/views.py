@@ -5595,21 +5595,13 @@ def _vincular_kaspersky_pelo_glpi(nomes=None) -> int:
 def kaspersky_dashboard_view(request):
     """Lista os dispositivos com antivirus, o consumo de licencas e os filtros
     por setor e por status."""
-    dispositivos = list(KasperskyDispositivo.objects.all())
+    dispositivos = list(KasperskyDispositivo.objects.select_related("ramal"))
     config = KasperskyConfig.load()
 
     # So consome licenca o dispositivo que esta no ultimo export E tem o
     # antivirus instalado (quem so tem o Agente de Rede nao consome).
     em_uso = sum(1 for d in dispositivos if d.no_ultimo_export and d.tem_antivirus)
     contratadas = config.licencas_contratadas
-
-    contagem_setor = {}
-    for d in dispositivos:
-        contagem_setor[d.setor_label] = contagem_setor.get(d.setor_label, 0) + 1
-    setores = [
-        {"label": label, "count": contagem_setor[label]}
-        for label in sorted(contagem_setor, key=lambda s: (s == "Sem setor", s.lower()))
-    ]
 
     # Sugestoes do campo setor: o que ja existe aqui + os setores dos ramais.
     sugestoes = {d.setor.strip() for d in dispositivos if d.setor.strip()}
@@ -5627,22 +5619,40 @@ def kaspersky_dashboard_view(request):
         if d.ramal_id:
             por_ramal.setdefault(d.ramal_id, []).append(d)
 
+    # A maquina da pessoa pode estar no inventario do GLPI (modulo Contatos) e
+    # NAO no Kaspersky - e o caso mais grave, porque significa computador sem o
+    # antivirus gerenciado. Antes essas pessoas apareciam como "Sem dispositivo",
+    # escondendo o problema no meio de quem realmente nao tem maquina.
+    nomes_kaspersky = {d.nome.strip().upper() for d in dispositivos if d.nome}
+    computadores_por_ramal = {}
+    for computador in Computador.objects.exclude(ramal__isnull=True).only("nome", "ramal_id"):
+        computadores_por_ramal.setdefault(computador.ramal_id, []).append(computador)
+
     colaboradores = []
     for ramal in Ramal.objects.all():
         vinculados = por_ramal.get(ramal.id, [])
-        com_av = [d for d in vinculados if d.tem_antivirus]
-        if com_av:
+        computadores_glpi = computadores_por_ramal.get(ramal.id, [])
+        # Computadores do GLPI que o Kaspersky nao conhece (nem pelo nome).
+        fora_do_kaspersky = [
+            c for c in computadores_glpi if (c.nome or "").strip().upper() not in nomes_kaspersky
+        ]
+
+        if any(d.tem_antivirus for d in vinculados):
             situacao, situacao_label = "protegido", "Com antivirus"
-        elif vinculados:
+        elif vinculados or fora_do_kaspersky:
             situacao, situacao_label = "sem-antivirus", "Sem antivirus"
         else:
             situacao, situacao_label = "sem-dispositivo", "Sem dispositivo"
+
+        nomes = [d.nome for d in vinculados]
+        # Mostra a maquina do GLPI marcada, para saber de onde veio a informacao.
+        nomes += [f"{c.nome} (so no GLPI)" for c in fora_do_kaspersky]
         colaboradores.append(
             {
                 "nome": ramal.colaborador or "(sem nome)",
                 "setor": ramal.setor or "Sem setor",
                 "email": ramal.email,
-                "dispositivos": ", ".join(d.nome for d in vinculados) or "-",
+                "dispositivos": ", ".join(nomes) or "-",
                 "situacao": situacao,
                 "situacao_label": situacao_label,
             }
@@ -5664,11 +5674,13 @@ def kaspersky_dashboard_view(request):
         "criticos": sum(1 for d in dispositivos if d.status_slug == "critico"),
         "sem_conexao": sum(1 for d in dispositivos if d.sem_conexao),
         "fora_do_export": sum(1 for d in dispositivos if not d.no_ultimo_export),
-        "setores": setores,
         "setores_sugestoes": sorted(sugestoes, key=str.lower),
         "colaboradores": colaboradores,
         "total_colaboradores": len(colaboradores),
         "colaboradores_protegidos": protegidos,
+        "colaboradores_sem_antivirus": sum(
+            1 for c in colaboradores if c["situacao"] == "sem-antivirus"
+        ),
         "colaboradores_sem_dispositivo": sum(
             1 for c in colaboradores if c["situacao"] == "sem-dispositivo"
         ),
