@@ -92,6 +92,88 @@
     let reqEditId = null;
     let returnToDetailFromReqForm = false;
 
+    // ------------------------------------------------------------------
+    // Busca inteligente da lista de requisicoes
+    // ------------------------------------------------------------------
+    // Filtra no proprio navegador (resultado a cada tecla, sem ida ao
+    // servidor) sobre o texto que a view monta no `data-search` de cada item:
+    // codigo, titulo, tipo, status, descricao, autor, data e todos os
+    // orcamentos/suborcamentos (titulo, loja, link, valores) com os nomes dos
+    // documentos anexados. Aceita varias palavras (todas precisam bater) e
+    // ignora acentos e maiusculas.
+    const searchInput = document.getElementById("requisicaoSearch");
+    const searchStatus = document.getElementById("requisicaoSearchStatus");
+    const searchNoResults = document.getElementById("requisicoesNoResults");
+
+    function normalizeSearch(value) {
+        return (value || "")
+            .toString()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .toLowerCase();
+    }
+
+    function applyRequisicaoFilter() {
+        const rows = Array.from(requisicoesList?.querySelectorAll("[data-requisicao-row]") || []);
+        const termos = normalizeSearch(searchInput?.value).trim().split(/\s+/).filter(Boolean);
+        let visiveis = 0;
+        rows.forEach((row) => {
+            const alvo = normalizeSearch(row.dataset.search);
+            const mostrar = termos.every((termo) => alvo.includes(termo));
+            row.classList.toggle("is-hidden", !mostrar);
+            if (mostrar) visiveis += 1;
+        });
+        if (searchNoResults) {
+            searchNoResults.classList.toggle("is-hidden", visiveis !== 0 || rows.length === 0);
+        }
+        if (searchStatus) {
+            searchStatus.textContent = termos.length
+                ? `${visiveis} de ${rows.length} requisicao(oes) encontrada(s).`
+                : `${rows.length} requisicao(oes) no total.`;
+        }
+    }
+
+    searchInput?.addEventListener("input", applyRequisicaoFilter);
+    searchInput?.addEventListener("keydown", (event) => {
+        // Esc limpa a pesquisa e devolve a lista inteira.
+        if (event.key === "Escape" && searchInput.value) {
+            event.preventDefault();
+            searchInput.value = "";
+            applyRequisicaoFilter();
+        }
+    });
+
+    function setRequisicaoBusca(id, texto) {
+        const btn = requisicoesList?.querySelector(`.requisicao-item[data-requisicao-id="${id}"]`);
+        const row = btn ? btn.closest("[data-requisicao-row]") : null;
+        if (row) row.dataset.search = texto;
+    }
+
+    // Espelha o `_requisicao_busca_texto` do backend a partir do detalhe ja
+    // carregado, para a busca continuar achando o que mudou na sessao (novo
+    // orcamento, outra loja, status) sem precisar recarregar a pagina.
+    function buildRequisicaoBusca(data) {
+        const req = data.requisicao || {};
+        const partes = [
+            req.codigo,
+            req.titulo,
+            req.tipo_label,
+            req.status_label,
+            req.texto,
+            req.criado_por,
+            req.criado_em,
+            req.entregue_por,
+        ];
+        (data.orcamentos || []).forEach((orc) => {
+            if (orc.aprovado) partes.push("aprovado", orc.aprovado_por);
+            [orc, ...(orc.suborcamentos || [])].forEach((item) => {
+                partes.push(item.titulo, item.loja, item.link, item.valor, item.total_display);
+                (item.documentos || []).forEach((doc) => partes.push(doc.nome));
+            });
+        });
+        return partes.filter(Boolean).join(" ");
+    }
+
     function openReqCreateForm() {
         reqFormMode = "create";
         reqEditId = null;
@@ -141,12 +223,14 @@
         }
     }
 
-    function addRequisicaoToList(req) {
+    function addRequisicaoToList(req, extraBusca) {
         const empty = requisicoesList.querySelector(".requisicoes-empty");
         if (empty) {
             empty.remove();
         }
         const li = document.createElement("li");
+        li.setAttribute("data-requisicao-row", "");
+        li.dataset.search = [req.codigo, req.titulo, req.status_label, extraBusca].filter(Boolean).join(" ");
         const button = document.createElement("button");
         button.type = "button";
         button.className = "requisicao-item";
@@ -172,6 +256,7 @@
         button.addEventListener("click", () => openRequisicaoDetail(req.id));
         li.appendChild(button);
         requisicoesList.insertBefore(li, requisicoesList.firstChild);
+        applyRequisicaoFilter();
     }
 
     createReqForm?.addEventListener("submit", async (event) => {
@@ -194,7 +279,7 @@
                 showToast(data.message || "Requisicao atualizada.", "success");
             } else {
                 const data = await sendJson(requisicaoCreateUrl, payload);
-                addRequisicaoToList(data.requisicao);
+                addRequisicaoToList(data.requisicao, `${payload.tipo} ${payload.texto}`);
                 createReqModal?.hide();
                 createReqForm.reset();
                 showToast(data.message || "Requisicao criada.", "success");
@@ -601,6 +686,9 @@
         syncNaoAprovarButton(req.status);
         renderOrcamentos(data.orcamentos);
         renderTimeline(data.eventos);
+        // Mantem a busca em dia com o que foi alterado nesta sessao.
+        setRequisicaoBusca(req.id, buildRequisicaoBusca(data));
+        applyRequisicaoFilter();
     }
 
     async function sendGet(url) {
@@ -1078,6 +1166,7 @@
             p.textContent = requisicoesList.dataset.emptyText || "Nenhuma requisicao cadastrada ainda.";
             requisicoesList.appendChild(p);
         }
+        applyRequisicaoFilter();
     }
 
     // abre a confirmacao (empilha sobre o detalhe: esconde e reabre ao cancelar)

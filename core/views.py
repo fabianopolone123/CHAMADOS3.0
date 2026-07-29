@@ -1817,9 +1817,49 @@ def _serialize_orcamento(orc: OrcamentoContrato):
     }
 
 
+def _requisicao_busca_texto(req: RequisicaoContrato) -> str:
+    """Texto pesquisavel de uma requisicao, usado pela busca da lista.
+
+    A lista mostra so codigo, titulo e status, mas a pesquisa precisa achar
+    "qualquer coisa" da requisicao. Este texto vai no `data-search` do item e o
+    filtro roda no navegador (instantaneo, sem ida ao servidor): junta os dados
+    da requisicao, quem criou/entregou e todos os orcamentos e suborcamentos
+    (titulo, loja, link, valores) com os nomes dos documentos anexados.
+    """
+    partes = [
+        req.codigo,
+        req.titulo,
+        req.tipo_label,
+        req.status_label,
+        req.texto,
+        _attendant_display(req.criado_por),
+        timezone.localtime(req.criado_em).strftime("%d/%m/%Y") if req.criado_em else "",
+        _attendant_display(req.entregue_por),
+    ]
+    for orc in req.orcamentos.all():
+        if orc.aprovado:
+            partes += ["aprovado", _attendant_display(orc.aprovado_por)]
+        for item in [orc, *orc.suborcamentos.all()]:
+            partes += [
+                item.titulo,
+                item.loja,
+                item.link,
+                f"{item.valor:.2f}",
+                _fmt_money(item.total, item.moeda),
+            ]
+            partes += [doc.nome_original or doc.arquivo.name for doc in item.documentos.all()]
+    return " ".join(parte.strip() for parte in partes if parte and parte.strip())
+
+
 @ti_required
 def contratos_dashboard_view(request):
-    requisicoes = list(RequisicaoContrato.objects.select_related("criado_por").all())
+    requisicoes = list(
+        RequisicaoContrato.objects.select_related("criado_por", "entregue_por").prefetch_related(
+            "orcamentos__aprovado_por",
+            "orcamentos__documentos",
+            "orcamentos__suborcamentos__documentos",
+        )
+    )
     rows = [
         {
             "id": req.id,
@@ -1827,6 +1867,7 @@ def contratos_dashboard_view(request):
             "titulo": req.titulo,
             "status": req.status,
             "status_label": req.status_label,
+            "busca": _requisicao_busca_texto(req),
         }
         for req in requisicoes
     ]

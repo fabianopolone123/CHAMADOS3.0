@@ -41,9 +41,24 @@
         </header>
 
         <section class="contratos-panel">
+            <div class="requisicoes-search">
+                <span class="requisicoes-search__icon" aria-hidden="true">&#128269;</span>
+                <input
+                    type="search"
+                    id="requisicaoSearch"
+                    class="requisicoes-search__input"
+                    placeholder="Pesquisar qualquer coisa: codigo, titulo, descricao, loja, valor, link, anexo, status..."
+                    autocomplete="off"
+                    aria-describedby="requisicaoSearchStatus"
+                >
+            </div>
+            <p class="requisicoes-search__status" id="requisicaoSearchStatus" aria-live="polite">
+                {{ requisicoes_total }} requisicao(oes) no total.
+            </p>
+
             <ul class="requisicoes-list" id="requisicoesList" data-empty-text="Nenhuma requisicao cadastrada ainda.">
                 {% for req in requisicoes %}
-                    <li>
+                    <li data-requisicao-row data-search="{{ req.busca }}">
                         <button type="button" class="requisicao-item" data-requisicao-id="{{ req.id }}">
                             {% if req.codigo %}<span class="requisicao-item__code">{{ req.codigo }}</span>{% endif %}
                             <span class="requisicao-item__title">{{ req.titulo }}</span>
@@ -54,6 +69,9 @@
                     <p class="requisicoes-empty">Nenhuma requisicao cadastrada ainda.</p>
                 {% endfor %}
             </ul>
+            <p class="requisicoes-no-results is-hidden" id="requisicoesNoResults">
+                Nenhuma requisicao encontrada para esta pesquisa.
+            </p>
         </section>
     </section>
 </main>

@@ -1347,6 +1347,100 @@ class RequisicaoRenumeracaoTests(TestCase):
         self.assertEqual(RequisicaoContrato.objects.count(), 0)
 
 
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class RequisicaoBuscaTests(TestCase):
+    """Busca inteligente da lista de requisicoes (texto pesquisavel no data-search).
+
+    A lista mostra so codigo/titulo/status, mas a pesquisa filtra por qualquer
+    coisa da requisicao. O filtro roda no navegador sobre o texto que a view
+    monta em `_requisicao_busca_texto`; aqui garantimos que esse texto leva os
+    dados da requisicao e dos orcamentos/suborcamentos.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x", first_name="Fabiano")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+
+        self.requisicao = RequisicaoContrato.objects.create(
+            titulo="Notebooks para o RH",
+            tipo=RequisicaoContrato.TIPO_FISICA,
+            texto="Substituir as maquinas antigas do setor",
+            criado_por=self.ti,
+        )
+        self.orcamento = OrcamentoContrato.objects.create(
+            requisicao=self.requisicao,
+            titulo="Dell Vostro",
+            loja="Kabum",
+            link="https://loja.exemplo/produto-1",
+            valor=Decimal("4321.99"),
+            quantidade=2,
+        )
+        SuborcamentoContrato.objects.create(
+            orcamento_pai=self.orcamento,
+            titulo="Mouse sem fio",
+            loja="Mercado Livre",
+            valor=Decimal("89.90"),
+            quantidade=1,
+        )
+        OrcamentoDocumento.objects.create(
+            orcamento=self.orcamento,
+            arquivo=SimpleUploadedFile("proposta.pdf", b"conteudo"),
+            nome_original="proposta-dell.pdf",
+        )
+
+    def _busca(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("contratos_dashboard"))
+        self.assertEqual(resp.status_code, 200)
+        linhas = [r for r in resp.context["requisicoes"] if r["id"] == self.requisicao.id]
+        self.assertEqual(len(linhas), 1)
+        return linhas[0]["busca"]
+
+    def test_busca_leva_dados_da_requisicao(self):
+        texto = self._busca()
+        self.assertIn(self.requisicao.codigo, texto)
+        self.assertIn("Notebooks para o RH", texto)
+        self.assertIn("Fisica", texto)
+        self.assertIn("Aberta", texto)
+        self.assertIn("maquinas antigas", texto)
+        self.assertIn("Fabiano", texto)
+
+    def test_busca_leva_orcamentos_suborcamentos_e_documentos(self):
+        texto = self._busca()
+        # Orcamento: titulo, loja, link, valor cru e total formatado.
+        self.assertIn("Dell Vostro", texto)
+        self.assertIn("Kabum", texto)
+        self.assertIn("https://loja.exemplo/produto-1", texto)
+        self.assertIn("4321.99", texto)
+        self.assertIn("R$ 8.643,98", texto)  # 4321,99 x 2
+        # Suborcamento e o nome do documento anexado.
+        self.assertIn("Mouse sem fio", texto)
+        self.assertIn("Mercado Livre", texto)
+        self.assertIn("proposta-dell.pdf", texto)
+
+    def test_busca_acompanha_aprovacao_e_status(self):
+        self.client.force_login(self.ti)
+        resp = self.client.post(reverse("orcamento_aprovar", args=[self.orcamento.id]))
+        self.assertEqual(resp.status_code, 200)
+        texto = self._busca()
+        self.assertIn("Aguardando entrega", texto)
+        self.assertIn("aprovado", texto)
+
+    def test_campo_de_busca_aparece_na_tela(self):
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("contratos_dashboard")).content.decode()
+        self.assertIn('id="requisicaoSearch"', html)
+        self.assertIn("data-search=", html)
+
+    def test_usuario_comum_nao_acessa_a_lista(self):
+        self.client.force_login(self.common)
+        resp = self.client.get(reverse("contratos_dashboard"))
+        self.assertEqual(resp.status_code, 302)
+
+
 class ContaEmailImportTests(TestCase):
     """Importacao da lista de contas de e-mail (upsert por e-mail) e permissoes."""
 

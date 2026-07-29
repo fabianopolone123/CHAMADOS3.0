@@ -91,6 +91,51 @@
     padding: clamp(0.9rem, 1.4vw, 1.4rem);
 }
 
+/* ----- Busca inteligente da lista de requisicoes ----- */
+.requisicoes-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.requisicoes-search__icon {
+    position: absolute;
+    left: 0.9rem;
+    font-size: 0.95rem;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.requisicoes-search__input {
+    width: 100%;
+    padding: 0.7rem 1rem 0.7rem 2.4rem;
+    border-radius: 0.9rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.95rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.requisicoes-search__input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.requisicoes-search__status {
+    margin: 0.6rem 0 0.7rem;
+    font-size: 0.82rem;
+    color: #64748b;
+    min-height: 1rem;
+}
+
+.requisicoes-no-results {
+    margin: 0.5rem 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
 .requisicoes-list {
     list-style: none;
     margin: 0;
