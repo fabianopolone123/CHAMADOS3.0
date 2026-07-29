@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Max, Q
+from django.db.models.functions import TruncMonth
 from django.http import (
     FileResponse,
     Http404,
@@ -397,6 +398,10 @@ def tickets_dashboard_view(request):
         itens.sort(key=lambda item: not item[1]["attendance"]["is_active"])  # ativos no topo (estavel)
         by_attendant[atendente_id] = [card for _, card in itens]
 
+    # Meses com atendimento de cada atendente, para o modal da planilha nao
+    # oferecer meses vazios (o sistema so tem historico desde que o controle de
+    # tempo entrou em uso).
+    meses_planilha = _meses_com_atendimento(attendants)
     attendant_columns = [
         {
             "attendant_id": user.id,
@@ -405,6 +410,7 @@ def tickets_dashboard_view(request):
             "tickets": by_attendant[user.id],
             "count": len(by_attendant[user.id]),
             "stats": _column_stats(by_attendant[user.id]),
+            "planilha_meses_json": json.dumps(meses_planilha.get(user.id, [])),
         }
         for user in attendants
     ]
@@ -422,7 +428,6 @@ def tickets_dashboard_view(request):
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "pendencia_prioridades": PendenciaTI.prioridade_opcoes(),
         "attendant_columns": attendant_columns,
-        "planilha_meses": _opcoes_meses_planilha(),
         "closed_column": {"count": closed_count, "recent": closed_recent},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
@@ -1618,23 +1623,47 @@ def download_message_anexo_view(request, numero: str, anexo_id: int):
         raise Http404("Arquivo nao encontrado no armazenamento.")
 
 
-def _opcoes_meses_planilha(quantidade: int = 12):
-    """Meses oferecidos no modal da planilha: o atual (padrao) e os anteriores."""
+def _meses_com_atendimento(atendentes):
+    """Meses que **tem atendimento registrado**, por atendente, para o modal da planilha.
+
+    O sistema so passou a registrar Play/Stop a partir do momento em que o
+    controle de tempo entrou em uso, entao oferecer 12 meses fixos faz o usuario
+    baixar planilhas vazias de meses que nunca existiram no sistema (os anteriores
+    foram preenchidos a mao, fora dele). Aqui a lista sai do proprio historico:
+    apenas meses com atendimento, com a contagem no rotulo, mais recentes primeiro.
+    O mes atual entra sempre, mesmo sem atendimento ainda, para acompanhar o mes
+    em andamento.
+    """
     hoje = timezone.localdate()
-    opcoes = []
-    ano, mes = hoje.year, hoje.month
-    for indice in range(quantidade):
-        opcoes.append(
+    atual = f"{hoje.year:04d}-{hoje.month:02d}"
+    rotulo_atual = f"{planilha_atendimentos.MESES_PT[hoje.month - 1]} {hoje.year}"
+
+    totais = {}
+    linhas = (
+        AtendimentoHistorico.objects.filter(atendente__in=atendentes)
+        .annotate(mes=TruncMonth("iniciado_em"))
+        .values("atendente_id", "mes")
+        .annotate(total=Count("id"))
+    )
+    for linha in linhas:
+        mes = linha["mes"]
+        if not mes:
+            continue
+        totais.setdefault(linha["atendente_id"], []).append(
             {
-                "valor": f"{ano:04d}-{mes:02d}",
-                "rotulo": f"{planilha_atendimentos.MESES_PT[mes - 1]} {ano}",
-                "atual": indice == 0,
+                "valor": f"{mes.year:04d}-{mes.month:02d}",
+                "rotulo": f"{planilha_atendimentos.MESES_PT[mes.month - 1]} {mes.year}",
+                "total": linha["total"],
             }
         )
-        mes -= 1
-        if mes == 0:
-            mes, ano = 12, ano - 1
-    return opcoes
+
+    por_atendente = {}
+    for atendente in atendentes:
+        opcoes = sorted(totais.get(atendente.id, []), key=lambda o: o["valor"], reverse=True)
+        if not any(o["valor"] == atual for o in opcoes):
+            opcoes.insert(0, {"valor": atual, "rotulo": rotulo_atual, "total": 0})
+        por_atendente[atendente.id] = opcoes
+    return por_atendente
 
 
 def _setor_por_solicitante(chamados_ids_por_user):

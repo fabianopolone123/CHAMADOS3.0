@@ -3474,3 +3474,37 @@ class PlanilhaAtendimentosTests(TestCase):
         self.assertIn(f'data-planilha-atendente="{self.ti.id}"', html)
         self.assertIn('id="planilhaAtendimentosModal"', html)
         self.assertIn('id="planilhaMes"', html)
+
+    def test_modal_oferece_apenas_meses_com_atendimento(self):
+        # O sistema so tem historico desde que o controle de tempo entrou em uso:
+        # oferecer meses fixos faria o usuario baixar planilhas em branco.
+        chamado = self._chamado("Chamado com atendimento")
+        self._periodo(chamado, self._dt(5, 9, 0), self._dt(5, 10, 0))
+        self._periodo(chamado, self._dt(20, 9, 0, mes=4), self._dt(20, 10, 0, mes=4))
+
+        self.client.force_login(self.ti)
+        colunas = self.client.get(reverse("tickets_dashboard")).context["attendant_columns"]
+        minha = next(c for c in colunas if c["attendant_id"] == self.ti.id)
+        meses = json.loads(minha["planilha_meses_json"])
+        valores = [m["valor"] for m in meses]
+
+        hoje = timezone.localdate()
+        atual = f"{hoje.year}-{hoje.month:02d}"
+        # Os dois meses com atendimento + o mes atual (sempre disponivel).
+        self.assertIn("2026-05", valores)
+        self.assertIn("2026-04", valores)
+        self.assertIn(atual, valores)
+        self.assertNotIn("2026-03", valores)  # mes sem atendimento nao e oferecido
+        self.assertEqual(valores[0], atual)  # mais recente primeiro (padrao)
+        por_valor = {m["valor"]: m["total"] for m in meses}
+        self.assertEqual(por_valor["2026-05"], 1)
+        self.assertEqual(por_valor["2026-04"], 1)
+
+    def test_atendente_sem_atendimento_recebe_apenas_o_mes_atual(self):
+        self.client.force_login(self.ti)
+        colunas = self.client.get(reverse("tickets_dashboard")).context["attendant_columns"]
+        dele = next(c for c in colunas if c["attendant_id"] == self.outro.id)
+        meses = json.loads(dele["planilha_meses_json"])
+        hoje = timezone.localdate()
+        self.assertEqual([m["valor"] for m in meses], [f"{hoje.year}-{hoje.month:02d}"])
+        self.assertEqual(meses[0]["total"], 0)

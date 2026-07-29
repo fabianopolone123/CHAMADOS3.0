@@ -1461,7 +1461,38 @@
         const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
         const titulo = modalElement.querySelector("[data-planilha-titulo]");
         const seletorMes = modalElement.querySelector("#planilhaMes");
+        const aviso = modalElement.querySelector("[data-planilha-aviso]");
+        const enviar = document.getElementById("planilhaAtendimentosSubmit");
         let atendenteId = null;
+
+        // Cada botao carrega os meses que aquele atendente realmente tem
+        // atendimento (o sistema so tem historico desde que o controle de tempo
+        // entrou em uso), para nao oferecer meses que sairiam em branco.
+        function preencherMeses(botao) {
+            if (!seletorMes) return;
+            let meses = [];
+            try {
+                meses = JSON.parse(botao.dataset.planilhaMeses || "[]");
+            } catch (error) {
+                meses = [];
+            }
+            seletorMes.innerHTML = "";
+            meses.forEach((mes) => {
+                const opcao = document.createElement("option");
+                opcao.value = mes.valor;
+                opcao.textContent = mes.total
+                    ? `${mes.rotulo} (${mes.total} atendimento${mes.total > 1 ? "s" : ""})`
+                    : `${mes.rotulo} (sem atendimento)`;
+                seletorMes.appendChild(opcao);
+            });
+            const semDados = !meses.some((mes) => mes.total > 0);
+            if (aviso) {
+                aviso.hidden = !semDados;
+            }
+            if (enviar) {
+                enviar.disabled = meses.length === 0;
+            }
+        }
 
         triggers.forEach((botao) => {
             botao.addEventListener("click", (event) => {
@@ -1471,6 +1502,7 @@
                 if (titulo) {
                     titulo.textContent = `Planilha de ${botao.dataset.planilhaNome || "atendimentos"}`;
                 }
+                preencherMeses(botao);
                 modal.show();
             });
         });

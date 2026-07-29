@@ -73,7 +73,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 
 ## Regras atuais da planilha mensal de atendimentos
 
-1. O cabecalho de cada coluna de **Atendente TI** no Kanban tem um botao de **baixar planilha**. Ele abre um modal que pergunta o **mes** (uma lista com os 12 ultimos, o **mes atual como padrao**) e baixa o `.xlsx` daquele atendente.
+1. O cabecalho de cada coluna de **Atendente TI** no Kanban tem um botao de **baixar planilha**. Ele abre um modal que pergunta o **mes** e baixa o `.xlsx` daquele atendente. A lista de meses traz **apenas os meses em que aquele atendente tem atendimento registrado**, com a contagem no rotulo ("Julho 2026 (23 atendimentos)"), mais o **mes atual**, que entra sempre e e o padrao. Meses anteriores ao inicio do controle de tempo nao aparecem, porque sairiam em branco: o sistema so tem periodos Play/Stop desde que essa etapa entrou em uso e os meses antigos foram preenchidos a mao fora dele.
 2. A planilha sai no **mesmo modelo que a TI ja preenchia a mao** (`core/planilhas/modelo_atendimentos.xlsx`): mesmas colunas, cores, larguras e formulas de resumo por prioridade. O arquivo se chama `MM-AAAA - <PrimeiroNome>.xlsx`, a aba recebe o nome do mes, `A4` fica "Atendimentos TI Sidertec - MM/AAAA" e `A5` o nome do atendente com o telefone do ramal dele.
 3. **Uma linha por atendimento, nao por chamado**: cada Play -> Pause/Stop (`AtendimentoHistorico`) gera uma linha. Um chamado trabalhado em tres dias aparece em tres linhas, exatamente como era preenchido a mao.
 4. O mes e recortado pelo **inicio do periodo (Play)**: um atendimento que comeca dia 31 e termina dia 1 fica no mes em que comecou.

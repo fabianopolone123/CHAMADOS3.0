@@ -17,12 +17,14 @@
 
                     <div class="portal-field">
                         <label for="planilhaMes">Mes</label>
-                        <select id="planilhaMes" name="mes" class="form-select form-select-lg">
-                            {% for opcao in planilha_meses %}
-                                <option value="{{ opcao.valor }}"{% if opcao.atual %} selected{% endif %}>{{ opcao.rotulo }}</option>
-                            {% endfor %}
-                        </select>
+                        {# Preenchido pelo JS com os meses que aquele atendente tem atendimento. #}
+                        <select id="planilhaMes" name="mes" class="form-select form-select-lg"></select>
                     </div>
+
+                    <p class="create-ticket-hint" data-planilha-aviso hidden>
+                        Este atendente ainda nao tem atendimento registrado no periodo:
+                        a planilha vai sair so com o cabecalho.
+                    </p>
                 </div>
 
                 <div class="modal-footer">
