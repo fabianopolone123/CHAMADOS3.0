@@ -16,8 +16,8 @@ Colunas (linha 7 do modelo):
 | B   | Data             | inicio do periodo (hora do Play)                      |
 | C   | Contato          | solicitante do chamado                                |
 | D   | Setor            | setor do solicitante, casado com a lista de Ramais    |
-| E   | Notificacao      | titulo do chamado                                     |
-| F   | Prioridade       | "Programada" (aberto pela TI) ou Baixa/Media/Alta     |
+| E   | Notificacao      | o pedido: descricao do chamado (titulo se faltar)     |
+| F   | Prioridade       | "Programada" (trabalho da TI) ou "Baixa"              |
 | G   | Falha            | "N/A"                                                 |
 | H   | Acao / Correcao  | o que foi feito no periodo (descricao do Pause/Stop)  |
 | I   | Fechado          | fim do periodo (hora do Pause/Stop)                   |
@@ -28,6 +28,7 @@ Colunas (linha 7 do modelo):
 from __future__ import annotations
 
 import io
+import re
 from copy import copy
 from datetime import date
 
@@ -46,15 +47,18 @@ ULTIMA_LINHA_MODELO = 152  # ate onde o modelo ja vem formatado
 # "Programada" (trabalho planejado), nao como demanda de usuario.
 ORIGENS_TI = {"Kanban TI", "Pendencia TI"}
 
-# A planilha usa apenas Alta/Media/Baixa/Programada (celulas F2:F5 contam por
-# esses rotulos). "Critica" do sistema entra como Alta.
-PRIORIDADE_LABEL = {
-    "": "Baixa",
-    "baixa": "Baixa",
-    "media": "Media",
-    "alta": "Alta",
-    "critica": "Alta",
-}
+# A planilha e preenchida com apenas dois rotulos, seguindo o criterio que a TI
+# ja usava a mao: "Programada" para o trabalho da propria TI e "Baixa" para o que
+# vem de usuario - independente da prioridade gravada no chamado. Conferido
+# contra a planilha de 05/2026 preenchida a mao, onde chamados que o sistema
+# marca como "alta"/"critica" aparecem como "Baixa".
+PRIORIDADE_TI = "Programada"
+PRIORIDADE_USUARIO = "Baixa"
+
+# Metadados que a migracao do sistema antigo anexou ao fim da descricao
+# ("\n\nTipo legado: programado | Falha legado: software\n[ERP-TI-ID:1]"): sao
+# controle interno e nao devem aparecer na planilha.
+_META_LEGADO = re.compile(r"\n{1,2}Tipo legado:.*\Z|\n?\[ERP-TI-ID:\d+\]\s*\Z", re.DOTALL)
 
 MESES_PT = [
     "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
@@ -85,16 +89,29 @@ def periodos_do_mes(atendente, ano: int, mes: int):
 
 
 def _prioridade_planilha(chamado: Chamado) -> str:
-    """"Programada" quando o chamado nasceu na propria TI; senao a prioridade."""
+    """"Programada" para trabalho da propria TI; "Baixa" para demanda de usuario."""
     if (chamado.origem or "").strip() in ORIGENS_TI:
-        return "Programada"
+        return PRIORIDADE_TI
+    # O sistema antigo tinha o tipo "programado", que veio no campo prioridade.
+    if (chamado.prioridade or "").strip().lower() == "programada":
+        return PRIORIDADE_TI
     solicitante = chamado.solicitante
     if solicitante is not None:
         from .permissions import is_admin_user, is_attendant_user
 
         if is_admin_user(solicitante) or is_attendant_user(solicitante):
-            return "Programada"
-    return PRIORIDADE_LABEL.get((chamado.prioridade or "").strip().lower(), "Baixa")
+            return PRIORIDADE_TI
+    return PRIORIDADE_USUARIO
+
+
+def _notificacao(chamado: Chamado) -> str:
+    """O pedido como o usuario escreveu (a planilha a mao usa a descricao).
+
+    Cai para o titulo quando nao ha descricao. Remove os metadados que a migracao
+    do sistema antigo anexou no fim do texto.
+    """
+    texto = _META_LEGADO.sub("", (chamado.descricao or "").strip()).strip()
+    return texto or chamado.titulo
 
 
 def _copiar_estilo_linha(ws, origem: int, destino: int) -> None:
@@ -136,7 +153,7 @@ def gerar_planilha(atendente, ano: int, mes: int, setor_por_solicitante=None, te
         ws.cell(row=linha, column=2).number_format = FORMATO_DATA
         ws.cell(row=linha, column=3, value=_contato(chamado))
         ws.cell(row=linha, column=4, value=setor_por_solicitante.get(solicitante_id, ""))
-        ws.cell(row=linha, column=5, value=chamado.titulo)
+        ws.cell(row=linha, column=5, value=_notificacao(chamado))
         ws.cell(row=linha, column=6, value=_prioridade_planilha(chamado))
         ws.cell(row=linha, column=7, value="N/A")
         ws.cell(row=linha, column=8, value=periodo.descricao_atividade or "")

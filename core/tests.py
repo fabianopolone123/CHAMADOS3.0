@@ -3508,3 +3508,255 @@ class PlanilhaAtendimentosTests(TestCase):
         hoje = timezone.localdate()
         self.assertEqual([m["valor"] for m in meses], [f"{hoje.year}-{hoje.month:02d}"])
         self.assertEqual(meses[0]["total"], 0)
+
+
+class ImportaAtendimentosLegadoTests(TestCase):
+    """Importacao dos periodos de atendimento do sistema antigo (ERP-TI).
+
+    O foco dos testes sao as protecoes: nao encostar em chamado recente, nunca
+    criar periodo sem fim (que viraria atendimento ativo no Kanban) e nao
+    duplicar o que o sistema novo ja registrou.
+    """
+
+    ORIGEM = "Migrado (sistema antigo)"
+
+    def setUp(self):
+        User = get_user_model()
+        self.ti = User.objects.create_user(username="fabiano.polone", password="x", first_name="Fabiano")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        self.solicitante = User.objects.create_user(username="usuario", password="x")
+
+    # ----- banco legado sintetico -----
+    def _banco_legado(self, tickets, periodos, usuarios=None):
+        """Cria um sqlite com o schema minimo do sistema antigo."""
+        import sqlite3
+        import tempfile
+
+        caminho = os.path.join(tempfile.mkdtemp(), "legado.sqlite3")
+        con = sqlite3.connect(caminho)
+        con.execute("CREATE TABLE auth_user (id INTEGER PRIMARY KEY, username TEXT)")
+        con.execute("CREATE TABLE chamados_ticket (id INTEGER PRIMARY KEY, created_at TEXT)")
+        con.execute(
+            "CREATE TABLE chamados_ticketattendance ("
+            " id INTEGER PRIMARY KEY, ticket_id INTEGER, attendant_id INTEGER,"
+            " started_at TEXT, ended_at TEXT, end_action TEXT, note TEXT)"
+        )
+        for uid, username in (usuarios or [(1, "fabiano.polone")]):
+            con.execute("INSERT INTO auth_user VALUES (?, ?)", (uid, username))
+        for tid, criado in tickets:
+            con.execute("INSERT INTO chamados_ticket VALUES (?, ?)", (tid, criado))
+        for i, (tid, uid, inicio, fim, acao, nota) in enumerate(periodos, start=1):
+            con.execute(
+                "INSERT INTO chamados_ticketattendance VALUES (?,?,?,?,?,?,?)",
+                (i, tid, uid, inicio, fim, acao, nota),
+            )
+        con.commit()
+        con.close()
+        return caminho
+
+    def _chamado_migrado(self, numero_int, criado_local, titulo="Chamado legado"):
+        """Cria o chamado como a migracao original criou: CH-{id} e origem migrada."""
+        from datetime import datetime
+
+        criado = timezone.make_aware(datetime.strptime(criado_local, "%Y-%m-%d %H:%M:%S"))
+        chamado = Chamado.objects.create(
+            numero=f"CH-{numero_int:06d}",
+            titulo=titulo,
+            solicitante=self.solicitante,
+            origem=self.ORIGEM,
+            status=Chamado.STATUS_FECHADO,
+        )
+        # criado_em e auto_now_add: precisa de update para simular a data legada.
+        Chamado.objects.filter(pk=chamado.pk).update(criado_em=criado)
+        chamado.refresh_from_db()
+        return chamado
+
+    def _importar(self, caminho):
+        from core.importa_atendimentos_legado import importar
+
+        return importar(caminho)
+
+    # ----- caso normal -----
+    def test_importa_periodo_com_atendente_texto_e_duracao(self):
+        chamado = self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 14:42:00", "stop", "Feito")],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 1)
+
+        periodo = AtendimentoHistorico.objects.get()
+        self.assertEqual(periodo.chamado, chamado)
+        self.assertEqual(periodo.atendente, self.ti)
+        self.assertEqual(periodo.descricao_atividade, "Feito")
+        self.assertEqual(periodo.tipo_encerramento, "stop")
+        self.assertEqual(periodo.duracao.total_seconds(), 3 * 3600 + 4 * 60)
+        # O banco antigo grava UTC naive: 11:38 UTC = 08:38 local (o mesmo valor
+        # que a planilha preenchida a mao registra).
+        self.assertEqual(timezone.localtime(periodo.iniciado_em).strftime("%d/%m/%Y %H:%M"), "20/05/2026 08:38")
+
+    def test_marcador_tecnico_sai_da_descricao(self):
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-03-27 22:00:00", "2026-03-27 22:00:00", "stop",
+                       "Ciclo importado do legado. [ERP-TI-CYCLE:206]")],
+        )
+        self._importar(caminho)
+        self.assertEqual(AtendimentoHistorico.objects.get().descricao_atividade, "Ciclo importado do legado.")
+
+    # ----- protecoes -----
+    def test_periodo_sem_fim_nao_e_importado(self):
+        # Um periodo sem fim seria "atendimento ativo": sujaria o Kanban e
+        # bloquearia o Play do atendente.
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-07-15 11:47:14", None, "", "")],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 0)
+        self.assertEqual(rel["sem_fim"], 1)
+        self.assertFalse(AtendimentoHistorico.objects.exists())
+
+    def test_nao_encosta_em_chamado_recente(self):
+        # CH-000800 foi criado no sistema novo: mesmo que o legado tenha um
+        # ticket 800, nada e anexado a ele.
+        recente = Chamado.objects.create(
+            numero="CH-000800",
+            titulo="Chamado novo",
+            solicitante=self.solicitante,
+            origem="Portal do solicitante",
+            status=Chamado.STATUS_ABERTO,
+        )
+        caminho = self._banco_legado(
+            tickets=[(800, "2026-02-09 17:00:50")],
+            periodos=[(800, 1, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 0)
+        self.assertEqual(rel["sem_chamado"], 1)
+        self.assertEqual(recente.atendimentos.count(), 0)
+        recente.refresh_from_db()
+        self.assertEqual(recente.status, Chamado.STATUS_ABERTO)  # intacto
+
+    def test_data_divergente_e_pulada(self):
+        # Numero bate, mas a data de criacao nao: nao e o mesmo chamado.
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2025-01-01 08:00:00")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 0)
+        self.assertEqual(rel["data_divergente"], 1)
+
+    def test_periodo_a_partir_do_primeiro_do_sistema_novo_e_ignorado(self):
+        # Se os dois sistemas tiverem rodado em paralelo, nada e duplicado.
+        chamado = self._chamado_migrado(3, "2026-02-09 17:00:50")
+        from datetime import datetime
+
+        corte = timezone.make_aware(datetime(2026, 7, 15, 14, 15))
+        AtendimentoHistorico.objects.create(
+            chamado=chamado, atendente=self.ti, iniciado_em=corte,
+            finalizado_em=corte, duracao=timezone.timedelta(0), tipo_encerramento="stop",
+        )
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[
+                # valores em UTC, como o banco antigo grava: 12:32 UTC = 09:32
+                # local (antes do corte de 14:15) e 20:00 UTC = 17:00 local (depois)
+                (3, 1, "2026-07-15 12:32:00", "2026-07-15 12:40:00", "stop", "Antes do corte"),
+                (3, 1, "2026-07-15 20:00:00", "2026-07-15 20:30:00", "stop", "Depois do corte"),
+            ],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 1)
+        self.assertEqual(rel["apos_corte"], 1)
+        self.assertTrue(
+            AtendimentoHistorico.objects.filter(descricao_atividade="Antes do corte").exists()
+        )
+        self.assertFalse(
+            AtendimentoHistorico.objects.filter(descricao_atividade="Depois do corte").exists()
+        )
+
+    def test_rodar_duas_vezes_nao_duplica(self):
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+        )
+        primeira = self._importar(caminho)
+        segunda = self._importar(caminho)
+        self.assertEqual(primeira["criados"], 1)
+        self.assertEqual(segunda["criados"], 0)
+        self.assertEqual(segunda["ja_existiam"], 1)
+        self.assertEqual(AtendimentoHistorico.objects.count(), 1)
+
+    def test_atendente_inexistente_no_sistema_novo_e_pulado(self):
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 99, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+            usuarios=[(99, "sumiu.do.sistema")],
+        )
+        rel = self._importar(caminho)
+        self.assertEqual(rel["criados"], 0)
+        self.assertEqual(rel["sem_usuario"], 1)
+
+    def test_nao_altera_nenhum_campo_do_chamado(self):
+        chamado = self._chamado_migrado(3, "2026-02-09 17:00:50")
+        antes = {
+            "status": chamado.status,
+            "atendente_atual_id": chamado.atendente_atual_id,
+            "fechado_em": chamado.fechado_em,
+            "titulo": chamado.titulo,
+        }
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+        )
+        self._importar(caminho)
+        chamado.refresh_from_db()
+        self.assertEqual(chamado.status, antes["status"])
+        self.assertEqual(chamado.atendente_atual_id, antes["atendente_atual_id"])
+        self.assertEqual(chamado.fechado_em, antes["fechado_em"])
+        self.assertEqual(chamado.titulo, antes["titulo"])
+
+    def test_conferencia_sem_gravar(self):
+        self._chamado_migrado(3, "2026-02-09 17:00:50")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 12:00:00", "stop", "Feito")],
+        )
+        from core.importa_atendimentos_legado import importar
+
+        rel = importar(caminho, gravar=False)
+        self.assertEqual(rel["criados"], 1)
+        self.assertFalse(AtendimentoHistorico.objects.exists())
+
+    def test_periodos_importados_alimentam_a_planilha(self):
+        # O ponto de todo o trabalho: os meses antigos deixam de sair vazios.
+        self._chamado_migrado(3, "2026-02-09 17:00:50", titulo="Orcamento provedores de E-mail")
+        caminho = self._banco_legado(
+            tickets=[(3, "2026-02-09 17:00:50")],
+            periodos=[(3, 1, "2026-05-20 11:38:00", "2026-05-20 14:42:00", "stop", "Feito")],
+        )
+        self._importar(caminho)
+
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("atendimentos_planilha", args=[self.ti.id]), {"mes": "2026-05"})
+        self.assertEqual(resp.status_code, 200)
+
+        import io as _io
+
+        import openpyxl
+
+        ws = openpyxl.load_workbook(_io.BytesIO(resp.content)).active
+        self.assertEqual(ws["E8"].value, "Orcamento provedores de E-mail")
+        self.assertEqual(ws["H8"].value, "Feito")
+        # 11:38->14:42 UTC no banco antigo = 08:38->11:42 na planilha (hora local)
+        self.assertEqual(ws["B8"].value.strftime("%d/%m/%Y %H:%M"), "20/05/2026 08:38")
+        self.assertEqual(ws["I8"].value.strftime("%d/%m/%Y %H:%M"), "20/05/2026 11:42")

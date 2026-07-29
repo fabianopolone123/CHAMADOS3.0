@@ -6,10 +6,11 @@
 
 ## Pendencias conhecidas
 
-- (nenhuma no momento)
+- Os 757 chamados migrados estao com `criado_em`/`fechado_em` **3 horas adiantados**: a migracao original leu as datas do banco antigo (naive em UTC) como hora local. Afeta o "Aberto em" do Kanban e o modal de fechados; a planilha de atendimentos nao e afetada. Corrigir exige um `update` de -3h nesses 757 registros.
 
 ## Concluidas
 
+- Importados os **886 periodos de atendimento do sistema antigo** (migration `0048`, lendo `seed/chamados_legado.sqlite3`), que a migracao original nao havia trazido: a planilha mensal e o Historico passam a ter fev-jun/2026, nao so julho. Importador em `core/importa_atendimentos_legado.py`, idempotente e sem tocar em nenhum campo de `Chamado`; testes `ImportaAtendimentosLegadoTests`
 - Planilha de atendimentos: o seletor de mes oferece apenas os meses com atendimento daquele atendente (mais o mes atual), com a contagem no rotulo, em vez de 12 meses fixos que saiam em branco. Script `scripts/diagnostico_planilha.py` (somente leitura) para conferir a base no servidor
 - Criada a planilha mensal de atendimentos por atendente (.xlsx no modelo que a TI ja usava): botao no cabecalho da coluna do Kanban, modal com o mes (atual por padrao) e uma linha por periodo Play -> Pause/Stop. Gerador em `core/planilha_atendimentos.py` sobre `core/planilhas/modelo_atendimentos.xlsx`, rota `atendimentos_planilha`, setor/telefone vindos dos Ramais; testes `PlanilhaAtendimentosTests`
 - Kanban: corrigido o Stop de chamado em "aguardando", que mostrava o botao mas respondia "Este chamado nao possui atendimento ativo para voce." e nao abria o modal — a guarda de clique em `bindActionButton` (`static/js/chamados.js`) nao considerava o encerramento direto (`isDirectClose`). Só frontend; o backend ja estava correto

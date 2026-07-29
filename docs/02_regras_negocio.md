@@ -77,12 +77,36 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 2. A planilha sai no **mesmo modelo que a TI ja preenchia a mao** (`core/planilhas/modelo_atendimentos.xlsx`): mesmas colunas, cores, larguras e formulas de resumo por prioridade. O arquivo se chama `MM-AAAA - <PrimeiroNome>.xlsx`, a aba recebe o nome do mes, `A4` fica "Atendimentos TI Sidertec - MM/AAAA" e `A5` o nome do atendente com o telefone do ramal dele.
 3. **Uma linha por atendimento, nao por chamado**: cada Play -> Pause/Stop (`AtendimentoHistorico`) gera uma linha. Um chamado trabalhado em tres dias aparece em tres linhas, exatamente como era preenchido a mao.
 4. O mes e recortado pelo **inicio do periodo (Play)**: um atendimento que comeca dia 31 e termina dia 1 fica no mes em que comecou.
-5. Preenchimento das colunas: **Data** = hora do Play; **Contato** = solicitante do chamado; **Setor** = setor do solicitante, casado com a lista de **Ramais** (pelo e-mail e, se nao achar, pelo nome, com o mesmo algoritmo do modulo Contatos) e em branco quando nao ha match; **Notificacao** = titulo do chamado; **Prioridade** = "Programada" quando o chamado nasceu na propria TI (criado no Kanban, convertido de pendencia ou com solicitante TI/admin) e senao Baixa/Media/Alta; **Falha** = "N/A"; **Acao / Correcao** = o que foi feito naquele periodo (o texto obrigatorio do Pause/Stop); **Fechado** = hora do Pause/Stop; **Tempo** = formula `=Fechado-Data`. As colunas **Tk** e **Acao Eficaz** ficam vazias, como nas planilhas atuais.
+5. Preenchimento das colunas: **Data** = hora do Play; **Contato** = solicitante do chamado; **Setor** = setor do solicitante, casado com a lista de **Ramais** (pelo e-mail e, se nao achar, pelo nome, com o mesmo algoritmo do modulo Contatos) e em branco quando nao ha match; **Notificacao** = o pedido como o usuario escreveu (a **descricao** do chamado, caindo para o titulo quando nao houver; os metadados que a migracao do sistema antigo anexou no fim do texto sao removidos); **Prioridade** = **"Programada"** para trabalho da propria TI (criado no Kanban, convertido de pendencia, solicitante TI/admin, ou o tipo "programado" do sistema antigo) e **"Baixa"** para demanda de usuario - **independente da prioridade gravada no chamado**, que e controle interno; **Falha** = "N/A"; **Acao / Correcao** = o que foi feito naquele periodo (o texto obrigatorio do Pause/Stop); **Fechado** = hora do Pause/Stop; **Tempo** = formula `=Fechado-Data`. As colunas **Tk** e **Acao Eficaz** ficam vazias. Todas essas escolhas foram conferidas contra a planilha de 05/2026 preenchida a mao, linha por linha.
 6. Atendimento **ainda em andamento** (Play aberto na hora do download) entra com a Data preenchida e Fechado/Tempo em branco.
 7. **Chamado encerrado direto pelo Stop (sem Play) nao gera linha**, porque nao existe periodo de atendimento (ver regra 10b do controle de tempo). O mesmo vale para chamado aberto no mes que nunca recebeu Play: a planilha e um registro de **tempo trabalhado**, nao de chamados abertos.
 8. Qualquer Atendente TI/Admin pode baixar a planilha de **qualquer** atendente (o botao aparece em todas as colunas). E uma diferenca intencional em relacao a tela de Historico, que mostra ao atendente apenas os proprios registros.
 9. A planilha e gerada **ao vivo** a partir do banco: se um chamado for editado depois, uma nova baixa do mesmo mes sai diferente. O arquivo baixado (que a TI salva na pasta do mes) e o registro definitivo daquele fechamento.
 10. Nao existe hoje exclusao de chamado pela aplicacao (nao ha rota nem registro no admin do Django). Se ela for criada algum dia, `AtendimentoHistorico` tem `on_delete=CASCADE` para `chamado` **e** para `atendente`: apagar um chamado ou um usuario apagaria tambem os periodos de atendimento e mudaria retroativamente as planilhas dos meses ja fechados.
+
+## Atendimentos importados do sistema antigo
+
+1. A migracao original dos chamados trouxe os **757 chamados** e as mensagens, mas **nao** a tabela
+   `chamados_ticketattendance` do banco antigo, onde estava o tempo trabalhado. Por isso, ate 07/2026, qualquer
+   relatorio baseado em `AtendimentoHistorico` (planilha mensal, tela de Historico) so tinha dados de **15/07/2026**
+   em diante, quando o controle de tempo do sistema novo entrou em uso.
+2. A migration `0048` importa esses periodos (**886 de 891**; 5 sao descartados por nao ter fim). Ela le
+   `seed/chamados_legado.sqlite3` - o banco antigo **nao e versionado**; sem o arquivo, a migration nao faz nada.
+3. Mapeamento: **ticket antigo `id` N -> chamado `CH-{N:06d}`**. As faixas nao se cruzam (migrados
+   `CH-000003`..`CH-000799`; os criados no sistema novo comecam em `CH-000800`), e cada registro ainda e conferido
+   pela data de criacao do chamado antes de gravar.
+4. Protecoes da importacao: **nunca cria periodo sem fim** (um `finalizado_em` nulo significa "atendimento ativo",
+   sujaria os contadores do Kanban e bloquearia o Play do atendente); ignora periodo que comece a partir do primeiro
+   periodo do sistema novo (nao duplica se algum dia os dois tiverem rodado em paralelo); e **idempotente** pela
+   chave (chamado, atendente, inicio); e **nao altera nenhum campo de `Chamado`** - status, `atendente_atual` e
+   `fechado_em` ficam intactos.
+5. O banco antigo grava data/hora **naive em UTC**. Conferido de duas formas: o periodo de 04/05 aparece como
+   11:48->17:39 no banco e a planilha preenchida a mao registra 08:48->14:39 (exatamente UTC-3); e a hora de abertura
+   dos 757 tickets se concentra entre 11h e 21h, sem nada de manha - como UTC isso e o expediente 08h-18h local.
+6. **Pendencia conhecida:** a migracao original leu esses mesmos valores como hora **local**, entao os 757 chamados
+   migrados ficaram com `criado_em`/`fechado_em` **3 horas adiantados** no banco novo (afeta o "Aberto em" do Kanban
+   e o modal de fechados, nao a planilha). A conferencia da importacao aceita as duas leituras justamente para nao
+   depender disso.
 
 ## Regras atuais de permissao
 
