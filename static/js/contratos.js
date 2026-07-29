@@ -919,7 +919,6 @@
         sub: "border-left:3px solid #cbd5e1;margin:12px 0 0 12px;padding:8px 0 2px 12px;",
         subTitle: "margin:0 0 6px;font-size:14px;color:#334155;",
         docs: "margin:8px 0 0;padding-left:18px;font-size:13px;color:#475569;",
-        rodape: "margin:22px 0 0;padding-top:10px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;",
     };
 
     // Linhas "rotulo: valor" de um orcamento/suborcamento, em tabela (o layout
@@ -1034,7 +1033,6 @@
             partes.push(`<div style="${EMAIL_STYLES.card}">${bloco.join("")}</div>`);
         });
 
-        partes.push(`<p style="${EMAIL_STYLES.rodape}">Portal de TI &middot; requisi&ccedil;&otilde;es de compra</p>`);
         return `<div style="${EMAIL_STYLES.wrap}">${partes.join("")}</div>`;
     }
 

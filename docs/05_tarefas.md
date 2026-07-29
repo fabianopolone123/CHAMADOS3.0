@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Requisicoes: removido o rodape "Portal de TI - requisicoes de compra" do "Copiar p/ e-mail"
 - Requisicoes: pesquisa inteligente na lista, filtrando a cada tecla por qualquer dado da requisicao (codigo, titulo, tipo, status, descricao, autor, data e os orcamentos/suborcamentos com loja, link, valores e nomes dos documentos), sem acento/maiuscula e com varias palavras. Texto pesquisavel montado em `_requisicao_busca_texto` (`core/views.py`) e filtro client-side em `static/js/contratos.js`; testes `RequisicaoBuscaTests`
 - Kaspersky x GLPI: o colaborador e o setor dos dispositivos passam a vir do inventario do GLPI pelo nome da maquina (nas duas importacoes e pelo botao "Puxar nomes do GLPI"), sem sobrescrever vinculos manuais. Rota `kaspersky_sincronizar_glpi`; testes em `ContatosTests`
 - Criado o modulo "Contatos" (apenas TI/admin): lista unificada de colaborador + computador (CPU) + e-mail + ramal/telefone + antivirus. Importa o CSV de computadores do GLPI (upsert pelo nome, vinculo automatico ao colaborador pelo nome invertido/parcial, mantendo os vinculos manuais) e cruza o antivirus com o Kaspersky pelo nome do computador. Model `Computador` (migration `0047`), rotas sob `/contatos/`, testes `ContatosTests`
