@@ -15,7 +15,15 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Max, Q
-from django.http import FileResponse, Http404, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
+from django.http import (
+    FileResponse,
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    JsonResponse,
+    StreamingHttpResponse,
+)
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -25,6 +33,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import emails as notificacoes
+from . import planilha_atendimentos
 from .forms import AberturaChamadoForm, LoginForm, MensagemChamadoForm
 from .models import (
     AssinaturaResponsavelTI,
@@ -413,6 +422,7 @@ def tickets_dashboard_view(request):
         "pendencia_column": {"pendencias": pendencias, "count": len(pendencias)},
         "pendencia_prioridades": PendenciaTI.prioridade_opcoes(),
         "attendant_columns": attendant_columns,
+        "planilha_meses": _opcoes_meses_planilha(),
         "closed_column": {"count": closed_count, "recent": closed_recent},
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
@@ -1606,6 +1616,119 @@ def download_message_anexo_view(request, numero: str, anexo_id: int):
         )
     except FileNotFoundError:
         raise Http404("Arquivo nao encontrado no armazenamento.")
+
+
+def _opcoes_meses_planilha(quantidade: int = 12):
+    """Meses oferecidos no modal da planilha: o atual (padrao) e os anteriores."""
+    hoje = timezone.localdate()
+    opcoes = []
+    ano, mes = hoje.year, hoje.month
+    for indice in range(quantidade):
+        opcoes.append(
+            {
+                "valor": f"{ano:04d}-{mes:02d}",
+                "rotulo": f"{planilha_atendimentos.MESES_PT[mes - 1]} {ano}",
+                "atual": indice == 0,
+            }
+        )
+        mes -= 1
+        if mes == 0:
+            mes, ano = 12, ano - 1
+    return opcoes
+
+
+def _setor_por_solicitante(chamados_ids_por_user):
+    """Mapa {user_id: setor} para a coluna "Setor" da planilha de atendimentos.
+
+    O chamado nao guarda o setor de quem abriu (o portal pede apenas titulo,
+    descricao e anexos), entao o setor vem da lista de **Ramais**: primeiro pelo
+    e-mail (mais confiavel) e, se nao achar, pelo nome, reaproveitando o mesmo
+    casamento por conjunto de palavras do modulo Contatos (resolve nome
+    invertido e nomes do meio). Sem match o setor fica em branco - e o que a
+    planilha preenchida a mao tambem faz.
+    """
+    if not chamados_ids_por_user:
+        return {}
+
+    ramais = list(Ramal.objects.exclude(setor=""))
+    por_email = {(r.email or "").strip().lower(): r.setor for r in ramais if (r.email or "").strip()}
+    tokens = [(r, _tokens_nome(r.colaborador)) for r in ramais if r.colaborador]
+
+    setores = {}
+    for user_id, (email, nome) in chamados_ids_por_user.items():
+        setor = por_email.get((email or "").strip().lower(), "")
+        if not setor and nome:
+            ramal = _ramal_por_nome(nome, tokens)
+            setor = ramal.setor if ramal else ""
+        if setor:
+            setores[user_id] = setor
+    return setores
+
+
+def _telefone_do_atendente(atendente) -> str:
+    """Telefone do atendente (cabecalho da planilha), buscado nos Ramais."""
+    email = (atendente.email or "").strip().lower()
+    if email:
+        ramal = Ramal.objects.filter(email__iexact=email).exclude(telefone="").first()
+        if ramal:
+            return ramal.telefone
+    nome = atendente.get_full_name()
+    if nome:
+        ramal = _ramal_por_nome(nome)
+        if ramal and ramal.telefone:
+            return ramal.telefone
+    return ""
+
+
+@ti_required
+def atendimentos_planilha_view(request, attendant_id: int):
+    """Baixa a planilha mensal de atendimentos de um atendente (.xlsx).
+
+    Uma linha por periodo Play -> Pause/Stop do atendente que **comecou** no mes
+    escolhido (`?mes=AAAA-MM`, padrao o mes atual). Qualquer Atendente TI/admin
+    pode baixar a planilha de qualquer atendente.
+    """
+    User = get_user_model()
+    atendente = User.objects.filter(pk=attendant_id).first()
+    if not atendente or not (is_admin_user(atendente) or is_attendant_user(atendente)):
+        raise Http404("Atendente nao encontrado.")
+
+    hoje = timezone.localdate()
+    mes_param = (request.GET.get("mes") or "").strip()
+    ano, mes = hoje.year, hoje.month
+    if mes_param:
+        try:
+            ano_txt, mes_txt = mes_param.split("-")
+            ano, mes = int(ano_txt), int(mes_txt)
+        except (ValueError, TypeError):
+            return HttpResponseBadRequest("Mes invalido. Use o formato AAAA-MM.")
+        if not (1 <= mes <= 12) or not (2000 <= ano <= 2100):
+            return HttpResponseBadRequest("Mes invalido. Use o formato AAAA-MM.")
+
+    periodos = planilha_atendimentos.periodos_do_mes(atendente, ano, mes)
+    solicitantes = {
+        p.chamado.solicitante_id: (
+            p.chamado.solicitante.email if p.chamado.solicitante else "",
+            _requester_display(p.chamado),
+        )
+        for p in periodos
+        if p.chamado.solicitante_id
+    }
+
+    conteudo = planilha_atendimentos.gerar_planilha(
+        atendente,
+        ano,
+        mes,
+        setor_por_solicitante=_setor_por_solicitante(solicitantes),
+        telefone_atendente=_telefone_do_atendente(atendente),
+    )
+    resposta = HttpResponse(
+        conteudo,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    nome = planilha_atendimentos.nome_arquivo(atendente, ano, mes)
+    resposta["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return resposta
 
 
 @history_access_required

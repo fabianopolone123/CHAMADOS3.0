@@ -71,6 +71,19 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 13. "Pause" encerra o periodo de atendimento. Com um motivo de "aguardando" (usuario/peca/autorizacao) marca esse status; sem motivo, devolve o chamado para "Atribuido" (deixa de ficar "Em atendimento", pois nao ha mais Play ativo), desde que nao haja outro atendimento ativo no mesmo chamado.
 14. O encerramento pelo "Stop" registra no historico tecnico a mudanca de status e um evento de finalizacao com quem finalizou e o texto de "O que foi feito" (ex.: "Chamado finalizado por fabiano.polone. O que foi feito: atualizacao do driver e validacao com o usuario."), sem duplicar registros se o chamado ja estiver fechado. Esse texto e registro tecnico de encerramento, separado da conversa do usuario (`ChamadoMensagem`).
 
+## Regras atuais da planilha mensal de atendimentos
+
+1. O cabecalho de cada coluna de **Atendente TI** no Kanban tem um botao de **baixar planilha**. Ele abre um modal que pergunta o **mes** (uma lista com os 12 ultimos, o **mes atual como padrao**) e baixa o `.xlsx` daquele atendente.
+2. A planilha sai no **mesmo modelo que a TI ja preenchia a mao** (`core/planilhas/modelo_atendimentos.xlsx`): mesmas colunas, cores, larguras e formulas de resumo por prioridade. O arquivo se chama `MM-AAAA - <PrimeiroNome>.xlsx`, a aba recebe o nome do mes, `A4` fica "Atendimentos TI Sidertec - MM/AAAA" e `A5` o nome do atendente com o telefone do ramal dele.
+3. **Uma linha por atendimento, nao por chamado**: cada Play -> Pause/Stop (`AtendimentoHistorico`) gera uma linha. Um chamado trabalhado em tres dias aparece em tres linhas, exatamente como era preenchido a mao.
+4. O mes e recortado pelo **inicio do periodo (Play)**: um atendimento que comeca dia 31 e termina dia 1 fica no mes em que comecou.
+5. Preenchimento das colunas: **Data** = hora do Play; **Contato** = solicitante do chamado; **Setor** = setor do solicitante, casado com a lista de **Ramais** (pelo e-mail e, se nao achar, pelo nome, com o mesmo algoritmo do modulo Contatos) e em branco quando nao ha match; **Notificacao** = titulo do chamado; **Prioridade** = "Programada" quando o chamado nasceu na propria TI (criado no Kanban, convertido de pendencia ou com solicitante TI/admin) e senao Baixa/Media/Alta; **Falha** = "N/A"; **Acao / Correcao** = o que foi feito naquele periodo (o texto obrigatorio do Pause/Stop); **Fechado** = hora do Pause/Stop; **Tempo** = formula `=Fechado-Data`. As colunas **Tk** e **Acao Eficaz** ficam vazias, como nas planilhas atuais.
+6. Atendimento **ainda em andamento** (Play aberto na hora do download) entra com a Data preenchida e Fechado/Tempo em branco.
+7. **Chamado encerrado direto pelo Stop (sem Play) nao gera linha**, porque nao existe periodo de atendimento (ver regra 10b do controle de tempo). O mesmo vale para chamado aberto no mes que nunca recebeu Play: a planilha e um registro de **tempo trabalhado**, nao de chamados abertos.
+8. Qualquer Atendente TI/Admin pode baixar a planilha de **qualquer** atendente (o botao aparece em todas as colunas). E uma diferenca intencional em relacao a tela de Historico, que mostra ao atendente apenas os proprios registros.
+9. A planilha e gerada **ao vivo** a partir do banco: se um chamado for editado depois, uma nova baixa do mesmo mes sai diferente. O arquivo baixado (que a TI salva na pasta do mes) e o registro definitivo daquele fechamento.
+10. Nao existe hoje exclusao de chamado pela aplicacao (nao ha rota nem registro no admin do Django). Se ela for criada algum dia, `AtendimentoHistorico` tem `on_delete=CASCADE` para `chamado` **e** para `atendente`: apagar um chamado ou um usuario apagaria tambem os periodos de atendimento e mudaria retroativamente as planilhas dos meses ja fechados.
+
 ## Regras atuais de permissao
 
 1. O usuario `fabiano.polone` deve ser administrador principal do sistema.

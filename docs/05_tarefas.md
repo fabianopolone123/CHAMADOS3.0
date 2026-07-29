@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Criada a planilha mensal de atendimentos por atendente (.xlsx no modelo que a TI ja usava): botao no cabecalho da coluna do Kanban, modal com o mes (atual por padrao) e uma linha por periodo Play -> Pause/Stop. Gerador em `core/planilha_atendimentos.py` sobre `core/planilhas/modelo_atendimentos.xlsx`, rota `atendimentos_planilha`, setor/telefone vindos dos Ramais; testes `PlanilhaAtendimentosTests`
 - Kanban: corrigido o Stop de chamado em "aguardando", que mostrava o botao mas respondia "Este chamado nao possui atendimento ativo para voce." e nao abria o modal — a guarda de clique em `bindActionButton` (`static/js/chamados.js`) nao considerava o encerramento direto (`isDirectClose`). Só frontend; o backend ja estava correto
 - Requisicoes: removido o rodape "Portal de TI - requisicoes de compra" do "Copiar p/ e-mail"
 - Requisicoes: pesquisa inteligente na lista, filtrando a cada tecla por qualquer dado da requisicao (codigo, titulo, tipo, status, descricao, autor, data e os orcamentos/suborcamentos com loja, link, valores e nomes dos documentos), sem acento/maiuscula e com varias palavras. Texto pesquisavel montado em `_requisicao_busca_texto` (`core/views.py`) e filtro client-side em `static/js/contratos.js`; testes `RequisicaoBuscaTests`

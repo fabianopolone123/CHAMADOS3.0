@@ -18,6 +18,7 @@
     data-create-pendencia-url="{% url 'pendencia_create' %}"
     data-closed-search-url="{% url 'closed_tickets_search' %}"
     data-closed-detail-url="{% url 'closed_ticket_detail' numero='__NUM__' %}"
+    data-planilha-url="{% url 'atendimentos_planilha' attendant_id=0 %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="chamados" %}
@@ -73,7 +74,18 @@
                                 <span class="column-kicker">Atendente TI</span>
                                 <h3 class="column-title">{{ attendant.name }}</h3>
                             </div>
-                            <span class="column-count" title="Total de chamados na coluna">{{ attendant.count }}</span>
+                            <div class="column-header__actions">
+                                {# Planilha mensal de atendimentos deste atendente (uma linha por Play -> Pause/Stop) #}
+                                <button
+                                    type="button"
+                                    class="column-sheet-btn"
+                                    data-planilha-atendente="{{ attendant.attendant_id }}"
+                                    data-planilha-nome="{{ attendant.name }}"
+                                    title="Baixar planilha de atendimentos de {{ attendant.name }}"
+                                    aria-label="Baixar planilha de atendimentos de {{ attendant.name }}"
+                                >&#11015;</button>
+                                <span class="column-count" title="Total de chamados na coluna">{{ attendant.count }}</span>
+                            </div>
                         </div>
                         <div class="column-breakdown" data-column-breakdown>
                             <span class="column-stat column-stat--attn{% if not attendant.stats.em_atendimento %} column-stat--zero{% endif %}" role="button" tabindex="0" title="Em atendimento - clique para ver so estes por instantes">
@@ -136,6 +148,7 @@
 {% include "partials/pendencia_create_modal.html" %}
 {% include "partials/pendencia_detail_modal.html" %}
 {% include "partials/closed_tickets_modal.html" %}
+{% include "partials/planilha_atendimentos_modal.html" %}
 {% endblock %}
 
 {% block extra_scripts %}

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    atendimentos_planilha_view,
     closed_ticket_detail_view,
     closed_tickets_search_view,
     cofre_credencial_create_view,
@@ -147,6 +148,11 @@ urlpatterns = [
     path("chamados/pendencias/<int:pendencia_id>/", pendencia_detail_view, name="pendencia_detail"),
     path("chamados/pendencias/<int:pendencia_id>/prioridade/", pendencia_priority_view, name="pendencia_priority"),
     path("chamados/pendencias/<int:pendencia_id>/converter/", pendencia_convert_view, name="pendencia_convert"),
+    path(
+        "chamados/planilha/<int:attendant_id>/",
+        atendimentos_planilha_view,
+        name="atendimentos_planilha",
+    ),
     path("chamados/pendencias/<int:pendencia_id>/excluir/", pendencia_delete_view, name="pendencia_delete"),
     path("meus-chamados/", my_tickets_view, name="my_tickets"),
     path("meus-chamados/novo/", open_ticket_view, name="open_ticket"),

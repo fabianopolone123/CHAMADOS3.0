@@ -17,6 +17,7 @@
 | `/chamados/pendencias/<id>/` | GET | Detalhe (JSON) da pendencia para o modal: titulo, descricao, data, autor e prioridade/cor (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/prioridade/` | POST | Altera a prioridade/cor da pendencia (1..5) e retorna a nova cor/rotulo (apenas TI/admin) | Implementada |
 | `/chamados/pendencias/<id>/converter/` | POST | Converte a pendencia em chamado ao ser arrastada para um atendente (apenas TI/admin) | Implementada |
+| `/chamados/planilha/<attendant_id>/` | GET | Baixa a planilha mensal de atendimentos do atendente (.xlsx); `?mes=AAAA-MM` (padrao o mes atual). Uma linha por periodo Play -> Pause/Stop (apenas TI/admin; qualquer atendente baixa de qualquer um) | Implementada |
 | `/meus-chamados/` | GET | Portal do solicitante: lista os chamados do proprio usuario | Implementada |
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe do chamado com conversa, anexos, historico tecnico (recolhido) e timeline de atendimentos | Implementada |
@@ -307,6 +308,18 @@
   - **Nova mensagem** (`/meus-chamados/<numero>/mensagens/`): notifica a **outra parte** + TI, sem copiar quem escreveu.
   - **Mudanca de status** (`/chamados/mover/`, quando o status muda): notifica solicitante + TI.
   - **Fechamento** (Stop em `/chamados/atendimento/encerrar/`): notifica solicitante + TI, com o "o que foi feito".
+
+## Regras da planilha mensal de atendimentos
+
+- `/chamados/planilha/<attendant_id>/` usa `ti_required` (Atendente TI/Admin; usuario comum e redirecionado). **Qualquer Atendente TI pode baixar a planilha de qualquer atendente** - diferente da tela de Historico, que restringe o atendente aos proprios registros (`_get_history_queryset_for_user`). A diferenca e intencional: a planilha e um relatorio de equipe.
+- O `attendant_id` precisa ser um usuario do grupo `Atendente TI` (ou admin), senao `404`. O parametro `?mes=AAAA-MM` e validado (`400` para formato invalido, mes fora de 1..12 ou ano fora de 2000..2100); sem o parametro usa o mes atual.
+- O arquivo sai no mesmo formato dos que a TI ja salvava a mao: nome `MM-AAAA - <PrimeiroNome>.xlsx`, aba com o nome do mes ("Maio"), `A4` = "Atendimentos TI Sidertec - MM/AAAA" e `A5` = nome do atendente + telefone (buscado nos Ramais). Todo o layout, cores, larguras e as formulas de resumo (`E2`/`F2:F5`) vem do modelo versionado `core/planilhas/modelo_atendimentos.xlsx`.
+- **Uma linha por periodo de atendimento** (`AtendimentoHistorico`), nao por chamado: cada Play -> Pause/Stop gera uma linha, entao um chamado trabalhado em tres dias aparece tres vezes. O recorte do mes usa o **inicio** (Play): um periodo que comeca dia 31 e termina dia 1 pertence ao mes em que comecou.
+- Colunas: `A` Tk vazio (nao usado nas planilhas atuais), `B` Data = hora do Play, `C` Contato = solicitante, `D` Setor = setor do solicitante casado com a lista de Ramais (por e-mail e, se nao achar, pelo nome com o mesmo algoritmo do modulo Contatos; em branco quando nao ha match), `E` Notificacao = titulo do chamado, `F` Prioridade = "Programada" quando o chamado nasceu na propria TI (origem `Kanban TI`/`Pendencia TI` ou solicitante TI/admin) e senao Baixa/Media/Alta (`critica` entra como Alta), `G` Falha = "N/A", `H` Acao / Correcao = o que foi feito no periodo (`descricao_atividade`), `I` Fechado = hora do Pause/Stop, `J` Tempo = formula `=I{n}-B{n}`, `K` Acao Eficaz vazio (preenchido a mao).
+- Datas saem como data/hora reais (formato `dd/mm/yyyy hh:mm`), nao texto, para a formula de tempo e a ordenacao no Excel funcionarem.
+- Periodo ainda em andamento (Play aberto no momento do download) entra com a Data preenchida e **Fechado/Tempo em branco** (a formula sem o fim daria resultado negativo).
+- **Chamado encerrado direto pelo Stop (sem Play) nao gera linha**, porque nao cria periodo em `AtendimentoHistorico` (decisao de uso). O mesmo vale para chamado aberto no mes que nunca recebeu Play.
+- Meses com mais de 145 atendimentos: as linhas extras herdam o estilo da primeira linha de dados do modelo.
 
 ## Regras das rotas de historico
 

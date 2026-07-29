@@ -1442,6 +1442,51 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // Planilha mensal de atendimentos (botao no cabecalho da coluna)
+    // ------------------------------------------------------------------
+    // O botao abre um modal que pergunta o mes (atual como padrao) e baixa o
+    // .xlsx daquele atendente. O download e um GET simples na rota protegida,
+    // por isso navegamos ate a URL em vez de usar fetch (deixa o navegador
+    // cuidar do "Salvar como").
+    function initializePlanilhaDownload() {
+        const modalElement = document.getElementById("planilhaAtendimentosModal");
+        const form = document.getElementById("planilhaAtendimentosForm");
+        const urlTemplate = appElement.dataset.planilhaUrl;
+        const triggers = document.querySelectorAll("[data-planilha-atendente]");
+        if (!modalElement || !form || !urlTemplate || !triggers.length) {
+            return;
+        }
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+        const titulo = modalElement.querySelector("[data-planilha-titulo]");
+        const seletorMes = modalElement.querySelector("#planilhaMes");
+        let atendenteId = null;
+
+        triggers.forEach((botao) => {
+            botao.addEventListener("click", (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                atendenteId = botao.dataset.planilhaAtendente;
+                if (titulo) {
+                    titulo.textContent = `Planilha de ${botao.dataset.planilhaNome || "atendimentos"}`;
+                }
+                modal.show();
+            });
+        });
+
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            if (!atendenteId) {
+                return;
+            }
+            const mes = seletorMes ? seletorMes.value : "";
+            const url = urlTemplate.replace(/0\/$/, `${atendenteId}/`);
+            window.location.href = mes ? `${url}?mes=${encodeURIComponent(mes)}` : url;
+            modal.hide();
+        });
+    }
+
     function initialize() {
         attendanceForm.addEventListener("submit", handleAttendanceSubmit);
         initializeDragAndDrop();
@@ -1451,6 +1496,7 @@
         initializeCreatePendencia();
         initializeClosedTicketsModal();
         initializeColumnStatFilters();
+        initializePlanilhaDownload();
         syncInitialActiveState();
     }
 

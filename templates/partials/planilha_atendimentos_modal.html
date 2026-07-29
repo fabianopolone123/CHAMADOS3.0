@@ -1,0 +1,35 @@
+<div class="modal fade" id="planilhaAtendimentosModal" tabindex="-1" aria-labelledby="planilhaAtendimentosModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content create-ticket-modal">
+            <form id="planilhaAtendimentosForm" class="create-ticket-form">
+                <div class="modal-header">
+                    <div>
+                        <span class="create-ticket-kicker">Planilha de atendimentos</span>
+                        <h5 class="modal-title" id="planilhaAtendimentosModalLabel" data-planilha-titulo>Baixar planilha</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="create-ticket-hint">
+                        Uma linha por atendimento (cada Play &rarr; Pause/Stop) que comecou no mes escolhido.
+                    </p>
+
+                    <div class="portal-field">
+                        <label for="planilhaMes">Mes</label>
+                        <select id="planilhaMes" name="mes" class="form-select form-select-lg">
+                            {% for opcao in planilha_meses %}
+                                <option value="{{ opcao.valor }}"{% if opcao.atual %} selected{% endif %}>{{ opcao.rotulo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="planilhaAtendimentosSubmit">Baixar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

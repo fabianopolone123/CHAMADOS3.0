@@ -10,6 +10,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - `core`: app unico que concentra autenticacao, rotas, Kanban, portal do solicitante, permissoes, historico e todos os modulos de TI. Modulos atuais: Requisicoes (nomes tecnicos internos com prefixo `Contrato`), Insumos, Documentos, Emprestimos (termo em PDF via `core/termo_pdf.py`), Emails, Ramais, Licencas, IPs, Servicos feitos, Contratos (`/contratos-ti/`, distinto de Requisicoes), Futura Digital, Dicas, Starlinks, Kaspersky, Contatos, Cofre (cifra em `core/crypto.py`) e E-mail (notificacoes SMTP em `core/emails.py`, senha cifrada)
 - `core/crypto.py`: cifra simetrica (Fernet) do Cofre de senhas e da senha de app do e-mail; a chave vem de `VAULT_ENCRYPTION_KEY` (env)
 - `core/emails.py`: notificacoes de chamado por e-mail (SMTP a partir da `EmailConfig`); envio fail-safe (falha nunca quebra o chamado)
+- `core/planilha_atendimentos.py`: gera a planilha mensal de atendimentos (.xlsx) a partir do modelo versionado em `core/planilhas/modelo_atendimentos.xlsx`, usando openpyxl
 - `templates/core`: templates da autenticacao e de permissoes
 - `templates/chamados`: templates das telas autenticadas (Kanban, portal e cada modulo)
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
@@ -46,6 +47,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - Bootstrap via CDN
 - SortableJS via CDN
 - ReportLab para geracao do termo de emprestimo em PDF (sem dependencia nativa)
+- openpyxl para a planilha mensal de atendimentos (.xlsx), preenchendo o modelo da TI
 - Pillow para campos de imagem (`ImageField`)
 - cryptography (Fernet) para a cifra das credenciais do Cofre
 - CSS proprio para refinamento visual

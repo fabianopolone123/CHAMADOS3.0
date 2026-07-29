@@ -428,6 +428,36 @@
     outline-offset: 2px;
 }
 
+/* Botao discreto de baixar a planilha de atendimentos do atendente. Fica ao
+   lado do contador da coluna e nao deve competir com o "+" de criar chamado. */
+.column-sheet-btn {
+    appearance: none;
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    width: 1.9rem;
+    height: 1.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: #475569;
+    background: #fff;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.column-sheet-btn:hover {
+    color: #1d4ed8;
+    border-color: rgba(37, 99, 235, 0.45);
+    background: #eff6ff;
+}
+
+.column-sheet-btn:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.28);
+    outline-offset: 2px;
+}
+
 .pendencia-card {
     cursor: pointer;
     padding: clamp(0.6rem, 0.5rem + 0.4vw, 0.85rem) clamp(0.75rem, 0.6rem + 0.5vw, 1rem);

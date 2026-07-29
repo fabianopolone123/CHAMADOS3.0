@@ -3287,3 +3287,190 @@ class ContatosTests(TestCase):
         self.client.force_login(self.ti)
         self.assertEqual(self.client.get(reverse("contatos_dashboard")).status_code, 200)
         self.assertEqual(self.client.get(reverse("contatos_import")).status_code, 405)
+
+
+class PlanilhaAtendimentosTests(TestCase):
+    """Planilha mensal de atendimentos por atendente (modelo .xlsx da TI).
+
+    Regra central: uma linha por periodo Play -> Pause/Stop que COMECOU no mes.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(
+            username="ti", password="x", first_name="Fabiano", last_name="Polone", email="fabiano@x.com"
+        )
+        self.outro = User.objects.create_user(username="outro.ti", password="x", first_name="Marina")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        grupo = Group.objects.get(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(grupo)
+        self.outro.groups.add(grupo)
+
+        self.solicitante = User.objects.create_user(
+            username="dandara", password="x", first_name="Dandara", last_name="Santiago", email="dandara@x.com"
+        )
+        Ramal.objects.create(colaborador="Dandara Santiago", setor="RH", email="dandara@x.com", telefone="1234")
+        Ramal.objects.create(
+            colaborador="Fabiano Polone", setor="TI", email="fabiano@x.com", telefone="(14) 98820-8134"
+        )
+
+    def _chamado(self, titulo, origem="Portal do solicitante", solicitante=None):
+        return Chamado.objects.create(
+            numero=Chamado.gerar_numero(),
+            titulo=titulo,
+            solicitante=solicitante or self.solicitante,
+            atendente_atual=self.ti,
+            origem=origem,
+            status=Chamado.STATUS_ATRIBUIDO,
+        )
+
+    def _periodo(self, chamado, inicio, fim, descricao="Feito", atendente=None):
+        return AtendimentoHistorico.objects.create(
+            chamado=chamado,
+            atendente=atendente or self.ti,
+            iniciado_em=inicio,
+            finalizado_em=fim,
+            duracao=(fim - inicio) if fim else None,
+            tipo_encerramento=AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP if fim else "",
+            descricao_atividade=descricao,
+        )
+
+    def _abrir(self, resposta):
+        import io as _io
+
+        import openpyxl
+
+        return openpyxl.load_workbook(_io.BytesIO(resposta.content))
+
+    def _dt(self, dia, hora, minuto=0, mes=5, ano=2026):
+        from datetime import datetime
+
+        return timezone.make_aware(datetime(ano, mes, dia, hora, minuto))
+
+    def _baixar(self, atendente=None, mes="2026-05"):
+        return self.client.get(reverse("atendimentos_planilha", args=[(atendente or self.ti).id]), {"mes": mes})
+
+    # ----- uma linha por periodo -----
+    def test_cada_play_stop_gera_uma_linha(self):
+        chamado = self._chamado("Fazer melhoria sistema chamados")
+        self._periodo(chamado, self._dt(5, 8, 12), self._dt(5, 17, 45), "Feito uma parte")
+        self._periodo(chamado, self._dt(6, 8, 20), self._dt(6, 10, 0), "Terminado")
+
+        self.client.force_login(self.ti)
+        resp = self._baixar()
+        self.assertEqual(resp.status_code, 200)
+        ws = self._abrir(resp).active
+
+        # Duas linhas (8 e 9) para o mesmo chamado, uma por periodo trabalhado.
+        self.assertEqual(ws["E8"].value, "Fazer melhoria sistema chamados")
+        self.assertEqual(ws["E9"].value, "Fazer melhoria sistema chamados")
+        self.assertIsNone(ws["E10"].value)
+        self.assertEqual(ws["H8"].value, "Feito uma parte")
+        self.assertEqual(ws["H9"].value, "Terminado")
+        # Data = Play, Fechado = Stop, Tempo = formula
+        self.assertEqual(ws["B8"].value.strftime("%d/%m/%Y %H:%M"), "05/05/2026 08:12")
+        self.assertEqual(ws["I8"].value.strftime("%d/%m/%Y %H:%M"), "05/05/2026 17:45")
+        self.assertEqual(ws["J8"].value, "=I8-B8")
+
+    def test_colunas_contato_setor_falha_e_tk(self):
+        chamado = self._chamado("Preciso de um fone")
+        self._periodo(chamado, self._dt(5, 10, 20), self._dt(5, 10, 41), "Disponibilizado")
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertIsNone(ws["A8"].value)  # Tk fica vazio, como nas planilhas atuais
+        self.assertEqual(ws["C8"].value, "Dandara Santiago")
+        self.assertEqual(ws["D8"].value, "RH")  # setor vindo do Ramal (casado pelo e-mail)
+        self.assertEqual(ws["F8"].value, "Baixa")
+        self.assertEqual(ws["G8"].value, "N/A")
+        self.assertIsNone(ws["K8"].value)  # Acao Eficaz e preenchida a mao
+
+    def test_chamado_criado_pela_ti_entra_como_programada(self):
+        chamado = self._chamado("Fazer orcamentos", origem="Kanban TI", solicitante=self.ti)
+        self._periodo(chamado, self._dt(5, 15, 44), self._dt(5, 17, 45))
+        pendencia = self._chamado("Cadastrar contratos", origem="Pendencia TI", solicitante=self.ti)
+        self._periodo(pendencia, self._dt(6, 9, 0), self._dt(6, 9, 30))
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertEqual(ws["F8"].value, "Programada")
+        self.assertEqual(ws["F9"].value, "Programada")
+        self.assertEqual(ws["D8"].value, "TI")
+
+    def test_cabecalho_traz_mes_atendente_e_telefone(self):
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertEqual(ws["A4"].value, "Atendimentos TI Sidertec - 05/2026")
+        self.assertEqual(ws["A5"].value, "Fabiano Polone (14) 98820-8134")
+        self.assertEqual(ws.title, "Maio")
+        self.assertEqual(ws["B7"].value, "Data")  # cabecalho do modelo preservado
+
+    def test_so_entram_periodos_do_mes_e_do_atendente(self):
+        chamado = self._chamado("Chamado do mes")
+        self._periodo(chamado, self._dt(5, 9, 0), self._dt(5, 10, 0), "Do mes")
+        self._periodo(chamado, self._dt(20, 9, 0, mes=4), self._dt(20, 10, 0, mes=4), "Abril")
+        self._periodo(chamado, self._dt(7, 9, 0), self._dt(7, 10, 0), "Da Marina", atendente=self.outro)
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertEqual(ws["H8"].value, "Do mes")
+        self.assertIsNone(ws["H9"].value)
+
+    def test_periodo_em_andamento_sai_sem_fechado_e_sem_tempo(self):
+        chamado = self._chamado("Play aberto")
+        self._periodo(chamado, self._dt(5, 9, 0), None, "")
+
+        self.client.force_login(self.ti)
+        ws = self._abrir(self._baixar()).active
+        self.assertIsNotNone(ws["B8"].value)
+        self.assertIsNone(ws["I8"].value)
+        self.assertIsNone(ws["J8"].value)
+
+    def test_encerramento_direto_sem_play_nao_gera_linha(self):
+        # Stop de chamado em "aguardando" nao cria AtendimentoHistorico: por
+        # decisao de uso, nao entra na planilha.
+        chamado = self._chamado("Aguardando peca")
+        chamado.status = Chamado.STATUS_AGUARDANDO_PECA
+        chamado.save(update_fields=["status"])
+        self.client.force_login(self.ti)
+        resp = self.client.post(
+            reverse("finish_attendance"),
+            data=json.dumps({"ticket_number": chamado.numero, "action": "stop", "description": "Peca nao veio"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(AtendimentoHistorico.objects.filter(chamado=chamado).count(), 0)
+
+        hoje = timezone.localdate()
+        ws = self._abrir(self._baixar(mes=f"{hoje.year}-{hoje.month:02d}")).active
+        self.assertIsNone(ws["E8"].value)
+
+    def test_nome_do_arquivo_segue_o_padrao_da_ti(self):
+        self.client.force_login(self.ti)
+        resp = self._baixar()
+        self.assertIn('filename="05-2026 - Fabiano.xlsx"', resp["Content-Disposition"])
+        self.assertIn("spreadsheetml", resp["Content-Type"])
+
+    def test_qualquer_atendente_baixa_de_qualquer_atendente(self):
+        self.client.force_login(self.outro)
+        self.assertEqual(self._baixar(self.ti).status_code, 200)
+
+    def test_usuario_comum_nao_baixa(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self._baixar().status_code, 302)
+
+    def test_mes_invalido_retorna_400_e_usuario_nao_atendente_404(self):
+        self.client.force_login(self.ti)
+        self.assertEqual(self._baixar(mes="abc").status_code, 400)
+        self.assertEqual(self._baixar(mes="2026-13").status_code, 400)
+        self.assertEqual(
+            self.client.get(reverse("atendimentos_planilha", args=[self.solicitante.id])).status_code, 404
+        )
+
+    def test_botao_e_modal_aparecem_no_kanban(self):
+        self.client.force_login(self.ti)
+        html = self.client.get(reverse("tickets_dashboard")).content.decode()
+        self.assertIn(f'data-planilha-atendente="{self.ti.id}"', html)
+        self.assertIn('id="planilhaAtendimentosModal"', html)
+        self.assertIn('id="planilhaMes"', html)
