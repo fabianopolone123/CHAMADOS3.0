@@ -125,7 +125,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 
 ## Modulos removidos
 
-Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem refeitos do zero. As regras antigas deles sairam deste documento (o historico esta no `docs/06_changelog.md`). Os **dados** importados (83 computadores do GLPI e 44 dispositivos do Kaspersky) e os models continuam no banco; o que saiu foi a interface, as rotas e as views. O **casamento de nome com os Ramais** continua valendo, porque a planilha mensal de atendimentos usa para achar o setor do solicitante e o telefone do atendente.
+Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem refeitos do zero. As regras antigas deles sairam deste documento (o historico esta no `docs/06_changelog.md`). Os **dados e os models tambem foram apagados** (migration `0050`): eram 83 computadores do GLPI, 44 dispositivos do Kaspersky e os vinculos feitos a mao. Foi decisao consciente de comecar do zero; ha backup do banco de producao de 30/07/2026 no servidor. Os arquivos de origem (CSV do GLPI e export.txt do Kaspersky) reconstroem a lista quando os modulos forem refeitos - o que nao volta sao os ajustes manuais. O **casamento de nome com os Ramais** continua valendo, porque a planilha mensal de atendimentos usa para achar o setor do solicitante e o telefone do atendente.
 
 ## Regras atuais de permissao
 

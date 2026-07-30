@@ -56,15 +56,6 @@ Modulo IPs:
 
 - `EnderecoIP`
 
-Modulo Contatos (modulo removido em 30/07/2026; o model e os dados continuam):
-
-- `Computador`
-
-Modulo Kaspersky (modulo removido em 30/07/2026; os models e os dados continuam):
-
-- `KasperskyDispositivo`
-- `KasperskyConfig`
-
 Modulo Servicos feitos:
 
 - `ServicoFeito`
@@ -614,38 +605,6 @@ Regra de cobranca (aplicada no cadastro/edicao):
 - As taxas (excedente e cor) e a franquia sao editaveis por fatura (defaults acima). O calculo aparece ao vivo no formulario e e conferido no backend ao salvar.
 - So Atendente TI/Admin acessam (usuario comum e redirecionado; download do documento retorna `404`). Metodos/propriedades: `recalcular()`, `mes_label`, `copias_pb` (producao P&B, so informativa), `*_display`. As faturas ja cadastradas NAO sao recalculadas por uma mudanca de formula (guardam o valor efetivamente pago); o recalculo so acontece ao salvar/editar a fatura.
 
-### Computador
-
-Computador do inventario do GLPI — o "nome do CPU" que a pessoa usa (migration `0047`). E a ponte entre os modulos: o mesmo `nome` e a chave do Kaspersky e o `ramal` liga a pessoa ao e-mail e ao telefone.
-
-- `nome` (unico; chave da importacao) e `usuario_glpi` (nome do usuario como vem do GLPI, no formato "Sobrenome Nome")
-- `ramal` (FK opcional para `Ramal`, `on_delete=SET_NULL`, related_name `computadores`) — resolvido pelo nome na importacao e ajustavel a mao
-- Dados do inventario: `localizacao`, `status`, `fabricante`, `tipo`, `modelo`, `processador`, `sistema_operacional`, `atualizado_glpi`
-- Controle da importacao: `no_ultimo_import`, `importado_em`, `criado_em`, `atualizado_em`
-
-Propriedades: `tipo_slug` (`notebook`/`desktop`/`outro`), `usuario_display` (colaborador vinculado ou o usuario do GLPI) e `atualizado_glpi_display`.
-
-### KasperskyDispositivo
-
-Dispositivo gerenciado pelo Kaspersky Security Center, alimentado pelo arquivo do botao "Exportar" do portal (migration `0046`).
-
-- `nome` (unico; chave da importacao)
-- Organizacao interna, NUNCA sobrescrita pela importacao: `setor`, `responsavel`, `observacoes` e `ramal` (FK opcional para `Ramal`, `on_delete=SET_NULL`, related_name `dispositivos_kaspersky`)
-- Vindos do export: `status`, `agente_executando`, `versao_agente`, `versao_aplicativo`, `endereco_ip`, `grupo`, `ultima_conexao`
-- Controle da importacao: `no_ultimo_export`, `importado_em`, `criado_em`, `atualizado_em`
-
-Regras/propriedades:
-
-- `tem_antivirus`: `versao_aplicativo` preenchida. Vazia = so o Agente de Rede instalado, ou seja, **nao consome licenca**.
-- `status_slug`: `ok` / `critico` / `aviso` / `indefinido` (sem acento, para classe CSS e filtro).
-- `sem_conexao`: sem contato ha `DIAS_SEM_CONEXAO` (7) dias ou mais, ou sem data.
-- `setor_label`: o setor ou "Sem setor". `ultima_conexao_display`: data formatada.
-- So Atendente TI/Admin acessam (usuario comum e redirecionado).
-
-### KasperskyConfig
-
-Singleton (`load()`) com `licencas_contratadas` (default 100) e `atualizado_em` (migration `0046`). O consumo nao e gravado: e calculado como os dispositivos do ultimo export que tem antivirus instalado.
-
 ### Dica
 
 Item da base de conhecimento da TI (modulo Dicas), migrado do banco antigo. Seed inicial via migration de dados `0025`, que le `seed/dicas_seed.json` (local, ignorado pelo Git); os anexos ficam em `media/dicas/` (tambem fora do Git).
@@ -698,6 +657,10 @@ Configuracao unica (singleton, `load()`) das notificacoes por e-mail (modulo E-m
 - Metodos: `definir_senha`/`obter_senha` (cifra/decifra), `tem_senha`, `remetente_efetivo`, `destinatarios_ti`.
 
 O envio real fica em `core/emails.py` (funcoes `notificar_novo_chamado`, `notificar_nova_mensagem`, `notificar_mudanca_status`, `notificar_fechamento` e `enviar_email_teste`), sempre **fail-safe**: qualquer falha de SMTP e apenas logada e nunca interrompe o fluxo do chamado. A conexao e montada a partir da `EmailConfig`; em testes, `settings.EMAIL_BACKEND_OVERRIDE` forca o backend em memoria.
+
+## Modelos removidos
+
+Os models `Computador`, `KasperskyDispositivo` e `KasperskyConfig` (modulos Contatos e Kaspersky) foram **apagados** pela migration `0050` em 30/07/2026, junto com os dados: os modulos serao refeitos do zero. As migrations `0046`/`0047`, que criaram essas tabelas, continuam no historico - nao se apaga migration ja aplicada.
 
 ## Modelos previstos para proximas fases
 
