@@ -3135,6 +3135,49 @@ class ContatosTests(TestCase):
         self.assertEqual(Computador.objects.get(nome="CPU-300").ramal, tamara)
         self.assertIsNone(Computador.objects.get(nome="CPU-999").ramal)
 
+    def test_vincula_com_grafia_diferente_do_sobrenome(self):
+        # Caso real da base: GLPI "Vich Everaldo" x ramal "Everaldo Vichi". A
+        # regra de 2 palavras identicas nao pega (vich != vichi), entao o
+        # desempate por semelhanca resolve - com um unico candidato.
+        everaldo = Ramal.objects.create(colaborador="Everaldo Vichi", setor="Qualidade")
+        Ramal.objects.create(colaborador="Marcelo Costa", setor="Montagem")
+        marcelo = Ramal.objects.create(colaborador="Marcelo Giannourenco", setor="Expedicao")
+        self.client.force_login(self.ti)
+        self._importar([
+            self._linha("CPU-186", "Vich Everaldo"),
+            self._linha("CPU-139", "Giamlourenco Marcelo"),  # dois "Marcelo" na lista
+        ])
+        self.assertEqual(Computador.objects.get(nome="CPU-186").ramal, everaldo)
+        # Entre os dois Marcelo, ganha quem tambem tem o sobrenome parecido.
+        self.assertEqual(Computador.objects.get(nome="CPU-139").ramal, marcelo)
+
+    def test_vincula_nome_de_uma_palavra_so_quando_e_exato_e_unico(self):
+        # Caso real: o GLPI traz "portaria" (nao e pessoa, e o posto).
+        portaria = Ramal.objects.create(colaborador="Portaria", setor="Portaria")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-277", "portaria"), self._linha("CPU-285", "portaria")])
+        self.assertEqual(Computador.objects.get(nome="CPU-277").ramal, portaria)
+        self.assertEqual(Computador.objects.get(nome="CPU-285").ramal, portaria)
+
+    def test_nao_vincula_quando_so_o_sobrenome_bate(self):
+        # "Silva Andre" com varias Silva na lista: vinculo errado e pior que
+        # nenhum, porque a pessoa sai do relatorio de quem esta sem antivirus.
+        Ramal.objects.create(colaborador="Albeni Silva", setor="Montagem Externa")
+        Ramal.objects.create(colaborador="Ariadny Silva", setor="PCP")
+        Ramal.objects.create(colaborador="Andre Luis", setor="Qualidade")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-248", "Silva Andre")])
+        self.assertIsNone(Computador.objects.get(nome="CPU-248").ramal)
+
+    def test_palavra_curta_nao_vale_como_semelhanca(self):
+        # "Ana" x "Ane" nao pode casar so por parecer: nome curto engana.
+        Ramal.objects.create(colaborador="Ane Souza", setor="RH")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-700", "Ana Souza")])
+        # "souza" e igual, "ana"/"ane" e curto demais para valer semelhanca,
+        # entao sobra 1 palavra igual - insuficiente.
+        self.assertIsNone(Computador.objects.get(nome="CPU-700").ramal)
+
     def test_import_atualiza_e_mantem_vinculo_manual(self):
         certo = Ramal.objects.create(colaborador="Maria Souza", setor="RH")
         self.client.force_login(self.ti)
@@ -3853,7 +3896,7 @@ class KasperskyColaboradoresTests(TestCase):
         self.assertEqual(carla["situacao_label"], "Sem antivirus")
         # e a maquina aparece, marcada de onde veio
         self.assertIn("CPU-146", carla["dispositivos"])
-        self.assertIn("so no GLPI", carla["dispositivos"])
+        self.assertIn("sem registro no Kaspersky", carla["dispositivos"])
 
     def test_sem_dispositivo_fica_so_para_quem_nao_tem_maquina(self):
         colaboradores, _ = self._colaboradores()
@@ -3882,7 +3925,7 @@ class KasperskyColaboradoresTests(TestCase):
         eva = colaboradores["Eva Dois Lados"]
         self.assertEqual(eva["situacao"], "protegido")
         self.assertEqual(eva["dispositivos"], "CPU-500")
-        self.assertNotIn("GLPI", eva["dispositivos"])
+        self.assertNotIn("Kaspersky", eva["dispositivos"])
 
 
 class KasperskyBuscaTests(TestCase):

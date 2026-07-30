@@ -5764,8 +5764,11 @@ def kaspersky_dashboard_view(request):
             situacao, situacao_label = "sem-dispositivo", "Sem dispositivo"
 
         nomes = [d.nome for d in vinculados]
-        # Mostra a maquina do GLPI marcada, para saber de onde veio a informacao.
-        nomes += [f"{c.nome} (so no GLPI)" for c in fora_do_kaspersky]
+        # A maquina existe no inventario do GLPI mas o Kaspersky nao a conhece -
+        # na pratica, computador sem o antivirus gerenciado. A etiqueta diz isso
+        # com letras: "so no GLPI" seria ambiguo, porque no modulo Contatos essa
+        # mesma expressao marca a PESSOA que nao tem ramal cadastrado.
+        nomes += [f"{c.nome} (sem registro no Kaspersky)" for c in fora_do_kaspersky]
         colaboradores.append(
             {
                 "nome": ramal.colaborador or "(sem nome)",
@@ -6030,17 +6033,56 @@ def _tokens_nome(nome: str) -> set:
     return {p for p in texto.split() if len(p) > 1 and p not in _NOME_IGNORAR}
 
 
+# Quao parecidas duas palavras precisam ser para valerem como a mesma
+# (grafia diferente do sobrenome: "Vich" x "Vichi", "Giamlourenco" x
+# "Giannourenco"). Abaixo disso o desempate por semelhanca nao acontece.
+_SEMELHANCA_MINIMA = 0.82
+
+
+def _palavras_parecidas(a: str, b: str) -> bool:
+    """Mesma palavra escrita de forma diferente (nao apenas prefixo curto)."""
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 4:
+        return False  # palavra curta: semelhanca nao diz nada
+    from difflib import SequenceMatcher
+
+    return SequenceMatcher(None, a, b).ratio() >= _SEMELHANCA_MINIMA
+
+
+def _pontuacao_nome(tokens: set, alvo: set) -> tuple:
+    """(palavras iguais, palavras parecidas) entre dois nomes."""
+    iguais = tokens & alvo
+    restantes_t = tokens - iguais
+    restantes_a = alvo - iguais
+    parecidas = 0
+    for palavra in restantes_t:
+        casada = next((o for o in restantes_a if _palavras_parecidas(palavra, o)), None)
+        if casada:
+            parecidas += 1
+            restantes_a = restantes_a - {casada}
+    return len(iguais), parecidas
+
+
 def _ramal_por_nome(nome: str, ramais=None):
     """Encontra o colaborador (Ramal) correspondente ao nome do usuario do GLPI.
 
     1. Conjunto de palavras identico -> match direto.
     2. Senao, um nome contido no outro (ex.: "Tamara Garbuio" x "Garbuio Tamara
        Cristiane") com pelo menos 2 palavras em comum, e apenas UM candidato.
+    3. Senao, 1 palavra igual + 1 palavra **parecida** (grafia diferente do
+       sobrenome: "Vich Everaldo" x "Everaldo Vichi"), com um unico melhor
+       candidato. Sem isso, esses casos ficavam para sempre sem dono, porque a
+       regra 2 exige duas palavras identicas.
+    4. Nome de uma palavra so (ex.: "portaria") casa apenas por igualdade exata
+       com um ramal tambem de uma palavra, e so se for unico.
+
     Em caso de duvida (nenhum ou mais de um candidato) devolve None e o vinculo
-    fica para ser feito a mao na tela.
+    fica para ser feito a mao na tela - vinculo errado e pior que vinculo nenhum,
+    porque a pessoa sai silenciosamente do relatorio de quem esta sem antivirus.
     """
     alvo = _tokens_nome(nome)
-    if len(alvo) < 2:
+    if not alvo:
         return None
     if ramais is None:
         ramais = [(r, _tokens_nome(r.colaborador)) for r in Ramal.objects.exclude(colaborador="")]
@@ -6051,12 +6093,31 @@ def _ramal_por_nome(nome: str, ramais=None):
     if exatos:
         return None  # homonimos: nao adivinha
 
+    # (4) uma palavra so: exige igualdade exata, ja tratada acima pelos "exatos".
+    if len(alvo) < 2:
+        return None
+
     candidatos = [
         r
         for r, tokens in ramais
         if len(tokens & alvo) >= 2 and (tokens <= alvo or alvo <= tokens)
     ]
-    return candidatos[0] if len(candidatos) == 1 else None
+    if len(candidatos) == 1:
+        return candidatos[0]
+    if candidatos:
+        return None
+
+    # (3) desempate por semelhanca: 1 palavra igual + 1 parecida, melhor unico.
+    pontuados = []
+    for ramal, tokens in ramais:
+        iguais, parecidas = _pontuacao_nome(tokens, alvo)
+        if iguais >= 1 and parecidas >= 1:
+            pontuados.append((iguais + parecidas, iguais, ramal))
+    if not pontuados:
+        return None
+    melhor = max(p[0] for p in pontuados)
+    finalistas = [p[2] for p in pontuados if p[0] == melhor]
+    return finalistas[0] if len(finalistas) == 1 else None
 
 
 def _parse_data_glpi(valor: str):

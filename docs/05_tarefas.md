@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Contatos/Kaspersky: casamento de nome do GLPI passou a resolver grafia diferente de sobrenome ("Vich Everaldo" x "Everaldo Vichi") e nome de uma palavra so ("portaria"); e a etiqueta do Kaspersky virou "(sem registro no Kaspersky)", que antes repetia o "so no GLPI" do Contatos com outro significado. Conferido contra a base de producao: resolve 4 casos e nao altera nenhum vinculo existente
 - Pausa automatica no fim do expediente (17:45) com complemento obrigatorio: comando `pausar_expediente`, model `PausaAutomatica` (migration `0049`), travamento de Play/Pause/Stop enquanto houver pendencia, aviso pulsante + notificacao + modal no Kanban, e a planilha avisando quando falta o complemento. Testes `PausaAutomaticaTests` (18 casos)
 
 - Kaspersky: a tela ficou **so com o campo de pesquisa** (sairam os chips de situacao e de setor das duas abas), com a busca cobrindo tambem as palavras das situacoes; e a aba **Colaboradores** passou a considerar o inventario do GLPI - quem tem computador no GLPI mas nada no Kaspersky agora aparece como **"Sem antivirus"** (com o nome da maquina) em vez de "Sem dispositivo". Testes `KasperskyColaboradoresTests` e `KasperskyBuscaTests`
