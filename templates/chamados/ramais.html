@@ -14,6 +14,7 @@
     class="tickets-app ramais-app"
     data-ramal-update-url="{% url 'ramal_update' ramal_id=0 %}"
     data-ramal-delete-url="{% url 'ramal_delete' ramal_id=0 %}"
+    data-ramal-kaspersky-url="{% url 'ramal_kaspersky_toggle' ramal_id=0 %}"
 >
     {% csrf_token %}
     {% include "partials/ti_sidebar.html" with active="ramais" %}
@@ -36,6 +37,14 @@
                 <span class="ramais-stat__label">Total de ramais</span>
                 <strong class="ramais-stat__value">{{ total_ramais }}</strong>
             </article>
+            <article class="ramais-stat ramais-stat--ok">
+                <span class="ramais-stat__label">Com Kaspersky</span>
+                <strong class="ramais-stat__value" data-stat-com-kaspersky>{{ com_kaspersky }}</strong>
+            </article>
+            <article class="ramais-stat ramais-stat--alerta">
+                <span class="ramais-stat__label">Sem Kaspersky</span>
+                <strong class="ramais-stat__value" data-stat-sem-kaspersky>{{ sem_kaspersky }}</strong>
+            </article>
         </section>
 
         <section class="ramais-panel">
@@ -45,7 +54,7 @@
                     type="search"
                     id="ramalSearch"
                     class="ramais-search__input"
-                    placeholder="Pesquisar por colaborador, setor, telefone, ramal ou e-mail..."
+                    placeholder="Pesquisar por colaborador, setor, telefone, ramal, e-mail ou 'sem kaspersky'..."
                     autocomplete="off"
                 >
             </div>
@@ -61,6 +70,7 @@
                             <th class="ramais-th ramais-col--hide-sm" data-sort-index="2" aria-sort="none">Telefone <span class="ramais-sort-ind" aria-hidden="true"></span></th>
                             <th class="ramais-th" data-sort-index="3" data-sort-numeric="1" aria-sort="none">Ramal <span class="ramais-sort-ind" aria-hidden="true"></span></th>
                             <th class="ramais-th ramais-col--hide-md" data-sort-index="4" aria-sort="none">E-mail <span class="ramais-sort-ind" aria-hidden="true"></span></th>
+                            <th class="ramais-th ramais-th--check" data-sort-index="5" aria-sort="none">Kaspersky <span class="ramais-sort-ind" aria-hidden="true"></span></th>
                         </tr>
                     </thead>
                     <tbody id="ramaisTableBody">
@@ -74,7 +84,8 @@
                             data-ramal="{{ r.ramal }}"
                             data-email="{{ r.email }}"
                             data-conta-id="{{ r.conta_email_id|default:'' }}"
-                            data-search="{{ r.colaborador|lower }} {{ r.setor|lower }} {{ r.telefone|lower }} {{ r.ramal|lower }} {{ r.email|lower }}"
+                            data-kaspersky="{{ r.kaspersky_instalado|yesno:"sim,nao" }}"
+                            data-search="{{ r.colaborador|lower }} {{ r.setor|lower }} {{ r.telefone|lower }} {{ r.ramal|lower }} {{ r.email|lower }} {% if r.kaspersky_instalado %}com kaspersky instalado antivirus{% else %}sem kaspersky sem antivirus{% endif %}"
                             tabindex="0"
                             role="button"
                             aria-label="Editar ramal de {{ r.colaborador|default:r.setor }}"
@@ -85,6 +96,14 @@
                             <td data-label="Ramal"><span class="ramais-badge">{{ r.ramal|default:"-" }}</span></td>
                             <td data-label="E-mail" class="ramais-col--hide-md ramais-cell--email">
                                 {% if r.email %}<a href="mailto:{{ r.email }}" class="ramais-mail-link">{{ r.email }}</a>{% else %}-{% endif %}
+                            </td>
+                            <td data-label="Kaspersky" class="ramais-cell--check">
+                                <label class="ramais-check" title="Marcar quando o Kaspersky estiver instalado na maquina desta pessoa">
+                                    <input type="checkbox" class="ramais-check__input" data-kaspersky-toggle
+                                           {% if r.kaspersky_instalado %}checked{% endif %}
+                                           aria-label="Kaspersky instalado para {{ r.colaborador|default:r.setor }}">
+                                    <span class="ramais-check__texto">{% if r.kaspersky_instalado %}instalado{% else %}nao{% endif %}</span>
+                                </label>
                             </td>
                         </tr>
                         {% endfor %}

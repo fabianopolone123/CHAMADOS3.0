@@ -1177,6 +1177,10 @@ class Ramal(models.Model):
     telefone = models.CharField(max_length=60, blank=True)
     ramal = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
+    # Controle do antivirus feito na mao, tiquando na propria lista: substitui os
+    # modulos Contatos/Kaspersky, que cruzavam GLPI x export do portal e davam
+    # numeros que nao fechavam (populacoes de pessoas diferentes em cada tela).
+    kaspersky_instalado = models.BooleanField(default=False)
     conta_email = models.ForeignKey(
         ContaEmail,
         on_delete=models.SET_NULL,

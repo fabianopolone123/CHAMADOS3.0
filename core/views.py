@@ -3954,10 +3954,13 @@ def ramais_dashboard_view(request):
         {"id": c.id, "email": c.email, "nome": c.nome_completo}
         for c in contas
     ]
+    com_kaspersky = sum(1 for r in ramais if r.kaspersky_instalado)
     context = {
         "page_title": "Ramais",
         "ramais": ramais,
         "total_ramais": len(ramais),
+        "com_kaspersky": com_kaspersky,
+        "sem_kaspersky": len(ramais) - com_kaspersky,
         "opcoes_email": opcoes_email,
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
@@ -3993,9 +3996,47 @@ def _ler_dados_ramal(request):
         "telefone": (request.POST.get("telefone") or "").strip(),
         "ramal": (request.POST.get("ramal") or "").strip(),
         "email": email,
+        "kaspersky_instalado": bool(request.POST.get("kaspersky_instalado")),
         "conta_email": conta,
     }
     return dados, None
+
+
+@login_required
+@require_POST
+def ramal_kaspersky_toggle_view(request, ramal_id: int):
+    """Liga/desliga o "Kaspersky instalado" de um ramal, tiquando na propria lista.
+
+    Responde JSON para o tique valer na hora, sem recarregar a pagina. O valor
+    enviado e usado como esta (o checkbox do navegador manda o estado que o
+    usuario deixou), em vez de inverter no servidor - assim dois cliques rapidos
+    nao se cruzam e deixam o registro invertido.
+    """
+    if not _is_ti(request.user):
+        return _json_error("Voce nao tem permissao para alterar ramais.", status=403)
+
+    ramal = Ramal.objects.filter(pk=ramal_id).first()
+    if not ramal:
+        return _json_error("Ramal nao encontrado.", status=404)
+
+    payload = _load_request_payload(request) or {}
+    ramal.kaspersky_instalado = bool(payload.get("instalado"))
+    ramal.save(update_fields=["kaspersky_instalado", "atualizado_em"])
+
+    total = Ramal.objects.count()
+    com = Ramal.objects.filter(kaspersky_instalado=True).count()
+    return JsonResponse(
+        {
+            "ok": True,
+            "instalado": ramal.kaspersky_instalado,
+            "com_kaspersky": com,
+            "sem_kaspersky": total - com,
+            "message": (
+                f"{ramal.colaborador or 'Ramal'}: Kaspersky "
+                f"{'marcado como instalado' if ramal.kaspersky_instalado else 'desmarcado'}."
+            ),
+        }
+    )
 
 
 @login_required

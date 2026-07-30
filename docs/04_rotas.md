@@ -68,6 +68,7 @@
 | `/ramais/criar/` | POST | Cadastra um ramal; o e-mail pode ser digitado ou vir de uma `ContaEmail` selecionada; notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/ramais/<id>/editar/` | POST | Edita um ramal existente (apenas TI/admin) | Implementada |
 | `/ramais/<id>/excluir/` | POST | Exclui um ramal (apenas TI/admin) | Implementada |
+| `/ramais/<id>/kaspersky/` | POST | Liga/desliga o "Kaspersky instalado" do ramal, tiquando na propria lista; responde JSON com o novo estado e os contadores (apenas TI/admin) | Implementada |
 | `/licencas/` | GET | Modulo Licencas: lista de softwares (cards expansiveis com suas licencas), cartoes de resumo e busca dinamica (apenas TI/admin) | Implementada |
 | `/licencas/softwares/criar/` | POST | Cadastra um software (nome, quantidade contratada, observacoes); notifica via Django messages e redireciona (apenas TI/admin) | Implementada |
 | `/licencas/softwares/<id>/editar/` | POST | Edita um software (apenas TI/admin) | Implementada |

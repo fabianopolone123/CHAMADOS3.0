@@ -494,6 +494,7 @@ Conta de e-mail corporativo, atualizada via importacao do CSV exportado do Googl
 Contato da lista telefonica interna (modulo Ramais). Seed inicial via migration de dados `0013`, que le um arquivo local ignorado pelo Git (`seed/ramais_seed.json`); os dados pessoais nao sao versionados.
 
 - `colaborador`, `setor`, `telefone`, `ramal`, `email`
+- `kaspersky_instalado` (boolean, default `False`, migration `0051`): controle do antivirus **tiquado a mao** na propria lista. Substitui os modulos Contatos/Kaspersky, que cruzavam o inventario do GLPI com o export do portal e davam numeros que nao fechavam.
 - `conta_email` (FK `ContaEmail` `on_delete=SET_NULL`, related_name `ramais`) — vinculo opcional com a conta de e-mail escolhida no cadastro
 - `criado_por` (FK `on_delete=SET_NULL`), `criado_em`, `atualizado_em`. Migration `0012`.
 

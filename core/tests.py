@@ -3783,3 +3783,101 @@ class CasamentoNomeRamalTests(TestCase):
         Ramal.objects.create(colaborador="Joao Silva", setor="PCP")
         Ramal.objects.create(colaborador="Joao Silva", setor="Pintura")
         self.assertIsNone(self._casar("Joao Silva"))
+
+
+class RamalKasperskyTests(TestCase):
+    """Coluna "Kaspersky instalado" na lista de Ramais.
+
+    Substitui os modulos Contatos/Kaspersky: em vez de cruzar o inventario do
+    GLPI com o export do portal, o controle e um tique feito a mao na propria
+    lista de pessoas.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.common = User.objects.create_user(username="comum", password="x")
+        self.ti = User.objects.create_user(username="ti", password="x")
+        Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti.groups.add(Group.objects.get(name=ATTENDANT_GROUP_NAME))
+        # O banco de teste vem com os ramais do seed: limpa para os contadores
+        # desta classe serem exatos.
+        Ramal.objects.all().delete()
+        self.ana = Ramal.objects.create(colaborador="Ana Souza", setor="RH")
+        self.bruno = Ramal.objects.create(
+            colaborador="Bruno Lima", setor="TI", kaspersky_instalado=True
+        )
+
+    def _toggle(self, ramal, instalado):
+        return self.client.post(
+            reverse("ramal_kaspersky_toggle", args=[ramal.id]),
+            data=json.dumps({"instalado": instalado}),
+            content_type="application/json",
+        )
+
+    def test_campo_nasce_desmarcado(self):
+        self.assertFalse(Ramal.objects.create(colaborador="Novo").kaspersky_instalado)
+
+    def test_marcar_e_desmarcar_pela_lista(self):
+        self.client.force_login(self.ti)
+        resp = self._toggle(self.ana, True)
+        self.assertEqual(resp.status_code, 200)
+        dados = resp.json()
+        self.assertTrue(dados["instalado"])
+        self.assertEqual(dados["com_kaspersky"], 2)  # Ana + Bruno
+        self.assertEqual(dados["sem_kaspersky"], 0)
+        self.ana.refresh_from_db()
+        self.assertTrue(self.ana.kaspersky_instalado)
+
+        resp = self._toggle(self.ana, False)
+        self.assertFalse(resp.json()["instalado"])
+        self.assertEqual(resp.json()["com_kaspersky"], 1)
+        self.ana.refresh_from_db()
+        self.assertFalse(self.ana.kaspersky_instalado)
+
+    def test_usa_o_valor_enviado_e_nao_inverte_no_servidor(self):
+        # Dois cliques que mandam o mesmo valor nao devem "desfazer" o tique.
+        self.client.force_login(self.ti)
+        self._toggle(self.ana, True)
+        self._toggle(self.ana, True)
+        self.ana.refresh_from_db()
+        self.assertTrue(self.ana.kaspersky_instalado)
+
+    def test_cadastro_e_edicao_levam_o_tique(self):
+        self.client.force_login(self.ti)
+        self.client.post(
+            reverse("ramal_create"),
+            {"colaborador": "Carla Dias", "setor": "PCP", "kaspersky_instalado": "on"},
+        )
+        carla = Ramal.objects.get(colaborador="Carla Dias")
+        self.assertTrue(carla.kaspersky_instalado)
+
+        # sem o campo no POST, o tique sai (checkbox desmarcado nao e enviado)
+        self.client.post(reverse("ramal_update", args=[carla.id]), {"colaborador": "Carla Dias", "setor": "PCP"})
+        carla.refresh_from_db()
+        self.assertFalse(carla.kaspersky_instalado)
+
+    def test_tela_mostra_a_coluna_o_resumo_e_o_estado(self):
+        self.client.force_login(self.ti)
+        resp = self.client.get(reverse("ramais_dashboard"))
+        self.assertEqual(resp.context["com_kaspersky"], 1)
+        self.assertEqual(resp.context["sem_kaspersky"], 1)
+        html = resp.content.decode()
+        self.assertIn("data-kaspersky-toggle", html)
+        self.assertIn('data-kaspersky="sim"', html)   # Bruno
+        self.assertIn('data-kaspersky="nao"', html)   # Ana
+        # a busca acha pelos dois estados
+        self.assertIn("sem kaspersky sem antivirus", html)
+        self.assertIn("com kaspersky instalado antivirus", html)
+
+    def test_usuario_comum_nao_altera(self):
+        self.client.force_login(self.common)
+        self.assertEqual(self._toggle(self.ana, True).status_code, 403)
+        self.ana.refresh_from_db()
+        self.assertFalse(self.ana.kaspersky_instalado)
+
+    def test_ramal_inexistente_e_metodo_invalido(self):
+        self.client.force_login(self.ti)
+        self.assertEqual(self._toggle(Ramal(id=99999), True).status_code, 404)
+        self.assertEqual(
+            self.client.get(reverse("ramal_kaspersky_toggle", args=[self.ana.id])).status_code, 405
+        )

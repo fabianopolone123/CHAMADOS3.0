@@ -21,6 +21,60 @@
     box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
 }
 
+/* Verde = protegido, ambar = falta instalar. So a borda muda, para os cartoes
+   continuarem iguais entre si. */
+.ramais-stat--ok {
+    border-left-color: #16a34a;
+}
+
+.ramais-stat--alerta {
+    border-left-color: #d97706;
+}
+
+/* ----- Tique do Kaspersky na lista ----- */
+.ramais-th--check,
+.ramais-cell--check {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.ramais-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    /* O clique aqui nao deve abrir o modal de edicao da linha (tratado no JS). */
+}
+
+.ramais-check__input {
+    width: 1.05rem;
+    height: 1.05rem;
+    accent-color: #16a34a;
+    cursor: pointer;
+}
+
+.ramais-check__input:disabled {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.ramais-check__texto {
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.ramais-check__input:checked + .ramais-check__texto {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.ramais-check--form {
+    margin-top: 0.35rem;
+    gap: 0.55rem;
+    font-size: 0.92rem;
+    color: #334155;
+}
+
 .ramais-stat__label {
     font-size: 0.78rem;
     font-weight: 700;

@@ -23,7 +23,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Modulo Documentos (apenas TI/admin): cadastro e armazenamento de documentos internos com nome, observacao e anexos multiplos
 - Modulo Emprestimos (apenas TI/admin): comodato de equipamentos de TI com multiplos equipamentos e fotos, assinatura protegida por senha, geracao do termo em PDF, anexo do termo assinado e controle de status
 - Modulo Emails (apenas TI/admin): consulta das contas de e-mail corporativo com busca e detalhe, atualizadas pela importacao da lista CSV do Google Workspace (upsert por e-mail)
-- Modulo Ramais (apenas TI/admin): lista telefonica interna (colaborador, setor, telefone, ramal, e-mail) com busca dinamica e cadastro cujo e-mail e escolhido entre as contas ja cadastradas
+- Modulo Ramais (apenas TI/admin): lista telefonica interna (colaborador, setor, telefone, ramal, e-mail) com coluna **Kaspersky** tiquada a mao (com/sem antivirus, com contadores no topo) com busca dinamica e cadastro cujo e-mail e escolhido entre as contas ja cadastradas
 - Modulo Licencas (apenas TI/admin): controle de licencas de software agrupadas por software (serial, usuario, e-mail vinculado, prazo e forma de pagamento), com cartoes de resumo, busca dinamica e CRUD de software e licenca
 - Modulo IPs (apenas TI/admin): inventario de IPs/equipamentos da rede interna (categoria, endereco, nome, fabricante, MAC, acesso), com cartoes de resumo, busca inteligente, filtro por categoria e CRUD
 - Modulo Servicos feitos (apenas TI/admin): registro de servicos de TI executados (empresa, data, valor e anexos de NF/orcamento), com cartoes de resumo, busca, ordenacao, modal de detalhe com download e CRUD

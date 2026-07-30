@@ -123,6 +123,16 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 9. **Na planilha**, o periodo pausado aparece com a coluna Acao/Correcao preenchida pelo complemento. Enquanto ele nao vier, a celula mostra `Pausa automatica no fim do expediente (pendente de complemento)` - em vez de sair vazia, o que pareceria esquecimento.
 10. Nao existe **retomada automatica** no dia seguinte: o atendente da Play quando volta ao chamado. Criar o Play sozinho lancaria horas em dias que ninguem tocou no chamado, que e justamente o problema que a pausa resolve.
 
+## Regras atuais do controle de antivirus (coluna nos Ramais)
+
+1. A lista de **Ramais** tem a coluna **Kaspersky**, com um tique por pessoa. E o controle do antivirus **feito a mao**: substituiu os modulos Contatos/Kaspersky, que cruzavam o inventario do GLPI com o export do portal e produziam numeros que nao fechavam.
+2. O tique e clicado **direto na linha** e salva na hora (`POST /ramais/<id>/kaspersky/`, JSON), sem recarregar a pagina. Se o servidor recusar, o tique **volta ao estado anterior** para a tela nao mostrar algo que nao foi gravado.
+3. O valor gravado e o que o navegador manda (`instalado: true/false`), nao uma inversao feita no servidor: assim dois cliques rapidos nao se cruzam deixando o registro invertido.
+4. A linha inteira continua clicavel para **editar** o ramal; o clique no tique **nao** abre o modal. O checkbox tambem aparece no formulario de cadastro e de edicao.
+5. Os cartoes do topo mostram **Com Kaspersky** e **Sem Kaspersky** e sao atualizados a cada tique, sem refresh.
+6. A busca cobre os dois estados: digitar `sem kaspersky` (ou `com kaspersky`, `antivirus`) filtra a lista.
+7. Somente Atendente TI/Admin alteram (`403` para usuario comum), e a rota aceita apenas `POST`.
+
 ## Modulos removidos
 
 Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem refeitos do zero. As regras antigas deles sairam deste documento (o historico esta no `docs/06_changelog.md`). Os **dados e os models tambem foram apagados** (migration `0050`): eram 83 computadores do GLPI, 44 dispositivos do Kaspersky e os vinculos feitos a mao. Foi decisao consciente de comecar do zero; ha backup do banco de producao de 30/07/2026 no servidor. Os arquivos de origem (CSV do GLPI e export.txt do Kaspersky) reconstroem a lista quando os modulos forem refeitos - o que nao volta sao os ajustes manuais. O **casamento de nome com os Ramais** continua valendo, porque a planilha mensal de atendimentos usa para achar o setor do solicitante e o telefone do atendente.
