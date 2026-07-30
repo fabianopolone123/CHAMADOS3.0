@@ -2,6 +2,7 @@
 
 ## Em andamento
 
+- Refazer os modulos Contatos e Kaspersky do zero (removidos em 30/07/2026; os dados importados ficaram no banco)
 - Evoluir a atribuicao para um fluxo formal de responsavel, se necessario
 
 ## Pendencias conhecidas

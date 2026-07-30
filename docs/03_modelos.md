@@ -56,11 +56,11 @@ Modulo IPs:
 
 - `EnderecoIP`
 
-Modulo Contatos:
+Modulo Contatos (modulo removido em 30/07/2026; o model e os dados continuam):
 
 - `Computador`
 
-Modulo Kaspersky:
+Modulo Kaspersky (modulo removido em 30/07/2026; os models e os dados continuam):
 
 - `KasperskyDispositivo`
 - `KasperskyConfig`
