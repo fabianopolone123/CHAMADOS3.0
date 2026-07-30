@@ -6076,6 +6076,11 @@ def _ramal_por_nome(nome: str, ramais=None):
        regra 2 exige duas palavras identicas.
     4. Nome de uma palavra so (ex.: "portaria") casa apenas por igualdade exata
        com um ramal tambem de uma palavra, e so se for unico.
+    5. Por ultimo, a ponte pelo **nome completo da conta de e-mail** (ver
+       `_ramal_pela_conta_email`): o ramal pode ter nome curto ("Joao Leal") e o
+       GLPI trazer outra combinacao ("Leal Henrique") - o nome completo do
+       Workspace ("Joao Henrique Gomes Leal") contem os dois, e o vinculo final
+       sai pelo e-mail.
 
     Em caso de duvida (nenhum ou mais de um candidato) devolve None e o vinculo
     fica para ser feito a mao na tela - vinculo errado e pior que vinculo nenhum,
@@ -6113,11 +6118,42 @@ def _ramal_por_nome(nome: str, ramais=None):
         iguais, parecidas = _pontuacao_nome(tokens, alvo)
         if iguais >= 1 and parecidas >= 1:
             pontuados.append((iguais + parecidas, iguais, ramal))
-    if not pontuados:
+    if pontuados:
+        melhor = max(p[0] for p in pontuados)
+        finalistas = [p[2] for p in pontuados if p[0] == melhor]
+        if len(finalistas) == 1:
+            return finalistas[0]
         return None
-    melhor = max(p[0] for p in pontuados)
-    finalistas = [p[2] for p in pontuados if p[0] == melhor]
-    return finalistas[0] if len(finalistas) == 1 else None
+
+    return _ramal_pela_conta_email(alvo, ramais)
+
+
+def _ramal_pela_conta_email(alvo: set, ramais):
+    """Ponte pelo nome completo da conta de e-mail corporativo.
+
+    O ramal pode estar cadastrado com um nome curto ("Joao Leal") que nao cobre o
+    que vem do GLPI ("Leal Henrique"), mas a conta do Workspace tem o nome
+    completo ("Joao Henrique Gomes Leal"), que contem os dois. Achando a conta,
+    o ramal e localizado pelo **e-mail** - chave exata, sem adivinhacao.
+
+    Exige que TODAS as palavras do nome do GLPI estejam no nome completo e que a
+    conta seja unica.
+    """
+    from .models import ContaEmail
+
+    candidatas = [
+        conta
+        for conta in ContaEmail.objects.all()
+        if conta.nome_completo.strip() and alvo <= _tokens_nome(conta.nome_completo)
+    ]
+    if len(candidatas) != 1:
+        return None
+
+    email = (candidatas[0].email or "").strip().lower()
+    if not email:
+        return None
+    achados = [r for r, _ in ramais if (r.email or "").strip().lower() == email]
+    return achados[0] if len(achados) == 1 else None
 
 
 def _parse_data_glpi(valor: str):

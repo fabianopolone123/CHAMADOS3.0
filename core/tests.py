@@ -3159,6 +3159,29 @@ class ContatosTests(TestCase):
         self.assertEqual(Computador.objects.get(nome="CPU-277").ramal, portaria)
         self.assertEqual(Computador.objects.get(nome="CPU-285").ramal, portaria)
 
+    def test_vincula_pela_ponte_do_email_corporativo(self):
+        # Caso real: GLPI "Leal Henrique" x ramal "Joao Leal" - so "leal" em
+        # comum. O nome completo do Workspace ("Joao Henrique Gomes Leal") cobre
+        # os dois, e o ramal e achado pelo e-mail (chave exata).
+        conta = ContaEmail.objects.create(
+            email="henrique.leal@sidertec.com.br", primeiro_nome="Joao Henrique", sobrenome="Gomes Leal"
+        )
+        joao = Ramal.objects.create(
+            colaborador="Joao Leal", setor="Pintura", email="henrique.leal@sidertec.com.br", conta_email=conta
+        )
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-144", "Leal Henrique")])
+        self.assertEqual(Computador.objects.get(nome="CPU-144").ramal, joao)
+
+    def test_ponte_do_email_nao_vale_com_duas_contas_possiveis(self):
+        # Duas contas cujo nome completo contem o nome do GLPI: nao adivinha.
+        ContaEmail.objects.create(email="a@x.com", primeiro_nome="Joao Henrique", sobrenome="Gomes Leal")
+        ContaEmail.objects.create(email="b@x.com", primeiro_nome="Maria Henrique", sobrenome="Leal")
+        Ramal.objects.create(colaborador="Joao Leal", setor="Pintura", email="a@x.com")
+        self.client.force_login(self.ti)
+        self._importar([self._linha("CPU-144", "Leal Henrique")])
+        self.assertIsNone(Computador.objects.get(nome="CPU-144").ramal)
+
     def test_nao_vincula_quando_so_o_sobrenome_bate(self):
         # "Silva Andre" com varias Silva na lista: vinculo errado e pior que
         # nenhum, porque a pessoa sai do relatorio de quem esta sem antivirus.
