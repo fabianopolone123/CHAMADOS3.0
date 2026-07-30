@@ -10,6 +10,7 @@
 
 ## Concluidas
 
+- Kaspersky: a aba Colaboradores passou a listar a mesma populacao do Contatos (Ramais + quem existe so no GLPI), entao quem tem dispositivo mas nao tem ramal deixou de sumir da tela
 - Contatos/Kaspersky: casamento de nome do GLPI passou a resolver grafia diferente de sobrenome ("Vich Everaldo" x "Everaldo Vichi") e nome de uma palavra so ("portaria"); e a etiqueta do Kaspersky virou "(sem registro no Kaspersky)", que antes repetia o "so no GLPI" do Contatos com outro significado. Conferido contra a base de producao: resolve 4 casos e nao altera nenhum vinculo existente
 - Pausa automatica no fim do expediente (17:45) com complemento obrigatorio: comando `pausar_expediente`, model `PausaAutomatica` (migration `0049`), travamento de Play/Pause/Stop enquanto houver pendencia, aviso pulsante + notificacao + modal no Kanban, e a planilha avisando quando falta o complemento. Testes `PausaAutomaticaTests` (18 casos)
 

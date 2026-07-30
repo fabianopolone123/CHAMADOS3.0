@@ -5777,6 +5777,41 @@ def kaspersky_dashboard_view(request):
                 "dispositivos": ", ".join(nomes) or "-",
                 "situacao": situacao,
                 "situacao_label": situacao_label,
+                "sem_ramal": False,
+            }
+        )
+
+    # A lista de pessoas e a MESMA do modulo Contatos: os Ramais mais quem existe
+    # so no inventario do GLPI. Sem isso, alguem que nao esta nos ramais mas tem
+    # dispositivo no Kaspersky (o caso da CPU-246) nao aparecia nesta aba, e o
+    # numero de "sem colaborador" ficava sem explicacao na tela.
+    por_usuario_glpi = {}
+    for computador in Computador.objects.filter(ramal__isnull=True).exclude(usuario_glpi=""):
+        por_usuario_glpi.setdefault(computador.usuario_glpi.strip(), []).append(computador)
+
+    por_nome_kaspersky = {d.nome.strip().upper(): d for d in dispositivos if d.nome}
+    for usuario, maquinas in por_usuario_glpi.items():
+        encontrados = [por_nome_kaspersky.get((c.nome or "").strip().upper()) for c in maquinas]
+        no_kaspersky = [d for d in encontrados if d is not None]
+        if any(d.tem_antivirus for d in no_kaspersky):
+            situacao, situacao_label = "protegido", "Com antivirus"
+        else:
+            situacao, situacao_label = "sem-antivirus", "Sem antivirus"
+
+        nomes = []
+        for computador, disp in zip(maquinas, encontrados):
+            nomes.append(
+                computador.nome if disp is not None else f"{computador.nome} (sem registro no Kaspersky)"
+            )
+        colaboradores.append(
+            {
+                "nome": usuario,
+                "setor": (maquinas[0].localizacao or "").strip() or "Sem setor",
+                "email": "",
+                "dispositivos": ", ".join(nomes),
+                "situacao": situacao,
+                "situacao_label": situacao_label,
+                "sem_ramal": True,
             }
         )
     # Quem precisa de atencao primeiro: sem dispositivo / sem antivirus no topo,

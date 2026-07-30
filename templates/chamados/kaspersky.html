@@ -202,8 +202,11 @@
                             {% for c in colaboradores %}
                             <tr class="ips-row ksp-colab-row"
                                 data-situacao="{{ c.situacao }}"
-                                data-search="{{ c.nome|lower }} {{ c.setor|lower }} {{ c.dispositivos|lower }} {{ c.email|lower }} {{ c.situacao_label|lower }}">
-                                <td data-label="Colaborador" class="ips-cell--name">{{ c.nome }}</td>
+                                data-search="{{ c.nome|lower }} {{ c.setor|lower }} {{ c.dispositivos|lower }} {{ c.email|lower }} {{ c.situacao_label|lower }}{% if c.sem_ramal %} sem ramal cadastrado{% endif %}">
+                                <td data-label="Colaborador" class="ips-cell--name">
+                                    {{ c.nome }}
+                                    {% if c.sem_ramal %}<span class="ksp-tag ksp-tag--fora" title="Existe no inventario do GLPI mas nao esta na lista de Ramais">sem ramal cadastrado</span>{% endif %}
+                                </td>
                                 <td data-label="Setor"><span class="ksp-setor{% if c.setor == 'Sem setor' %} ksp-setor--vazio{% endif %}">{{ c.setor }}</span></td>
                                 <td data-label="Dispositivos" class="ips-col--hide-sm">{{ c.dispositivos }}</td>
                                 <td data-label="Situacao"><span class="ksp-badge ksp-badge--{{ c.situacao }}">{{ c.situacao_label }}</span></td>

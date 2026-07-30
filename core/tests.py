@@ -3937,6 +3937,37 @@ class KasperskyColaboradoresTests(TestCase):
         self.assertEqual(resp.context["colaboradores_sem_antivirus"], 2)  # so-agente + so-glpi
         self.assertEqual(resp.context["colaboradores_sem_dispositivo"], 1)
 
+    def test_pessoa_que_esta_so_no_glpi_aparece_na_aba(self):
+        # A lista de pessoas e a mesma do modulo Contatos: Ramais + quem existe so
+        # no inventario do GLPI. Sem isso, quem tem dispositivo no Kaspersky mas
+        # nao tem ramal simplesmente nao aparecia, e o numero de "sem colaborador"
+        # ficava sem explicacao na tela.
+        Computador.objects.create(nome="CPU-246", usuario_glpi="Gabriele Ana", localizacao="Compras")
+        KasperskyDispositivo.objects.create(
+            nome="CPU-246", versao_aplicativo="12.12.0.522", no_ultimo_export=True
+        )
+        colaboradores, _ = self._colaboradores()
+        ana = colaboradores["Gabriele Ana"]
+        self.assertTrue(ana["sem_ramal"])
+        self.assertEqual(ana["setor"], "Compras")  # setor vem do local no GLPI
+        self.assertEqual(ana["situacao"], "protegido")  # tem antivirus na maquina
+        self.assertEqual(ana["dispositivos"], "CPU-246")
+
+    def test_pessoa_so_no_glpi_com_maquina_fora_do_kaspersky(self):
+        Computador.objects.create(nome="CPU-301", usuario_glpi="Leticia Destefano", localizacao="Qualidade")
+        colaboradores, _ = self._colaboradores()
+        leticia = colaboradores["Leticia Destefano"]
+        self.assertEqual(leticia["situacao"], "sem-antivirus")
+        self.assertIn("sem registro no Kaspersky", leticia["dispositivos"])
+
+    def test_pessoa_so_no_glpi_com_duas_maquinas_vira_uma_linha(self):
+        for nome in ("CPU-205", "NOT-053"):
+            Computador.objects.create(nome=nome, usuario_glpi="Freire Eliane", localizacao="PCP")
+        colaboradores, _ = self._colaboradores()
+        eliane = colaboradores["Freire Eliane"]
+        self.assertIn("CPU-205", eliane["dispositivos"])
+        self.assertIn("NOT-053", eliane["dispositivos"])
+
     def test_computador_do_glpi_que_existe_no_kaspersky_nao_duplica(self):
         # Mesmo nome nos dois lados: vale o registro do Kaspersky.
         ramal = Ramal.objects.create(colaborador="Eva Dois Lados", setor="Fiscal")
