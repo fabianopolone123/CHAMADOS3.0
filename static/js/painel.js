@@ -807,9 +807,14 @@
             const menu = blocoMenu(
                 "NAVEGACAO",
                 [
-                    estado.dados.somente_leitura
-                        ? '<div class="pnl-fraco">[N] TABELA SO DE LEITURA</div>'
-                        : linhaMenu("N", "NOVO REGISTRO"),
+                    ...(estado.dados.acoes || []).map((a) => linhaMenu(a.tecla, a.rotulo)),
+                    ...((estado.dados.acoes || []).some((a) => a.tecla === "N")
+                        ? []
+                        : [
+                              estado.dados.somente_leitura
+                                  ? '<div class="pnl-fraco">[N] TABELA SO DE LEITURA</div>'
+                                  : linhaMenu("N", "NOVO REGISTRO"),
+                          ]),
                     linhaMenu("B", "BUSCAR"),
                     linhaMenu(".", "PROXIMA PAGINA"),
                     linhaMenu(",", "PAGINA ANTERIOR"),
@@ -823,6 +828,8 @@
         tecla(tecla) {
             if (tecla === "0") return irPara(estado.contexto.voltaDaTabela || "tabelas");
             if (tecla === "A") return recarregar();
+            const acaoTabela = acaoDisponivel(tecla);
+            if (acaoTabela) return executarAcao(acaoTabela);
             if (tecla === "N") return criarRegistro();
             if (tecla === "B") {
                 const filtro = busca("tabela");
@@ -897,9 +904,13 @@
                 `<div class="pnl-campos">${tabelaHTML(["CAMPO", "VALOR", "ACESSO"], linhas)}</div>`,
                 estado.dados.nota ? `<div class="pnl-info">${esc(estado.dados.nota.toUpperCase())}</div>` : "",
             ].join("");
+            const acoes = estado.dados.acoes || [];
             const menu = blocoMenu(
                 "ACOES",
                 [
+                    ...(acoes.length
+                        ? acoes.map((a) => linhaMenu(a.tecla, a.rotulo)).concat(['<div class="pnl-regua"></div>'])
+                        : []),
                     '<div class="pnl-fraco">DIGITE O NUMERO DO CAMPO</div>',
                     '<div class="pnl-fraco">PARA ALTERAR O VALOR.</div>',
                     '<div class="pnl-regua"></div>',
@@ -914,6 +925,8 @@
         tecla(tecla) {
             if (tecla === "0") return irPara("tabela");
             if (tecla === "A") return recarregar();
+            const acao = acaoDisponivel(tecla);
+            if (acao) return executarAcao(acao);
             if (tecla === "X") {
                 if (!estado.dados.pode_excluir) {
                     avisar("ESTA TABELA NAO PERMITE EXCLUSAO PELO PAINEL.", "erro");
@@ -939,6 +952,105 @@
         },
     };
 
+
+
+    /* --------------------------------------------------- acoes de fluxo ---- */
+
+    /* Acoes que a tela classica ja tem (abrir chamado, Play/Pause/Stop,
+       converter pendencia, aprovar orcamento...). O terminal NAO repete a
+       regra: pergunta o que falta e chama a mesma rota, mostrando a resposta.
+       Assim o chamado aberto por aqui nasce com evento na timeline e com a
+       notificacao por e-mail, igual ao Kanban. */
+
+    function acaoDisponivel(tecla) {
+        return (estado.dados.acoes || []).find((a) => a.tecla === String(tecla).toUpperCase());
+    }
+
+    function executarAcao(acao) {
+        const campos = acao.campos || [];
+        if (acao.confirma) {
+            pedirConfirmacao(acao.confirma, () => coletarCampos(acao, campos, 0, {}));
+            return;
+        }
+        coletarCampos(acao, campos, 0, {});
+    }
+
+    function coletarCampos(acao, campos, indice, valores) {
+        if (indice >= campos.length) {
+            enviarAcao(acao, valores);
+            return;
+        }
+        const campo = campos[indice];
+        const dica = campo.opcoes.length ? `OPCOES: ${campo.opcoes.join(" / ").toUpperCase()}` : campo.tipo;
+        avisar(`${acao.rotulo} — ${campo.rotulo}${campo.obrigatorio ? "" : " (OPCIONAL)"}`, "info");
+        desenhar();
+        pedirTexto(
+            campo.rotulo,
+            "",
+            (valor) => {
+                const texto = String(valor).trim();
+                if (campo.obrigatorio && !texto) {
+                    avisar(`${campo.rotulo} E OBRIGATORIO. ACAO CANCELADA.`, "erro");
+                    desenhar();
+                    return;
+                }
+                if (texto) {
+                    valores[campo.nome] = texto;
+                }
+                coletarCampos(acao, campos, indice + 1, valores);
+            },
+            true,
+            dica
+        );
+    }
+
+    function enviarAcao(acao, valores) {
+        const corpo = Object.assign({}, acao.payload || {}, valores);
+        estado.ocupado = true;
+        avisar("EXECUTANDO...", "info");
+        desenharStatus();
+
+        const opcoes =
+            acao.formato === "form"
+                ? {
+                      method: "POST",
+                      headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+                      body: new URLSearchParams(corpo),
+                  }
+                : {
+                      method: "POST",
+                      headers: {
+                          "Content-Type": "application/json",
+                          "X-CSRFToken": csrfToken(),
+                          "X-Requested-With": "XMLHttpRequest",
+                      },
+                      body: JSON.stringify(corpo),
+                  };
+
+        fetch(acao.url, opcoes)
+            .then(async (resposta) => {
+                const dados = await resposta.json().catch(() => ({}));
+                if (!resposta.ok || dados.ok === false) {
+                    throw new Error(dados.message || "A acao nao pode ser concluida.");
+                }
+                return dados;
+            })
+            .then((dados) => {
+                estado.ocupado = false;
+                avisar((dados.message || `${acao.rotulo}: CONCLUIDO.`).toUpperCase(), "ok");
+                // Criou algo? o terminal ja filtra a lista pelo registro novo,
+                // que fica na primeira linha, pronto para abrir.
+                const identificador = acao.busca_resposta ? dados[acao.busca_resposta] : "";
+                if (identificador) {
+                    estado.buscas.tabela = { termo: String(identificador), pagina: 0 };
+                }
+                return recarregar();
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
 
     /* ----------------------------------------------------- criar registro --- */
 

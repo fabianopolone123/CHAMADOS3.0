@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- Painel do Titular: **acoes de fluxo dos modulos** dentro do terminal (abrir chamado, Play/Pause/Stop, atribuir/devolver, criar pendencia, trocar prioridade, converter em chamado, aprovar orcamento, entregar/desaprovar/nao aprovar requisicao), cada uma chamando a **mesma rota da tela classica** para nao duplicar regra; `core/painel_acoes.py`; testes novos em `PainelTitularTests` (17 casos no total)
+
 - Painel do Titular: area **[5] MODULOS** (entra em cada botao do menu e opera as tabelas daquele modulo por ali) e **criacao de registro** pelo terminal, perguntando campo a campo os obrigatorios; `core/painel_modulos.py`; testes novos em `PainelTitularTests` (13 casos no total)
 
 - **Painel do Titular** em `/painel/`: terminal de administracao por teclado (estilo sistema de banco), so para `fabiano.polone`, com as areas Interface (menu lateral configuravel), Usuarios, Dados (27 tabelas) e Operacao, tudo auditado em `PainelAuditoria`; menu lateral passou a ser dinamico (`core/menu.py` + `ItemMenuConfig`, migration `0052`); testes `PainelTitularTests` (9 casos)

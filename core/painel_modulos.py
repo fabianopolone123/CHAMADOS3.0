@@ -32,12 +32,12 @@ MODULOS: tuple[ModuloPainel, ...] = (
     ModuloPainel(
         chave="chamados",
         tabelas=("chamados", "atendimentos", "mensagens", "eventos", "pendencias", "pausas"),
-        nota="Play/Pause/Stop e o arrastar do Kanban continuam na tela de Chamados.",
+        nota="O arrastar do Kanban e os anexos continuam na tela de Chamados.",
     ),
     ModuloPainel(
         chave="contratos",
         tabelas=("requisicoes", "orcamentos", "suborcamentos"),
-        nota="Fotos, documentos, aprovacao e as copias para WhatsApp/e-mail continuam na tela de Requisicoes.",
+        nota="Fotos, documentos e as copias para WhatsApp/e-mail continuam na tela de Requisicoes.",
     ),
     ModuloPainel(
         chave="emprestimos",

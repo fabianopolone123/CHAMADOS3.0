@@ -4121,6 +4121,92 @@ class PainelTitularTests(TestCase):
             self._post(reverse("painel_registro_criar", args=["cofre"]), {"valores": {"rotulo": "X"}}).status_code, 400
         )
 
+    # --------------------------------------------------- acoes de fluxo ---
+    def _acoes(self, resposta):
+        """Mapa TECLA -> acao, do jeito que o terminal recebe."""
+        return {a["tecla"]: a for a in resposta.json()["acoes"]}
+
+    def test_abrir_chamado_pelo_terminal_segue_a_regra_do_kanban(self):
+        self.client.force_login(self.titular)
+
+        acoes = self._acoes(self.client.get(reverse("painel_tabela", args=["chamados"])))
+        # O [N] generico (que escreveria direto na tabela) da lugar a abertura
+        # de verdade, pela mesma rota do Kanban.
+        self.assertEqual(acoes["N"]["url"], reverse("create_ticket_kanban"))
+        self.assertEqual(acoes["N"]["formato"], "form")
+        self.assertEqual([c["nome"] for c in acoes["N"]["campos"]], ["titulo", "descricao"])
+
+        resposta = self.client.post(
+            acoes["N"]["url"],
+            data={"titulo": "Impressora parada", "descricao": "Nao imprime desde ontem."},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 200)
+        chamado = Chamado.objects.get(numero=resposta.json()["ticket_number"])
+        # O que a criacao generica nao faria: evento na linha do tempo.
+        self.assertTrue(chamado.eventos.filter(tipo=ChamadoEvento.TIPO_CRIACAO).exists())
+
+    def test_acoes_do_chamado_aparecem_e_somem_conforme_o_estado(self):
+        self.client.force_login(self.titular)
+        self.titular.groups.add(self.attendant_group)
+        chamado = Chamado.objects.create(
+            numero="CH-000900",
+            titulo="Chamado de teste",
+            descricao="Descricao do chamado de teste.",
+            status=Chamado.STATUS_ATRIBUIDO,
+            atendente_atual=self.titular,
+        )
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["chamados", chamado.pk])))
+        self.assertEqual(set(acoes), {"P", "U", "F", "M", "D"})
+        self.assertEqual(acoes["P"]["payload"], {"ticket_number": chamado.numero})
+        self.assertEqual(acoes["F"]["payload"]["action"], AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP)
+
+        # Play e Stop pela mesma rota da tela classica: o periodo de atendimento
+        # nasce e fecha, e o chamado termina fechado.
+        self.assertEqual(self._post(acoes["P"]["url"], acoes["P"]["payload"]).status_code, 200)
+        self.assertTrue(AtendimentoHistorico.objects.filter(chamado=chamado, finalizado_em__isnull=True).exists())
+
+        corpo = dict(acoes["F"]["payload"], description="Trocado o cabo de rede.")
+        self.assertEqual(self._post(acoes["F"]["url"], corpo).status_code, 200)
+        chamado.refresh_from_db()
+        self.assertIn(chamado.status, Chamado.STATUS_ENCERRADOS)
+
+        # Chamado encerrado nao oferece mais Play/Pause/Stop nem movimentacao.
+        depois = self._acoes(self.client.get(reverse("painel_registro", args=["chamados", chamado.pk])))
+        self.assertEqual(depois, {})
+
+    def test_acoes_da_pendencia_perguntam_a_prioridade_que_a_rota_espera(self):
+        self.client.force_login(self.titular)
+
+        criar = self._acoes(self.client.get(reverse("painel_tabela", args=["pendencias"])))["N"]
+        self.assertEqual(criar["url"], reverse("pendencia_create"))
+        # A rota exige descricao, entao o terminal tambem exige.
+        self.assertTrue(all(c["obrigatorio"] for c in criar["campos"] if c["nome"] != "prioridade"))
+        # Prioridade da pendencia e o numero da cor (1..5), nao o nome usado no chamado.
+        prioridade = next(c for c in criar["campos"] if c["nome"] == "prioridade")
+        self.assertEqual(prioridade["opcoes"], [str(v) for v, _ in PendenciaTI.PRIORIDADE_CHOICES])
+
+        resposta = self._post(criar["url"], {"titulo": "Trocar switch", "descricao": "Sala dos servidores.", "prioridade": "1"})
+        self.assertEqual(resposta.status_code, 200)
+        pendencia = PendenciaTI.objects.get(pk=resposta.json()["pendencia_id"])
+        self.assertEqual(pendencia.prioridade, 1)
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["pendencias", pendencia.pk])))
+        self.assertEqual(set(acoes), {"R", "C"})
+        self.assertEqual(acoes["C"]["url"], reverse("pendencia_convert", args=[pendencia.pk]))
+
+        # Convertida vira historico: nada mais a fazer por aqui.
+        pendencia.convertido_em_chamado = True
+        pendencia.save(update_fields=["convertido_em_chamado"])
+        self.assertEqual(
+            self._acoes(self.client.get(reverse("painel_registro", args=["pendencias", pendencia.pk]))), {}
+        )
+
+    def test_tabela_sem_acao_de_fluxo_mantem_o_novo_registro_generico(self):
+        self.client.force_login(self.titular)
+        self.assertEqual(self.client.get(reverse("painel_tabela", args=["ips"])).json()["acoes"], [])
+
     # ----------------------------------------------------------- operacao --
     def test_operacao_e_trilha_de_auditoria(self):
         self.client.force_login(self.titular)
