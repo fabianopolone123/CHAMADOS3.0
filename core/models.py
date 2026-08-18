@@ -1905,3 +1905,86 @@ class EmailConfig(models.Model):
             if email and email.lower() not in {v.lower() for v in vistos}:
                 vistos.append(email)
         return vistos
+
+
+class ItemMenuConfig(models.Model):
+    """Ajuste do titular em um item do menu lateral de TI.
+
+    So existe linha para o item que foi alterado; o padrao de fabrica (rotulo,
+    ordem e icone) fica em `core/menu.py`. Restaurar o padrao e simplesmente
+    apagar a linha.
+    """
+
+    chave = models.CharField(max_length=40, unique=True)
+    rotulo = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="Rotulo escolhido pelo titular. Em branco usa o rotulo padrao.",
+    )
+    ordem = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Posicao no menu. Nulo usa a ordem padrao do catalogo.",
+    )
+    visivel = models.BooleanField(default=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["ordem", "chave"]
+        verbose_name = "Item do menu"
+        verbose_name_plural = "Itens do menu"
+
+    def __str__(self) -> str:
+        return f"{self.chave} ({'visivel' if self.visivel else 'oculto'})"
+
+
+class PainelAuditoria(models.Model):
+    """Trilha do que foi feito pelo Painel do Titular.
+
+    O painel altera dados de qualquer modulo, entao toda acao fica registrada:
+    quem fez, quando, em que area, o alvo e um resumo em texto. Nunca guardar
+    aqui senha, chave ou conteudo cifrado.
+    """
+
+    AREA_INTERFACE = "interface"
+    AREA_USUARIOS = "usuarios"
+    AREA_DADOS = "dados"
+    AREA_OPERACAO = "operacao"
+    AREA_CHOICES = [
+        (AREA_INTERFACE, "Interface"),
+        (AREA_USUARIOS, "Usuarios"),
+        (AREA_DADOS, "Dados"),
+        (AREA_OPERACAO, "Operacao"),
+    ]
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acoes_painel",
+    )
+    area = models.CharField(max_length=20, choices=AREA_CHOICES)
+    acao = models.CharField(max_length=60)
+    alvo = models.CharField(max_length=200, blank=True, default="")
+    detalhe = models.TextField(blank=True, default="")
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+        verbose_name = "Acao do painel"
+        verbose_name_plural = "Acoes do painel"
+
+    def __str__(self) -> str:
+        return f"{self.get_area_display()} · {self.acao}"
+
+    @classmethod
+    def registrar(cls, usuario, area: str, acao: str, alvo: str = "", detalhe: str = "") -> "PainelAuditoria":
+        return cls.objects.create(
+            usuario=usuario if getattr(usuario, "is_authenticated", False) else None,
+            area=area,
+            acao=acao[:60],
+            alvo=(alvo or "")[:200],
+            detalhe=detalhe or "",
+        )

@@ -122,6 +122,19 @@
 | `/historico/` | GET | Tela de consulta do historico de atendimentos | Implementada |
 | `/historico/buscar/` | GET | Busca dinamica no historico com recorte por permissao | Implementada |
 | `/dashboard/` | GET | Redirecionamento por perfil (Kanban para TI, portal para usuario comum) | Implementada |
+| `/painel/` | GET | Painel do Titular: terminal de administracao (apenas `fabiano.polone`) | Implementada |
+| `/painel/api/estado/` | GET | Numeros da tela inicial do painel (chamados, atendimentos, pausas, usuarios, menu) | Implementada |
+| `/painel/api/interface/` | GET | Itens do menu lateral com rotulo, ordem e visibilidade atuais | Implementada |
+| `/painel/api/interface/salvar/` | POST | Esconde/mostra, renomeia, move ou restaura item do menu (`restaurar_tudo` volta ao padrao) | Implementada |
+| `/painel/api/usuarios/` | GET | Lista paginada de usuarios com perfil, situacao e ultimo acesso (busca por `q`) | Implementada |
+| `/painel/api/usuarios/<id>/` | POST | Alterna grupo Administrador/Atendente TI ou ativa/desativa a conta (titular recusado com `409`) | Implementada |
+| `/painel/api/dados/` | GET | Catalogo das tabelas do painel com a contagem de registros | Implementada |
+| `/painel/api/dados/<chave>/` | GET | Lista paginada de uma tabela (busca por `q`) | Implementada |
+| `/painel/api/dados/<chave>/<pk>/` | GET | Campos de um registro, com tipo e se e editavel | Implementada |
+| `/painel/api/dados/<chave>/<pk>/alterar/` | POST | Altera um campo do registro (auditado) | Implementada |
+| `/painel/api/dados/<chave>/<pk>/excluir/` | POST | Exclui o registro (auditado) | Implementada |
+| `/painel/api/operacao/` | GET | Estado do servidor, Play em aberto, pausas pendentes e trilha do painel | Implementada |
+| `/painel/api/operacao/acao/` | POST | Roda `pausar_expediente` (ou simulacao), `clearsessions` ou o `check` do Django | Implementada |
 | `/permissoes/` | GET | Gestao inicial de grupos e perfis | Implementada |
 | `/permissoes/<user_id>/toggle-atendente/` | POST | Adiciona ou remove o grupo `Atendente TI` | Implementada |
 | `/logout/` | GET | Encerra a sessao do usuario | Implementada |
@@ -320,6 +333,14 @@
 - O comando `python manage.py pausar_expediente` (agendado no servidor para 17:45) fecha os atendimentos com Play aberto, grava o fim no proprio horario do corte, deixa a descricao vazia e abre uma `PausaAutomatica` pendente. Opcoes: `--hora HH:MM` e `--dry-run`.
 - Enquanto o atendente tiver pausa pendente, `/chamados/atendimento/iniciar/` e `/chamados/atendimento/encerrar/` (Pause e Stop) respondem `409` com `pausas_pendentes` e `pausa_pendente_id` no JSON; o frontend usa isso para abrir o modal de preenchimento em vez de so mostrar o aviso. A trava e por atendente.
 - `/chamados/pausas-pendentes/` devolve `total` e a lista (chamado, titulo, dia, inicio, fim, duracao). `/chamados/pausas-pendentes/<id>/complementar/` aceita `POST` JSON com `description` (obrigatorio), grava no atendimento, registra o evento `complemento_pausa` e devolve `restantes`/`liberado`. Cada atendente so complementa as **proprias** pausas (`404` para as de outro) e uma pausa ja complementada responde `409`.
+
+## Regras do Painel do Titular
+
+- Todas as rotas `/painel/...` passam por `titular_required`: exigem login e que o usuario seja o titular (`fabiano.polone`). Outro usuario recebe redirecionamento na pagina e `403` nas rotas JSON — inclusive administrador e superusuario.
+- A pagina usa `ensure_csrf_cookie` (a tela e montada por JavaScript e nao tem formulario proprio); as rotas que gravam sao `POST` com corpo JSON e CSRF.
+- As rotas de leitura sao `GET` e as de escrita `POST` (`require_GET` / `require_POST`).
+- As rotas de dados nunca devolvem campo de segredo (senha, hash, cifrado, token) nem permitem editar arquivo/imagem; tabela marcada como somente leitura recusa alteracao e exclusao com `400`.
+- Toda rota que grava registra a acao em `PainelAuditoria`.
 
 ## Regras das rotas de historico
 

@@ -1,0 +1,940 @@
+/* Painel do Titular — terminal de administracao do sistema.
+
+   Navegacao no estilo dos terminais de banco: a tecla executa na hora, sem
+   ENTER e sem setas; ESC volta um nivel de cada vez; a ultima linha da janela e
+   a barra de status, que mostra o que esta sendo digitado e o aviso da ultima
+   acao. O ENTER so aparece em campo de texto livre (busca, rotulo, valor de
+   campo), onde nao ha como adivinhar o fim do que se digita.
+
+   O clique do mouse funciona como atalho de cortesia (mesma acao da tecla),
+   mas nada aqui depende dele.
+
+   Telas: principal -> interface | usuarios | dados (tabelas -> tabela ->
+   registro) | operacao. Cada tela carrega os proprios dados de `/painel/api/`.
+*/
+"use strict";
+
+(function () {
+    const raiz = document.querySelector(".pnl");
+    if (!raiz) {
+        return;
+    }
+
+    const URLS = {
+        estado: raiz.dataset.urlEstado,
+        interface: raiz.dataset.urlInterface,
+        interfaceSalvar: raiz.dataset.urlInterfaceSalvar,
+        usuarios: raiz.dataset.urlUsuarios,
+        usuarioAcao: raiz.dataset.urlUsuarioAcao,
+        tabelas: raiz.dataset.urlTabelas,
+        tabela: raiz.dataset.urlTabela,
+        registro: raiz.dataset.urlRegistro,
+        registroAlterar: raiz.dataset.urlRegistroAlterar,
+        registroExcluir: raiz.dataset.urlRegistroExcluir,
+        operacao: raiz.dataset.urlOperacao,
+        operacaoAcao: raiz.dataset.urlOperacaoAcao,
+        saida: raiz.dataset.urlSaida,
+    };
+    const OPERADOR = (raiz.dataset.operador || "").toUpperCase();
+
+    const $tela = document.getElementById("pnl-tela");
+    const $status = document.getElementById("pnl-status");
+    const $cabecalho = document.getElementById("pnl-cabecalho");
+
+    /* ------------------------------------------------------------ apoio -- */
+
+    const esc = (valor) =>
+        String(valor == null ? "" : valor).replace(/[&<>"]/g, (c) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+        }[c]));
+
+    const num = (valor, casas = 2) => String(valor).padStart(casas, "0");
+
+    function csrfToken() {
+        const campo = raiz.querySelector("input[name=csrfmiddlewaretoken]");
+        if (campo && campo.value) {
+            return campo.value;
+        }
+        const parte = document.cookie.split("; ").find((c) => c.startsWith("csrftoken="));
+        return parte ? decodeURIComponent(parte.split("=")[1]) : "";
+    }
+
+    function url(molde, chave, pk) {
+        return molde.replace("__CHAVE__", encodeURIComponent(chave)).replace("__PK__", encodeURIComponent(pk));
+    }
+
+    async function obter(endereco) {
+        const resposta = await fetch(endereco, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const dados = await resposta.json().catch(() => ({ ok: false, message: "Resposta ilegivel do servidor." }));
+        if (!resposta.ok || !dados.ok) {
+            throw new Error(dados.message || "Falha ao consultar o servidor.");
+        }
+        return dados;
+    }
+
+    async function enviar(endereco, corpo) {
+        const resposta = await fetch(endereco, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            body: JSON.stringify(corpo || {}),
+        });
+        const dados = await resposta.json().catch(() => ({ ok: false, message: "Resposta ilegivel do servidor." }));
+        if (!resposta.ok || !dados.ok) {
+            throw new Error(dados.message || "Falha ao gravar.");
+        }
+        return dados;
+    }
+
+    /* ------------------------------------------------------------ estado -- */
+
+    const estado = {
+        tela: "principal",
+        aviso: "",
+        avisoTipo: "info",
+        buffer: "",
+        selecionado: null,
+        entrada: null, // {rotulo, valor, livre, aoConfirmar}
+        confirma: null, // {texto, aoSim}
+        dados: {},
+        contexto: { tabela: null, rotuloTabela: "", pk: null, saida: [] },
+        // Busca e pagina sao por tela: entrar em DADOS nao herda a busca feita
+        // em USUARIOS, e voltar do registro para a lista preserva o filtro.
+        buscas: { usuarios: { termo: "", pagina: 0 }, tabela: { termo: "", pagina: 0 } },
+        ocupado: false,
+    };
+
+    function busca(tela) {
+        return estado.buscas[tela || estado.tela] || { termo: "", pagina: 0 };
+    }
+
+    function avisar(texto, tipo = "info") {
+        estado.aviso = texto || "";
+        estado.avisoTipo = tipo;
+    }
+
+    function falhar(erro) {
+        avisar(String(erro && erro.message ? erro.message : erro).toUpperCase(), "erro");
+        desenhar();
+    }
+
+    /* ---------------------------------------------------------- desenho --- */
+
+    function relogio() {
+        const agora = new Date();
+        const data = agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }).toUpperCase();
+        $cabecalho.textContent = `TERMINAL 01   OPERADOR: ${OPERADOR}   ${data}`;
+    }
+
+    function linhaMenu(tecla, texto) {
+        return `<div class="pnl-op" data-tecla="${esc(tecla)}"><span class="pnl-tecla">[${esc(tecla)}]</span> ${esc(texto)}</div>`;
+    }
+
+    function blocoMenu(titulo, linhas, rodape) {
+        return [
+            `<div class="pnl-titulo">${esc(titulo)}</div>`,
+            '<div class="pnl-regua"></div>',
+            `<div class="pnl-atalhos">${linhas.join("")}</div>`,
+            rodape ? `<div class="pnl-rot">${rodape}</div>` : "",
+        ].join("");
+    }
+
+    function tabelaHTML(colunas, linhas, opcoes = {}) {
+        if (!linhas.length) {
+            return `<div class="pnl-vazio">${esc(opcoes.vazio || "NADA A MOSTRAR.")}</div>`;
+        }
+        const cabecalho = colunas.map((c) => `<th>${esc(c)}</th>`).join("");
+        const corpo = linhas
+            .map((linha, indice) => {
+                const selecionada = estado.selecionado === indice + 1 ? " sel" : "";
+                const celulas = linha.map((valor) => `<td>${valor}</td>`).join("");
+                return `<tr class="pnl-item${selecionada}" data-linha="${indice + 1}"><td class="pnl-num">${num(indice + 1)}</td>${celulas}</tr>`;
+            })
+            .join("");
+        return `<table><thead><tr><th>N</th>${cabecalho}</tr></thead><tbody>${corpo}</tbody></table>`;
+    }
+
+    function desenhar() {
+        relogio();
+        const tela = TELAS[estado.tela];
+        const conteudo = tela.desenhar();
+        $tela.innerHTML = `<div class="pnl-lista">${conteudo.lista}</div><div class="pnl-menu">${conteudo.menu}</div>`;
+        desenharStatus();
+        ligarCliques();
+    }
+
+    function desenharStatus() {
+        if (estado.entrada) {
+            $status.innerHTML =
+                `<span class="pnl-tecla">${esc(estado.entrada.rotulo)}:</span>` +
+                `<input type="text" id="pnl-entrada" class="${estado.entrada.livre ? "pnl-livre" : ""}" autocomplete="off" spellcheck="false">` +
+                '<span class="pnl-fraco">ENTER CONFIRMA &nbsp; ESC CANCELA</span>';
+            const campo = document.getElementById("pnl-entrada");
+            campo.value = estado.entrada.valor || "";
+            campo.focus();
+            campo.select();
+            campo.addEventListener("keydown", teclaNaEntrada);
+            return;
+        }
+
+        if (estado.confirma) {
+            $status.innerHTML = `<span class="pnl-erro">${esc(estado.confirma.texto)} &nbsp; [S] SIM &nbsp; [N] NAO</span>`;
+            return;
+        }
+
+        const partes = [];
+        if (estado.buffer) {
+            partes.push(`<span class="pnl-buffer">LINHA: ${esc(estado.buffer)}_ &nbsp; ENTER ABRE &nbsp; ESC LIMPA</span>`);
+        } else if (estado.aviso) {
+            partes.push(`<span class="pnl-${esc(estado.avisoTipo)}">${esc(estado.aviso)}</span>`);
+        } else {
+            partes.push('<span class="pnl-fraco">PRONTO. DIGITE O NUMERO DA LINHA OU A TECLA DA ACAO.</span>');
+        }
+        $status.innerHTML = partes.join(" ");
+    }
+
+    function ligarCliques() {
+        $tela.querySelectorAll("[data-tecla]").forEach((elemento) => {
+            elemento.addEventListener("click", () => tratarTecla(elemento.dataset.tecla));
+        });
+        $tela.querySelectorAll("[data-linha]").forEach((elemento) => {
+            elemento.addEventListener("click", () => {
+                estado.buffer = "";
+                TELAS[estado.tela].escolher(parseInt(elemento.dataset.linha, 10));
+            });
+        });
+    }
+
+    /* --------------------------------------------------------- entradas --- */
+
+    function pedirTexto(rotulo, valorAtual, aoConfirmar, livre = false) {
+        estado.entrada = { rotulo: rotulo.toUpperCase(), valor: valorAtual || "", aoConfirmar, livre };
+        desenharStatus();
+    }
+
+    const ESPERA_CONFIRMACAO = 400; // ms
+
+    function pedirConfirmacao(texto, aoSim) {
+        estado.confirma = { texto: texto.toUpperCase(), aoSim, desde: Date.now() };
+        desenharStatus();
+    }
+
+    function teclaNaEntrada(evento) {
+        if (evento.key === "Enter") {
+            evento.preventDefault();
+            const valor = evento.target.value;
+            const acao = estado.entrada.aoConfirmar;
+            estado.entrada = null;
+            evento.stopPropagation();
+            acao(valor);
+            return;
+        }
+        if (evento.key === "Escape") {
+            evento.preventDefault();
+            estado.entrada = null;
+            avisar("CANCELADO.", "fraco");
+            desenharStatus();
+        }
+        evento.stopPropagation();
+
+    }
+
+    /* ----------------------------------------------------------- teclado -- */
+
+    function tratarTecla(bruta) {
+        if (estado.ocupado) {
+            // Requisicao em curso: a tecla e ignorada de proposito (enfileirar
+            // acabaria executando comando fora de contexto), mas o operador ve
+            // por que nada aconteceu.
+            avisar("PROCESSANDO... AGUARDE.", "info");
+            desenharStatus();
+            return;
+        }
+        const tecla = String(bruta || "").toUpperCase();
+
+        if (estado.confirma) {
+            if (Date.now() - estado.confirma.desde < ESPERA_CONFIRMACAO) {
+                return; // tecla que ja vinha sendo digitada nao confirma nada
+            }
+            if (tecla === "S") {
+                const acao = estado.confirma.aoSim;
+                estado.confirma = null;
+                acao();
+            } else if (tecla === "N" || tecla === "ESCAPE") {
+                estado.confirma = null;
+                avisar("CANCELADO.", "fraco");
+                desenhar();
+            }
+            return;
+        }
+
+        if (tecla === "ESCAPE") {
+            voltarUmNivel();
+            return;
+        }
+
+        if (/^[0-9]$/.test(tecla) && TELAS[estado.tela].totalLinhas) {
+            digitar(tecla);
+            return;
+        }
+
+        if (tecla === "ENTER") {
+            if (estado.buffer) {
+                const escolhido = parseInt(estado.buffer, 10);
+                estado.buffer = "";
+                TELAS[estado.tela].escolher(escolhido);
+            }
+            return;
+        }
+
+        TELAS[estado.tela].tecla(tecla);
+    }
+
+    function digitar(digito) {
+        const total = TELAS[estado.tela].totalLinhas();
+        const candidato = estado.buffer + digito;
+        const valor = parseInt(candidato, 10);
+
+        if (!valor || valor > total) {
+            // Numero fora da lista: nao acumula lixo no buffer.
+            if (estado.buffer === "" && TELAS[estado.tela].tecla(digito) !== false) {
+                return;
+            }
+            estado.buffer = "";
+            avisar("LINHA INEXISTENTE.", "erro");
+            desenharStatus();
+            return;
+        }
+
+        estado.buffer = candidato;
+        // Se nenhum outro numero da lista comeca por este, abre na hora.
+        if (valor * 10 > total) {
+            estado.buffer = "";
+            TELAS[estado.tela].escolher(valor);
+            return;
+        }
+        desenharStatus();
+    }
+
+    function voltarUmNivel() {
+        if (estado.entrada) {
+            estado.entrada = null;
+            avisar("CANCELADO.", "fraco");
+            desenhar();
+            return;
+        }
+        if (estado.buffer) {
+            estado.buffer = "";
+            desenharStatus();
+            return;
+        }
+        if (estado.selecionado !== null) {
+            estado.selecionado = null;
+            avisar("SELECAO LIMPA.", "fraco");
+            desenhar();
+            return;
+        }
+        const filtro = estado.buscas[estado.tela];
+        if (filtro && filtro.termo) {
+            filtro.termo = "";
+            filtro.pagina = 0;
+            recarregar();
+            return;
+        }
+
+        const anterior = TELAS[estado.tela].voltarPara;
+        if (!anterior) {
+            avisar("VOCE JA ESTA NA TELA INICIAL. USE 0 PARA ENCERRAR.", "erro");
+            desenharStatus();
+            return;
+        }
+        irPara(anterior);
+    }
+
+    function irPara(nome) {
+        estado.tela = nome;
+        estado.buffer = "";
+        estado.selecionado = null;
+        avisar("");
+        estado.ocupado = true;
+        TELAS[nome]
+            .carregar()
+            .then(() => {
+                estado.ocupado = false;
+                desenhar();
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
+
+    function recarregar() {
+        return TELAS[estado.tela].carregar().then(desenhar).catch(falhar);
+    }
+
+    /* ------------------------------------------------------- tela: principal */
+
+    const TELAS = {};
+
+    TELAS.principal = {
+        voltarPara: null,
+        carregar: async () => {
+            estado.dados = await obter(URLS.estado);
+        },
+        totalLinhas: () => 0,
+        escolher: () => {},
+        desenhar() {
+            const linhas = (estado.dados.linhas || [])
+                .map((l) => `<tr><td class="pnl-fraco">${esc(l.rotulo)}</td><td class="pnl-forte">${esc(l.valor)}</td></tr>`)
+                .join("");
+            const lista = [
+                '<div class="pnl-titulo">SITUACAO DO SISTEMA</div>',
+                '<div class="pnl-regua"></div>',
+                `<table>${linhas}</table>`,
+                '<div class="pnl-regua"></div>',
+                '<div class="pnl-fraco">ESCOLHA UMA AREA PELA TECLA CORRESPONDENTE.</div>',
+            ].join("");
+            const menu = blocoMenu(
+                "AREAS",
+                [
+                    linhaMenu("1", "INTERFACE DO SISTEMA"),
+                    linhaMenu("2", "USUARIOS E ACESSOS"),
+                    linhaMenu("3", "DADOS DOS MODULOS"),
+                    linhaMenu("4", "OPERACAO E MANUTENCAO"),
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "SAIR DO PAINEL"),
+                ],
+                "TITULAR: " + esc(OPERADOR)
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "1") return irPara("interface");
+            if (tecla === "2") return irPara("usuarios");
+            if (tecla === "3") return irPara("tabelas");
+            if (tecla === "4") return irPara("operacao");
+            if (tecla === "A") return recarregar();
+            if (tecla === "0") {
+                window.location.href = URLS.saida;
+                return;
+            }
+            return false;
+        },
+    };
+
+    /* ------------------------------------------------------- tela: interface */
+
+    TELAS.interface = {
+        voltarPara: "principal",
+        carregar: async () => {
+            estado.dados = await obter(URLS.interface);
+        },
+        totalLinhas: () => (estado.dados.itens || []).length,
+        escolher(linha) {
+            estado.selecionado = linha;
+            const item = estado.dados.itens[linha - 1];
+            avisar(`SELECIONADO: ${item.rotulo.toUpperCase()} — ESCOLHA A ACAO.`, "info");
+            desenhar();
+        },
+        desenhar() {
+            const linhas = (estado.dados.itens || []).map((item) => {
+                const rotulo = item.visivel
+                    ? `<span class="pnl-forte">${esc(item.rotulo)}</span>`
+                    : `<span class="pnl-oculto">${esc(item.rotulo)}</span>`;
+                const situacao = item.visivel ? "NO MENU" : '<span class="pnl-fraco">ESCONDIDO</span>';
+                const marca = item.alterado ? '<span class="pnl-alterado">ALTERADO</span>' : '<span class="pnl-fraco">PADRAO</span>';
+                return [rotulo, esc(item.chave), situacao, marca];
+            });
+            const lista = [
+                '<div class="pnl-titulo">INTERFACE — MENU LATERAL DE TI</div>',
+                '<div class="pnl-regua"></div>',
+                tabelaHTML(["ITEM", "CHAVE", "SITUACAO", "ESTADO"], linhas, { vazio: "SEM ITENS." }),
+                '<div class="pnl-regua"></div>',
+                '<div class="pnl-fraco">O QUE VOCE MUDAR AQUI VALE PARA TODA A EQUIPE, NA HORA.</div>',
+            ].join("");
+            const selecionado = estado.selecionado ? (estado.dados.itens || [])[estado.selecionado - 1] : null;
+            const acoes = selecionado
+                ? [
+                      `<div class="pnl-forte">${esc(selecionado.rotulo.toUpperCase())}</div>`,
+                      '<div class="pnl-regua"></div>',
+                      linhaMenu("V", selecionado.visivel ? "ESCONDER DO MENU" : "MOSTRAR NO MENU"),
+                      linhaMenu("+", "SUBIR NA LISTA"),
+                      linhaMenu("-", "DESCER NA LISTA"),
+                      linhaMenu("E", "EDITAR O ROTULO"),
+                      linhaMenu("R", "VOLTAR AO PADRAO"),
+                  ]
+                : ['<div class="pnl-fraco">DIGITE O NUMERO DE UM ITEM PARA AGIR SOBRE ELE.</div>'];
+            const menu = blocoMenu("ACOES", acoes.concat(['<div class="pnl-regua"></div>', linhaMenu("T", "RESTAURAR TUDO"), linhaMenu("A", "ATUALIZAR"), linhaMenu("0", "VOLTAR")]));
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("principal");
+            if (tecla === "A") return recarregar();
+            if (tecla === "T") {
+                pedirConfirmacao("RESTAURAR TODO O MENU PARA O PADRAO?", () => acaoInterface({ acao: "restaurar_tudo" }));
+                return;
+            }
+            if (estado.selecionado === null) {
+                return false;
+            }
+            const item = estado.dados.itens[estado.selecionado - 1];
+            if (tecla === "V") return acaoInterface({ acao: "visivel", chave: item.chave });
+            if (tecla === "+") return acaoInterface({ acao: "subir", chave: item.chave });
+            if (tecla === "-") return acaoInterface({ acao: "descer", chave: item.chave });
+            if (tecla === "R") return acaoInterface({ acao: "restaurar", chave: item.chave });
+            if (tecla === "E") {
+                pedirTexto(
+                    "NOVO ROTULO",
+                    item.rotulo,
+                    (valor) => acaoInterface({ acao: "rotulo", chave: item.chave, valor }),
+                    true
+                );
+                return;
+            }
+            return false;
+        },
+    };
+
+    function acaoInterface(corpo) {
+        estado.ocupado = true;
+        enviar(URLS.interfaceSalvar, corpo)
+            .then((dados) => {
+                estado.ocupado = false;
+                estado.dados = dados;
+                if (corpo.acao === "restaurar_tudo") {
+                    estado.selecionado = null;
+                } else if (corpo.acao === "subir" || corpo.acao === "descer") {
+                    // A linha selecionada acompanha o item que se moveu.
+                    const posicao = (dados.itens || []).findIndex((i) => i.chave === corpo.chave);
+                    estado.selecionado = posicao >= 0 ? posicao + 1 : null;
+                }
+                avisar((dados.message || "SALVO.").toUpperCase(), "ok");
+                desenhar();
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
+
+    /* -------------------------------------------------------- tela: usuarios */
+
+    TELAS.usuarios = {
+        voltarPara: "principal",
+        carregar: async () => {
+            const filtro = busca("usuarios");
+            const endereco = `${URLS.usuarios}?q=${encodeURIComponent(filtro.termo || "")}&pagina=${filtro.pagina || 0}`;
+            estado.dados = await obter(endereco);
+            filtro.pagina = estado.dados.pagina;
+        },
+        totalLinhas: () => (estado.dados.usuarios || []).length,
+        escolher(linha) {
+            estado.selecionado = linha;
+            const usuario = estado.dados.usuarios[linha - 1];
+            avisar(`SELECIONADO: ${usuario.usuario.toUpperCase()} — ESCOLHA A ACAO.`, "info");
+            desenhar();
+        },
+        desenhar() {
+            const linhas = (estado.dados.usuarios || []).map((u) => [
+                `<span class="pnl-forte">${esc(u.usuario)}</span>${u.titular ? ' <span class="pnl-alterado">(TITULAR)</span>' : ""}`,
+                esc(u.nome),
+                u.perfil === "COMUM" ? `<span class="pnl-fraco">COMUM</span>` : esc(u.perfil),
+                u.ativo ? "ATIVO" : '<span class="pnl-erro">INATIVO</span>',
+                esc(u.ultimo_acesso),
+            ]);
+            const lista = [
+                '<div class="pnl-titulo">USUARIOS E ACESSOS</div>',
+                '<div class="pnl-regua"></div>',
+                tabelaHTML(["USUARIO", "NOME", "PERFIL", "SITUACAO", "ULTIMO ACESSO"], linhas, { vazio: "NENHUM USUARIO ENCONTRADO." }),
+                '<div class="pnl-regua"></div>',
+                `<div class="pnl-fraco">${esc(estado.dados.total || 0)} CONTA(S) &nbsp; PAGINA ${(estado.dados.pagina || 0) + 1} DE ${estado.dados.paginas || 1}${busca("usuarios").termo ? " &nbsp; BUSCA: " + esc(busca("usuarios").termo.toUpperCase()) : ""}</div>`,
+            ].join("");
+            const selecionado = estado.selecionado ? (estado.dados.usuarios || [])[estado.selecionado - 1] : null;
+            const acoes = selecionado
+                ? [
+                      `<div class="pnl-forte">${esc(selecionado.usuario.toUpperCase())}</div>`,
+                      '<div class="pnl-regua"></div>',
+                      linhaMenu("M", selecionado.admin ? "TIRAR DE ADMINISTRADOR" : "TORNAR ADMINISTRADOR"),
+                      linhaMenu("T", selecionado.atendente ? "TIRAR DE ATENDENTE TI" : "TORNAR ATENDENTE TI"),
+                      linhaMenu("D", selecionado.ativo ? "DESATIVAR A CONTA" : "ATIVAR A CONTA"),
+                  ]
+                : ['<div class="pnl-fraco">DIGITE O NUMERO DE UMA LINHA PARA AGIR SOBRE A CONTA.</div>'];
+            const menu = blocoMenu(
+                "ACOES",
+                acoes.concat([
+                    '<div class="pnl-regua"></div>',
+                    linhaMenu("B", "BUSCAR"),
+                    linhaMenu(".", "PROXIMA PAGINA"),
+                    linhaMenu(",", "PAGINA ANTERIOR"),
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "VOLTAR"),
+                ]),
+                "A CONTA DO TITULAR NAO PODE SER ALTERADA AQUI."
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("principal");
+            if (tecla === "A") return recarregar();
+            if (tecla === "B") {
+                const filtro = busca("usuarios");
+                pedirTexto("BUSCAR USUARIO", filtro.termo, (valor) => {
+                    filtro.termo = valor.trim();
+                    filtro.pagina = 0;
+                    estado.selecionado = null;
+                    recarregar();
+                }, true);
+                return;
+            }
+            if (tecla === "." || tecla === ",") return paginar(tecla === ".");
+            if (estado.selecionado === null) {
+                return false;
+            }
+            const usuario = estado.dados.usuarios[estado.selecionado - 1];
+            const acoes = { M: "admin", T: "atendente", D: "ativo" };
+            if (!acoes[tecla]) {
+                return false;
+            }
+            const alvo = URLS.usuarioAcao.replace(/\/0\/$/, `/${usuario.pk}/`);
+            estado.ocupado = true;
+            enviar(alvo, { acao: acoes[tecla] })
+                .then((dados) => {
+                    estado.ocupado = false;
+                    avisar((dados.message || "SALVO.").toUpperCase(), "ok");
+                    return TELAS.usuarios.carregar();
+                })
+                .then(desenhar)
+                .catch((erro) => {
+                    estado.ocupado = false;
+                    falhar(erro);
+                });
+        },
+    };
+
+    function paginar(avancar) {
+        const paginas = estado.dados.paginas || 1;
+        const filtro = busca();
+        const destino = (filtro.pagina || 0) + (avancar ? 1 : -1);
+        if (destino < 0 || destino >= paginas) {
+            avisar(avancar ? "ULTIMA PAGINA." : "PRIMEIRA PAGINA.", "fraco");
+            desenharStatus();
+            return;
+        }
+        filtro.pagina = destino;
+        estado.selecionado = null;
+        recarregar();
+    }
+
+    /* --------------------------------------------------------- tela: dados -- */
+
+    TELAS.tabelas = {
+        voltarPara: "principal",
+        carregar: async () => {
+            estado.dados = await obter(URLS.tabelas);
+        },
+        totalLinhas: () => (estado.dados.tabelas || []).length,
+        escolher(linha) {
+            const tabela = estado.dados.tabelas[linha - 1];
+            estado.contexto.tabela = tabela.chave;
+            estado.contexto.rotuloTabela = tabela.rotulo;
+            estado.buscas.tabela = { termo: "", pagina: 0 };
+            irPara("tabela");
+        },
+        desenhar() {
+            const linhas = (estado.dados.tabelas || []).map((t) => [
+                `<span class="pnl-forte">${esc(t.rotulo)}</span>`,
+                esc(t.total),
+                t.somente_leitura ? '<span class="pnl-fraco">SO LEITURA</span>' : "EDITAVEL",
+            ]);
+            const lista = [
+                '<div class="pnl-titulo">DADOS DOS MODULOS</div>',
+                '<div class="pnl-regua"></div>',
+                tabelaHTML(["TABELA", "REGISTROS", "ACESSO"], linhas),
+                '<div class="pnl-regua"></div>',
+                '<div class="pnl-fraco">SENHAS, HASHES E TEXTOS CIFRADOS NAO APARECEM AQUI, EM NENHUMA TABELA.</div>',
+            ].join("");
+            const menu = blocoMenu("NAVEGACAO", [linhaMenu("A", "ATUALIZAR"), linhaMenu("0", "VOLTAR")], "DIGITE O NUMERO DA TABELA.");
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("principal");
+            if (tecla === "A") return recarregar();
+            return false;
+        },
+    };
+
+    TELAS.tabela = {
+        voltarPara: "tabelas",
+        carregar: async () => {
+            const filtro = busca("tabela");
+            const endereco = `${url(URLS.tabela, estado.contexto.tabela, "")}?q=${encodeURIComponent(filtro.termo || "")}&pagina=${filtro.pagina || 0}`;
+            estado.dados = await obter(endereco);
+            filtro.pagina = estado.dados.pagina;
+        },
+        totalLinhas: () => (estado.dados.linhas || []).length,
+        escolher(linha) {
+            const registro = estado.dados.linhas[linha - 1];
+            estado.contexto.pk = registro.pk;
+            irPara("registro");
+        },
+        desenhar() {
+            const linhas = (estado.dados.linhas || []).map((l) => [`<span class="pnl-fraco">#${esc(l.pk)}</span>`].concat(l.valores.map(esc)));
+            const lista = [
+                `<div class="pnl-titulo">${esc(estado.dados.rotulo || "")}</div>`,
+                '<div class="pnl-regua"></div>',
+                tabelaHTML(["ID"].concat(estado.dados.colunas || []), linhas, { vazio: "NENHUM REGISTRO." }),
+                '<div class="pnl-regua"></div>',
+                `<div class="pnl-fraco">${esc(estado.dados.total || 0)} REGISTRO(S) &nbsp; PAGINA ${(estado.dados.pagina || 0) + 1} DE ${estado.dados.paginas || 1}${busca("tabela").termo ? " &nbsp; BUSCA: " + esc(busca("tabela").termo.toUpperCase()) : ""}</div>`,
+                estado.dados.nota ? `<div class="pnl-info">${esc(estado.dados.nota.toUpperCase())}</div>` : "",
+            ].join("");
+            const menu = blocoMenu(
+                "NAVEGACAO",
+                [
+                    linhaMenu("B", "BUSCAR"),
+                    linhaMenu(".", "PROXIMA PAGINA"),
+                    linhaMenu(",", "PAGINA ANTERIOR"),
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "VOLTAR"),
+                ],
+                "DIGITE O NUMERO DA LINHA PARA ABRIR O REGISTRO."
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("tabelas");
+            if (tecla === "A") return recarregar();
+            if (tecla === "B") {
+                const filtro = busca("tabela");
+                pedirTexto("BUSCAR", filtro.termo, (valor) => {
+                    filtro.termo = valor.trim();
+                    filtro.pagina = 0;
+                    recarregar();
+                }, true);
+                return;
+            }
+            if (tecla === "." || tecla === ",") return paginar(tecla === ".");
+            return false;
+        },
+    };
+
+    TELAS.registro = {
+        voltarPara: "tabela",
+        carregar: async () => {
+            estado.dados = await obter(url(URLS.registro, estado.contexto.tabela, estado.contexto.pk));
+        },
+        totalLinhas: () => (estado.dados.campos || []).length,
+        escolher(linha) {
+            const campo = estado.dados.campos[linha - 1];
+            estado.selecionado = linha;
+            if (!campo.editavel) {
+                avisar(`${campo.rotulo}: CAMPO SO DE LEITURA.`, "erro");
+                desenhar();
+                return;
+            }
+            const dica = campo.opcoes.length ? ` (${campo.opcoes.join(" / ")})` : "";
+            avisar(`${campo.rotulo} — ${campo.tipo}${dica.toUpperCase()}`, "info");
+            desenhar();
+            pedirTexto(
+                campo.rotulo,
+                campo.valor === "-" ? "" : campo.valor,
+                (valor) => {
+                    estado.ocupado = true;
+                    enviar(url(URLS.registroAlterar, estado.contexto.tabela, estado.contexto.pk), {
+                        campo: campo.nome,
+                        valor,
+                    })
+                        .then((dados) => {
+                            estado.ocupado = false;
+                            estado.dados = dados;
+                            avisar((dados.message || "SALVO.").toUpperCase(), "ok");
+                            desenhar();
+                        })
+                        .catch((erro) => {
+                            estado.ocupado = false;
+                            falhar(erro);
+                        });
+                },
+                true
+            );
+        },
+        desenhar() {
+            const linhas = (estado.dados.campos || []).map((campo) => [
+                campo.editavel ? esc(campo.rotulo) : `<span class="pnl-fraco">${esc(campo.rotulo)}</span>`,
+                esc(campo.valor),
+                campo.editavel ? '<span class="pnl-fraco">EDITAVEL</span>' : '<span class="pnl-fraco">SO LEITURA</span>',
+            ]);
+            const lista = [
+                `<div class="pnl-titulo">${esc(estado.dados.rotulo || "")} &middot; REGISTRO #${esc(estado.dados.pk)}</div>`,
+                `<div class="pnl-forte">${esc(estado.dados.titulo || "")}</div>`,
+                '<div class="pnl-regua"></div>',
+                `<div class="pnl-campos">${tabelaHTML(["CAMPO", "VALOR", "ACESSO"], linhas)}</div>`,
+                estado.dados.nota ? `<div class="pnl-info">${esc(estado.dados.nota.toUpperCase())}</div>` : "",
+            ].join("");
+            const menu = blocoMenu(
+                "ACOES",
+                [
+                    '<div class="pnl-fraco">DIGITE O NUMERO DO CAMPO</div>',
+                    '<div class="pnl-fraco">PARA ALTERAR O VALOR.</div>',
+                    '<div class="pnl-regua"></div>',
+                    estado.dados.pode_excluir ? linhaMenu("X", "EXCLUIR O REGISTRO") : '<div class="pnl-fraco">[X] EXCLUSAO BLOQUEADA</div>',
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "VOLTAR"),
+                ],
+                "DATAS: DD/MM/AAAA &nbsp; SIM/NAO: S OU N &nbsp; VINCULO: ID"
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("tabela");
+            if (tecla === "A") return recarregar();
+            if (tecla === "X") {
+                if (!estado.dados.pode_excluir) {
+                    avisar("ESTA TABELA NAO PERMITE EXCLUSAO PELO PAINEL.", "erro");
+                    desenharStatus();
+                    return;
+                }
+                pedirConfirmacao(`EXCLUIR ${String(estado.dados.titulo || "").toUpperCase()}? NAO TEM VOLTA.`, () => {
+                    estado.ocupado = true;
+                    enviar(url(URLS.registroExcluir, estado.contexto.tabela, estado.contexto.pk), {})
+                        .then((dados) => {
+                            estado.ocupado = false;
+                            avisar((dados.message || "EXCLUIDO.").toUpperCase(), "ok");
+                            irPara("tabela");
+                        })
+                        .catch((erro) => {
+                            estado.ocupado = false;
+                            falhar(erro);
+                        });
+                });
+                return;
+            }
+            return false;
+        },
+    };
+
+    /* ------------------------------------------------------ tela: operacao -- */
+
+    TELAS.operacao = {
+        voltarPara: "principal",
+        carregar: async () => {
+            estado.dados = await obter(URLS.operacao);
+        },
+        totalLinhas: () => 0,
+        escolher: () => {},
+        desenhar() {
+            const sistema = (estado.dados.sistema || [])
+                .map((l) => `<tr><td class="pnl-fraco">${esc(l.rotulo)}</td><td class="pnl-forte">${esc(l.valor)}</td></tr>`)
+                .join("");
+            const abertos = (estado.dados.abertos || []).length
+                ? `<table><thead><tr><th>CHAMADO</th><th>ATENDENTE</th><th>DESDE</th><th>HORAS</th></tr></thead><tbody>${(estado.dados.abertos || [])
+                      .map(
+                          (a) =>
+                              `<tr><td>${esc(a.chamado)}</td><td>${esc(a.atendente)}</td><td>${esc(a.desde)}</td><td class="${a.horas > 12 ? "pnl-erro" : ""}">${esc(a.horas)}</td></tr>`
+                      )
+                      .join("")}</tbody></table>`
+                : '<div class="pnl-vazio">NENHUM PLAY ABERTO.</div>';
+            const auditoria = (estado.dados.auditoria || []).length
+                ? `<table><thead><tr><th>QUANDO</th><th>AREA</th><th>ACAO</th><th>ALVO</th></tr></thead><tbody>${(estado.dados.auditoria || [])
+                      .map((l) => `<tr><td>${esc(l.quando)}</td><td class="pnl-fraco">${esc(l.area)}</td><td>${esc(l.acao)}</td><td class="pnl-fraco">${esc(l.alvo)}</td></tr>`)
+                      .join("")}</tbody></table>`
+                : '<div class="pnl-vazio">NADA REGISTRADO AINDA.</div>';
+
+            const saida = (estado.contexto.saida || []).length
+                ? [
+                      '<div class="pnl-regua"></div>',
+                      '<div class="pnl-titulo">SAIDA DO ULTIMO COMANDO</div>',
+                      `<div class="pnl-pre pnl-fraco">${esc((estado.contexto.saida || []).join("\n"))}</div>`,
+                  ].join("")
+                : "";
+
+            const lista = [
+                '<div class="pnl-titulo">OPERACAO E MANUTENCAO</div>',
+                '<div class="pnl-regua"></div>',
+                `<div class="pnl-bloco"><table>${sistema}</table></div>`,
+                '<div class="pnl-regua"></div>',
+                `<div class="pnl-titulo">ATENDIMENTOS COM PLAY ABERTO &nbsp;<span class="pnl-fraco">(PAUSAS SEM COMPLEMENTO: ${esc(estado.dados.pausas_pendentes || 0)})</span></div>`,
+                abertos,
+                '<div class="pnl-regua"></div>',
+                '<div class="pnl-titulo">ULTIMAS ACOES NO PAINEL</div>',
+                auditoria,
+                saida,
+            ].join("");
+            const menu = blocoMenu(
+                "COMANDOS",
+                [
+                    linhaMenu("P", "PAUSAR O EXPEDIENTE"),
+                    linhaMenu("S", "SIMULAR A PAUSA"),
+                    linhaMenu("L", "LIMPAR SESSOES"),
+                    linhaMenu("V", "VERIFICAR O SISTEMA"),
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "VOLTAR"),
+                ],
+                "PAUSAR FECHA TODO PLAY ABERTO E ABRE A PENDENCIA DE COMPLEMENTO."
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("principal");
+            if (tecla === "A") {
+                estado.contexto.saida = [];
+                return recarregar();
+            }
+            const comandos = { S: "pausar_expediente_simulacao", L: "limpar_sessoes", V: "verificar" };
+            if (tecla === "P") {
+                pedirConfirmacao("PAUSAR AGORA TODOS OS ATENDIMENTOS COM PLAY ABERTO?", () => comandoOperacao("pausar_expediente"));
+                return;
+            }
+            if (comandos[tecla]) {
+                return comandoOperacao(comandos[tecla]);
+            }
+            return false;
+        },
+    };
+
+    function comandoOperacao(acao) {
+        estado.ocupado = true;
+        avisar("EXECUTANDO...", "info");
+        desenharStatus();
+        enviar(URLS.operacaoAcao, { acao })
+            .then((dados) => {
+                estado.ocupado = false;
+                estado.contexto.saida = dados.saida || [];
+                avisar((dados.message || "CONCLUIDO.").toUpperCase(), "ok");
+                return TELAS.operacao.carregar();
+            })
+            .then(desenhar)
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
+
+    /* ---------------------------------------------------------- inicio ----- */
+
+    document.addEventListener("keydown", (evento) => {
+        if (estado.entrada) {
+            return; // o proprio campo trata (ENTER confirma, ESC cancela)
+        }
+        if (evento.ctrlKey || evento.altKey || evento.metaKey) {
+            return; // atalhos do navegador seguem funcionando
+        }
+        const tecla = evento.key;
+        if (tecla === "Tab") {
+            return;
+        }
+        if (tecla.length === 1 || tecla === "Escape" || tecla === "Enter") {
+            evento.preventDefault();
+            tratarTecla(tecla === "Escape" ? "ESCAPE" : tecla === "Enter" ? "ENTER" : tecla);
+        }
+    });
+
+    setInterval(relogio, 30000);
+    irPara("principal");
+})();

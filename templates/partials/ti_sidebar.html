@@ -1,11 +1,25 @@
 {% comment %}
 Menu lateral padrao da area de TI (Atendente TI / Admin).
 Uso: {% include "partials/ti_sidebar.html" with active="chamados" %}
-Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimos", "emails", "ramais", "licencas", "ips", "servicos_feitos", "contratos_ti", "futura_digital", "dicas", "starlinks", "cofre", "email_config", "permissoes".
+
+Os itens vem de `menu_itens` (context processor `core.context_processors.ti_flags`),
+que resolve o catalogo de `core/menu.py` com os ajustes do Painel do Titular
+(rotulo, ordem e visibilidade). O valor de `active` continua sendo a chave do
+item (ex.: "chamados", "ramais", "cofre").
 {% endcomment %}
 <aside class="tickets-sidebar">
     <div class="sidebar-brand sidebar-brand--compact">
         <div class="system-mark">TI</div>
+        {% if is_titular_user %}
+        <a href="{% url 'painel_titular' %}" class="sidebar-painel" title="Painel do Titular" aria-label="Painel do Titular">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                <path d="M3 9h18"></path>
+                <path d="M7 13h5"></path>
+                <path d="M7 16h8"></path>
+            </svg>
+        </a>
+        {% endif %}
         <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false">
             <span class="sidebar-toggle__bar"></span>
             <span class="sidebar-toggle__bar"></span>
@@ -14,141 +28,12 @@ Valores de active: "chamados", "contratos", "insumos", "documentos", "emprestimo
     </div>
 
     <nav class="sidebar-menu">
-        <a href="{% url 'tickets_dashboard' %}" class="menu-link{% if active == 'chamados' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="4" width="6" height="16" rx="1.5"></rect>
-                <rect x="10.5" y="4" width="6" height="10" rx="1.5"></rect>
-                <rect x="18" y="4" width="3" height="16" rx="1.5"></rect>
-            </svg>
-            <span>Chamados</span>
+        {% for item in menu_itens %}
+        <a href="{% url item.url_name %}" class="menu-link{% if active == item.chave %} active{% endif %}">
+            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ item.icone }}</svg>
+            <span>{{ item.rotulo }}</span>
         </a>
-        <a href="{% url 'contratos_dashboard' %}" class="menu-link{% if active == 'contratos' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
-                <path d="M14 2v6h6"></path>
-                <path d="M9 13h6"></path>
-                <path d="M9 17h4"></path>
-            </svg>
-            <span>Requisicoes</span>
-        </a>
-        <a href="{% url 'emprestimos_dashboard' %}" class="menu-link{% if active == 'emprestimos' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="7" width="20" height="14" rx="2"></rect>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-            </svg>
-            <span>Emprestimos</span>
-        </a>
-        <a href="{% url 'documentos_dashboard' %}" class="menu-link{% if active == 'documentos' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M4 4a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"></path>
-                <path d="M13 2v6h6"></path>
-            </svg>
-            <span>Documentos</span>
-        </a>
-        <a href="{% url 'insumos_dashboard' %}" class="menu-link{% if active == 'insumos' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
-                <path d="m3.3 7 8.7 5 8.7-5"></path>
-                <path d="M12 22V12"></path>
-            </svg>
-            <span>Insumos</span>
-        </a>
-        <a href="{% url 'emails_dashboard' %}" class="menu-link{% if active == 'emails' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                <path d="m3 7 9 6 9-6"></path>
-            </svg>
-            <span>Emails</span>
-        </a>
-        <a href="{% url 'ramais_dashboard' %}" class="menu-link{% if active == 'ramais' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"></path>
-            </svg>
-            <span>Ramais</span>
-        </a>
-        <a href="{% url 'licencas_dashboard' %}" class="menu-link{% if active == 'licencas' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M7.5 12.5 3 17a2.83 2.83 0 0 0 4 4l4.5-4.5"></path>
-                <circle cx="16.5" cy="7.5" r="4.5"></circle>
-                <path d="m13.3 10.7-2.8 2.8"></path>
-                <path d="m9 13 2 2"></path>
-            </svg>
-            <span>Licencas</span>
-        </a>
-        <a href="{% url 'ips_dashboard' %}" class="menu-link{% if active == 'ips' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="2" y="3" width="20" height="8" rx="1.5"></rect>
-                <rect x="2" y="13" width="20" height="8" rx="1.5"></rect>
-                <path d="M6 7h.01"></path>
-                <path d="M6 17h.01"></path>
-                <path d="M10 7h8"></path>
-                <path d="M10 17h8"></path>
-            </svg>
-            <span>IPs</span>
-        </a>
-        <a href="{% url 'servicos_feitos_dashboard' %}" class="menu-link{% if active == 'servicos_feitos' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-            <span>Servicos feitos</span>
-        </a>
-        <a href="{% url 'contratos_ti_dashboard' %}" class="menu-link{% if active == 'contratos_ti' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
-                <path d="M14 2v6h6"></path>
-                <path d="M9 15l2 2 4-4"></path>
-            </svg>
-            <span>Contratos</span>
-        </a>
-        <a href="{% url 'futura_digital_dashboard' %}" class="menu-link{% if active == 'futura_digital' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M6 9V2h12v7"></path>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                <rect x="6" y="14" width="12" height="8" rx="1"></rect>
-            </svg>
-            <span>Futura Digital</span>
-        </a>
-        <a href="{% url 'dicas_dashboard' %}" class="menu-link{% if active == 'dicas' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 18h6"></path>
-                <path d="M10 22h4"></path>
-                <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1v.2h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"></path>
-            </svg>
-            <span>Dicas</span>
-        </a>
-        <a href="{% url 'starlinks_dashboard' %}" class="menu-link{% if active == 'starlinks' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M2 12a10 10 0 0 1 10-10"></path>
-                <path d="M5 15a6 6 0 0 1 6-6"></path>
-                <circle cx="6" cy="18" r="1.5"></circle>
-                <path d="M14 4l6 6-8 8"></path>
-            </svg>
-            <span>Starlinks</span>
-        </a>
-        <a href="{% url 'cofre_dashboard' %}" class="menu-link{% if active == 'cofre' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="11" width="18" height="11" rx="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                <circle cx="12" cy="16" r="1"></circle>
-            </svg>
-            <span>Cofre</span>
-        </a>
-        <a href="{% url 'email_config' %}" class="menu-link{% if active == 'email_config' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                <path d="m3 7 9 6 9-6"></path>
-                <circle cx="18" cy="6" r="3" fill="currentColor" stroke="none"></circle>
-            </svg>
-            <span>E-mail</span>
-        </a>
-        <a href="{% url 'permissions' %}" class="menu-link{% if active == 'permissoes' %} active{% endif %}">
-            <svg class="menu-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5l-8-3Z"></path>
-                <path d="m9 12 2 2 4-4"></path>
-            </svg>
-            <span>Permissoes</span>
-        </a>
+        {% endfor %}
     </nav>
 
     <div class="sidebar-footer">

@@ -21,6 +21,9 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 - Controle de permissao inicial deve preferir `Group` do Django antes de introduzir estruturas mais complexas.
 - Signals ficam em `core/signals.py`, registrados no `CoreConfig.ready()` (`apps.py`). Usar `post_delete` para limpar arquivos fisicos (`FileField`/`ImageField`) do `MEDIA_ROOT` quando o registro e apagado, evitando arquivos orfaos; a limpeza deve remover tambem diretorios vazios sem nunca ultrapassar o `MEDIA_ROOT`.
 
+- O menu lateral de TI e dinamico: o catalogo (chave, rota, rotulo padrao e icone SVG) fica em `core/menu.py` e os ajustes do titular em `ItemMenuConfig`. **Modulo novo entra no menu cadastrando o item em `core/menu.py`**, nunca escrevendo `<a>` a mao em `templates/partials/ti_sidebar.html`, que so itera `menu_itens`.
+- Telas de administracao que alteram dados de varios modulos (Painel do Titular) devem: restringir por `titular_required`, responder JSON, registrar toda escrita em `PainelAuditoria` e manter a lista de campos de segredo (`_CAMPO_SECRETO` em `core/painel_dados.py`) como barreira — nenhuma tela generica pode expor senha, hash ou texto cifrado.
+
 ## Configuracao e seguranca
 
 - Configuracoes sensiveis devem vir de variaveis de ambiente.

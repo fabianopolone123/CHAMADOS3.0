@@ -50,6 +50,18 @@ def is_attendant_user(user) -> bool:
     return user.groups.filter(name=ATTENDANT_GROUP_NAME).exists()
 
 
+def is_titular_user(user) -> bool:
+    """Titular do sistema: a unica conta que abre o Painel do Titular.
+
+    E o administrador principal (`PRIMARY_ADMIN_USERNAME`) e apenas ele — ser
+    superusuario ou estar no grupo Administrador nao basta, porque o painel
+    mexe na interface e nos dados de todos os modulos.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return (user.get_username() or "").lower() == PRIMARY_ADMIN_USERNAME.lower()
+
+
 def is_common_user(user) -> bool:
     """Usuario autenticado que nao e administrador nem atendente de TI."""
     if not user or not getattr(user, "is_authenticated", False):

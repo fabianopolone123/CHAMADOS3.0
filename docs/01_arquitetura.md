@@ -8,6 +8,9 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 
 - `chamados_ti`: configuracao principal do projeto
 - `core`: app unico que concentra autenticacao, rotas, Kanban, portal do solicitante, permissoes, historico e todos os modulos de TI. Modulos atuais: Requisicoes (nomes tecnicos internos com prefixo `Contrato`), Insumos, Documentos, Emprestimos (termo em PDF via `core/termo_pdf.py`), Emails, Ramais, Licencas, IPs, Servicos feitos, Contratos (`/contratos-ti/`, distinto de Requisicoes), Futura Digital, Dicas, Starlinks, Cofre (cifra em `core/crypto.py`) e E-mail (notificacoes SMTP em `core/emails.py`, senha cifrada)
+- `core/views_painel.py`: Painel do Titular — a tela `/painel/` e as rotas JSON `/painel/api/...` (interface, usuarios, dados, operacao), restritas ao titular
+- `core/painel_dados.py`: catalogo das tabelas do painel e camada generica de leitura/alteracao/exclusao montada sobre o `_meta` dos modelos, com bloqueio de campos de segredo e de arquivos
+- `core/menu.py`: catalogo do menu lateral de TI (chave, rota, rotulo padrao, icone) e resolucao com os ajustes de `ItemMenuConfig`
 - `core/crypto.py`: cifra simetrica (Fernet) do Cofre de senhas e da senha de app do e-mail; a chave vem de `VAULT_ENCRYPTION_KEY` (env)
 - `core/emails.py`: notificacoes de chamado por e-mail (SMTP a partir da `EmailConfig`); envio fail-safe (falha nunca quebra o chamado)
 - `core/planilha_atendimentos.py`: gera a planilha mensal de atendimentos (.xlsx) a partir do modelo versionado em `core/planilhas/modelo_atendimentos.xlsx`, usando openpyxl
@@ -15,7 +18,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - `templates/chamados`: templates das telas autenticadas (Kanban, portal e cada modulo)
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
 - `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral, e um CSS por modulo)
-- `static/js`: um script por modulo (ex.: `chamados.js`, `ramais.js`, `ips.js`, `futura_digital.js`, `cofre.js`, etc.) alem de `sidebar.js` (menu responsivo) e `notifications.js` (toasts)
+- `static/js`: um script por modulo (ex.: `chamados.js`, `ramais.js`, `ips.js`, `futura_digital.js`, `cofre.js`, `painel.js`, etc.) alem de `sidebar.js` (menu responsivo) e `notifications.js` (toasts)
 - `seed/`: arquivos locais de seed com dados/credenciais reais, IGNORADOS pelo Git (nao versionados)
 - `media/`: uploads e anexos, tambem fora de versionamento
 - `.env`: configuracao sensivel de ambiente (inclui `VAULT_ENCRYPTION_KEY`), fora de versionamento

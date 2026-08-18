@@ -137,6 +137,23 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 
 Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem refeitos do zero. As regras antigas deles sairam deste documento (o historico esta no `docs/06_changelog.md`). Os **dados e os models tambem foram apagados** (migration `0050`): eram 83 computadores do GLPI, 44 dispositivos do Kaspersky e os vinculos feitos a mao. Foi decisao consciente de comecar do zero; ha backup do banco de producao de 30/07/2026 no servidor. Os arquivos de origem (CSV do GLPI e export.txt do Kaspersky) reconstroem a lista quando os modulos forem refeitos - o que nao volta sao os ajustes manuais. O **casamento de nome com os Ramais** continua valendo, porque a planilha mensal de atendimentos usa para achar o setor do solicitante e o telefone do atendente.
 
+## Regras atuais do Painel do Titular
+
+- O painel (`/painel/`) e **exclusivo do titular**: apenas o usuario `fabiano.polone` (`PRIMARY_ADMIN_USERNAME`). Ser superusuario ou pertencer ao grupo Administrador **nao** da acesso, porque o painel mexe na interface e nos dados de todos os modulos.
+- O botao de entrada fica ao lado da marca "TI" na barra lateral e so e renderizado para o titular.
+- A navegacao e de terminal: a tecla executa na hora (sem ENTER e sem setas), ESC volta um nivel de cada vez (entrada de texto -> numero digitado -> selecao -> busca -> tela anterior) e o ENTER so vale em campo de texto livre. O clique do mouse repete a mesma acao da tecla.
+- **Toda acao que grava** (interface, usuarios, dados, operacao) e registrada em `PainelAuditoria`, com quem fez, quando, o alvo e o antes/depois.
+- **Interface**: o titular pode esconder, renomear e reordenar os itens do menu lateral de TI; a mudanca vale para toda a equipe na proxima carga de pagina. "Voltar ao padrao" apaga o ajuste do item e "restaurar tudo" apaga todos, devolvendo o catalogo de fabrica (`core/menu.py`).
+- **Usuarios**: da e tira os grupos Administrador e Atendente TI e ativa/desativa a conta. Tirar de Administrador tambem tira `is_staff`/`is_superuser`. **A conta do titular nao pode ser alterada pelo painel** (responde `409`), para nao existir caminho de auto-rebaixamento.
+- **Dados**: lista, busca, abre, altera campo a campo e exclui registros das tabelas do catalogo. Regras fixas desta area:
+  - campos de segredo (senha, hash, texto cifrado, token) **nunca** aparecem nem podem ser alterados — as credenciais do Cofre continuam so no Cofre, com a senha-mestra;
+  - arquivos e imagens aparecem so pelo nome e nao sao editaveis (upload continua pela tela do modulo, que trata o disco);
+  - `id` e campos automaticos (`auto_now`, `auto_now_add`) sao somente leitura;
+  - tabelas marcadas como somente leitura (eventos de chamado, auditorias, Cofre) nao aceitam alteracao nem exclusao;
+  - o valor digitado segue o padrao brasileiro: data `DD/MM/AAAA`, data e hora `DD/MM/AAAA HH:MM`, booleano `S`/`N`, vinculo pelo ID do registro.
+- **Operacao**: mostra o estado do servidor (Python/Django, banco, migracoes, tamanho do `media`, DEBUG, hora), os atendimentos com Play em aberto, as pausas sem complemento e a trilha do painel; executa `pausar_expediente` (com confirmacao) e sua simulacao, `clearsessions` e o `check` do Django.
+- Acoes destrutivas pedem confirmacao S/N e a confirmacao ignora teclas nos primeiros instantes, para que uma digitacao rapida nao confirme sozinha.
+
 ## Regras atuais de permissao
 
 1. O usuario `fabiano.polone` deve ser administrador principal do sistema.

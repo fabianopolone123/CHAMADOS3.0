@@ -1,0 +1,285 @@
+/* Painel do Titular — terminal de administracao.
+
+   Visual de terminal de banco: monoespacado, fundo escuro, bordas duplas, tudo
+   em caixa alta e barra de status na ultima linha. Tudo fica sob `.pnl` para
+   nao vazar para o resto do sistema (que segue no Bootstrap); no `body` a
+   classe `painel-body` troca o fundo da pagina inteira. */
+
+:root {
+    --pnl-fundo: #05080a;
+    --pnl-painel: #0a1014;
+    --pnl-linha: #1d3a2c;
+    --pnl-texto: #b9e4c4;
+    --pnl-fraco: #5f7d6b;
+    --pnl-forte: #eafff0;
+    --pnl-alerta: #ff6b6b;
+    --pnl-destaque: #ffc857;
+    --pnl-ok: #6ee7a0;
+    --pnl-info: #67d5ff;
+}
+
+body.painel-body {
+    background: var(--pnl-fundo);
+    color: var(--pnl-texto);
+    font-family: ui-monospace, "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 14px;
+    line-height: 1.45;
+    padding: 10px;
+    min-height: 100vh;
+}
+
+.pnl {
+    border: 3px double var(--pnl-linha);
+    background: var(--pnl-painel);
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 20px);
+}
+
+.pnl a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ---------------------------------------------------------------- topo --- */
+
+.pnl-topo {
+    border-bottom: 3px double var(--pnl-linha);
+    padding: 6px 10px;
+    text-align: center;
+}
+
+.pnl-topo b {
+    color: var(--pnl-forte);
+    letter-spacing: 2px;
+}
+
+.pnl-topo small {
+    display: block;
+    color: var(--pnl-fraco);
+}
+
+/* --------------------------------------------------------------- corpo --- */
+
+.pnl-corpo {
+    display: flex;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.pnl-lista {
+    flex: 1 1 auto;
+    padding: 8px 10px;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.pnl-menu {
+    flex: 0 0 250px;
+    border-left: 3px double var(--pnl-linha);
+    padding: 8px 10px;
+}
+
+.pnl-titulo {
+    color: var(--pnl-forte);
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.pnl-regua {
+    border-top: 1px solid var(--pnl-linha);
+    margin: 6px 0;
+}
+
+.pnl-fraco {
+    color: var(--pnl-fraco);
+}
+
+.pnl-forte {
+    color: var(--pnl-forte);
+}
+
+.pnl-pre {
+    white-space: pre-wrap;
+}
+
+/* -------------------------------------------------------------- tabela --- */
+
+.pnl table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pnl th {
+    text-align: left;
+    color: var(--pnl-fraco);
+    font-weight: normal;
+    padding: 2px 6px 2px 4px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--pnl-linha);
+}
+
+.pnl td {
+    padding: 2px 6px 2px 4px;
+    vertical-align: top;
+    max-width: 34ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pnl tr.pnl-item {
+    cursor: pointer;
+}
+
+.pnl tr.pnl-item:hover td {
+    background: #12211a;
+}
+
+.pnl tr.pnl-item.sel td {
+    background: #16281f;
+    color: var(--pnl-forte);
+}
+
+.pnl-num {
+    color: var(--pnl-destaque);
+    width: 42px;
+}
+
+.pnl-vazio {
+    color: var(--pnl-fraco);
+    padding: 10px 4px;
+}
+
+/* --------------------------------------------------------------- menu ---- */
+
+.pnl-menu div {
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pnl-op {
+    cursor: pointer;
+}
+
+.pnl-op:hover {
+    color: var(--pnl-forte);
+}
+
+.pnl-tecla {
+    color: var(--pnl-destaque);
+}
+
+.pnl-rot {
+    color: var(--pnl-fraco);
+    margin-top: 10px;
+}
+
+/* ------------------------------------------------------------- estados --- */
+
+.pnl-ok {
+    color: var(--pnl-ok);
+}
+
+.pnl-erro {
+    color: var(--pnl-alerta);
+}
+
+.pnl-info {
+    color: var(--pnl-info);
+}
+
+.pnl-oculto {
+    color: var(--pnl-fraco);
+    text-decoration: line-through;
+}
+
+.pnl-alterado {
+    color: var(--pnl-destaque);
+}
+
+/* --------------------------------------------------------- barra status -- */
+
+.pnl-status {
+    border-top: 3px double var(--pnl-linha);
+    padding: 5px 10px;
+    color: var(--pnl-fraco);
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pnl-status input {
+    flex: 1 1 auto;
+    background: transparent;
+    border: none;
+    color: var(--pnl-destaque);
+    font: inherit;
+    text-transform: uppercase;
+    padding: 0;
+    caret-color: var(--pnl-destaque);
+}
+
+.pnl-status input:focus {
+    outline: none;
+}
+
+.pnl-status input.pnl-livre {
+    text-transform: none;
+}
+
+.pnl-buffer {
+    color: var(--pnl-destaque);
+}
+
+/* --------------------------------------------------------------- campos -- */
+
+.pnl-campos td:nth-child(3) {
+    color: var(--pnl-forte);
+    white-space: pre-wrap;
+    max-width: 60ch;
+}
+
+.pnl-bloco {
+    margin-bottom: 10px;
+}
+
+.pnl-colunas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 0 20px;
+}
+
+/* --------------------------------------------------------- responsivo ---- */
+
+@media (max-width: 900px) {
+    body.painel-body {
+        font-size: 13px;
+        padding: 4px;
+    }
+
+    .pnl-corpo {
+        display: block;
+    }
+
+    .pnl-menu {
+        flex: none;
+        border-left: none;
+        border-top: 3px double var(--pnl-linha);
+    }
+
+    .pnl-menu .pnl-atalhos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+        gap: 0 12px;
+    }
+
+    .pnl td {
+        max-width: 20ch;
+    }
+}

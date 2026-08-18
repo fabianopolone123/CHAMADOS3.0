@@ -173,9 +173,17 @@
     white-space: nowrap;
 }
 
-/* Marca compacta: so o simbolo "TI" (sem titulo/descricao) */
+/* Marca compacta: so o simbolo "TI" (sem titulo/descricao), com o botao do
+   Painel do Titular ao lado quando o usuario e o titular. */
 .sidebar-brand--compact {
+    display: flex;
     align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+}
+
+.sidebar-brand--compact .system-mark {
+    margin-bottom: 0;
 }
 
 /* Sem o bloco de texto, o hamburger (mobile) vai para a direita. */
@@ -285,3 +293,33 @@
         border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 }
+
+/* Botao do Painel do Titular, ao lado da marca "TI". So aparece para o titular
+   (`is_titular_user`), entao nao ocupa espaco no menu de mais ninguem. */
+.sidebar-painel {
+    width: 2.2rem;
+    height: 2.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.7rem;
+    color: rgba(233, 240, 255, 0.72);
+    border: 1px solid rgba(233, 240, 255, 0.18);
+    background: rgba(8, 15, 30, 0.35);
+    text-decoration: none;
+    flex: 0 0 auto;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.sidebar-painel svg {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.sidebar-painel:hover,
+.sidebar-painel:focus-visible {
+    color: #eafff0;
+    border-color: rgba(110, 231, 160, 0.65);
+    background: rgba(13, 28, 21, 0.65);
+}
+

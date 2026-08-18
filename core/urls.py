@@ -1,5 +1,20 @@
 from django.urls import path
 
+from .views_painel import (
+    painel_estado_view,
+    painel_interface_salvar_view,
+    painel_interface_view,
+    painel_operacao_acao_view,
+    painel_operacao_view,
+    painel_registro_alterar_view,
+    painel_registro_excluir_view,
+    painel_registro_view,
+    painel_tabela_view,
+    painel_tabelas_view,
+    painel_usuario_acao_view,
+    painel_usuarios_view,
+    painel_view,
+)
 from .views import (
     atendimentos_planilha_view,
     closed_ticket_detail_view,
@@ -262,6 +277,20 @@ urlpatterns = [
     path("historico/buscar/", history_search_view, name="history_search"),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
+    # Painel do Titular (terminal de administracao, so `fabiano.polone`).
+    path("painel/", painel_view, name="painel_titular"),
+    path("painel/api/estado/", painel_estado_view, name="painel_estado"),
+    path("painel/api/interface/", painel_interface_view, name="painel_interface"),
+    path("painel/api/interface/salvar/", painel_interface_salvar_view, name="painel_interface_salvar"),
+    path("painel/api/usuarios/", painel_usuarios_view, name="painel_usuarios"),
+    path("painel/api/usuarios/<int:usuario_id>/", painel_usuario_acao_view, name="painel_usuario_acao"),
+    path("painel/api/dados/", painel_tabelas_view, name="painel_tabelas"),
+    path("painel/api/dados/<str:chave>/", painel_tabela_view, name="painel_tabela"),
+    path("painel/api/dados/<str:chave>/<str:pk>/", painel_registro_view, name="painel_registro"),
+    path("painel/api/dados/<str:chave>/<str:pk>/alterar/", painel_registro_alterar_view, name="painel_registro_alterar"),
+    path("painel/api/dados/<str:chave>/<str:pk>/excluir/", painel_registro_excluir_view, name="painel_registro_excluir"),
+    path("painel/api/operacao/", painel_operacao_view, name="painel_operacao"),
+    path("painel/api/operacao/acao/", painel_operacao_acao_view, name="painel_operacao_acao"),
     path("permissoes/", permissions_view, name="permissions"),
     path("permissoes/<int:user_id>/toggle-atendente/", toggle_attendant_permission_view, name="toggle_attendant_permission"),
 ]

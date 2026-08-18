@@ -28,10 +28,12 @@ from .models import (
     EquipamentoEmprestimoTI,
     EnderecoIP,
     FuturaDigital,
+    ItemMenuConfig,
     Licenca,
     LicencaSoftware,
     OrcamentoContrato,
     OrcamentoDocumento,
+    PainelAuditoria,
     PausaAutomatica,
     PendenciaTI,
     Ramal,
@@ -43,6 +45,8 @@ from .models import (
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
+from . import painel_dados
+from .menu import CHAVES_PADRAO, itens_menu_para_painel
 from .permissions import ADMIN_GROUP_NAME, ATTENDANT_GROUP_NAME
 
 
@@ -3881,3 +3885,180 @@ class RamalKasperskyTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("ramal_kaspersky_toggle", args=[self.ana.id])).status_code, 405
         )
+
+
+class PainelTitularTests(TestCase):
+    """Painel do Titular: acesso, interface do menu, usuarios, dados e trilha."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin_group, _ = Group.objects.get_or_create(name=ADMIN_GROUP_NAME)
+        self.attendant_group, _ = Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+
+        # O titular e sempre `fabiano.polone` (PRIMARY_ADMIN_USERNAME).
+        self.titular = User.objects.create_user("fabiano.polone", password="x")
+        self.titular.groups.add(self.admin_group)
+        # Outro administrador (que NAO e o titular) nao deve entrar no painel.
+        self.outro_admin = User.objects.create_user("maria.admin", password="x")
+        self.outro_admin.groups.add(self.admin_group)
+        self.comum = User.objects.create_user("joao.comum", password="x")
+
+        self.ramal = Ramal.objects.create(colaborador="Zebedeu Teste", setor="Financeiro", ramal="1234")
+
+    def _post(self, url, corpo=None):
+        return self.client.post(url, data=json.dumps(corpo or {}), content_type="application/json")
+
+    # ------------------------------------------------------------- acesso --
+    def test_so_o_titular_entra_no_painel(self):
+        for usuario in (self.outro_admin, self.comum):
+            self.client.force_login(usuario)
+            self.assertEqual(self.client.get(reverse("painel_titular")).status_code, 302)
+            self.assertEqual(self.client.get(reverse("painel_estado")).status_code, 403)
+
+        self.client.force_login(self.titular)
+        self.assertEqual(self.client.get(reverse("painel_titular")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("painel_estado")).status_code, 200)
+
+    def test_botao_do_painel_so_aparece_para_o_titular(self):
+        self.client.force_login(self.outro_admin)
+        self.assertNotIn("sidebar-painel", self.client.get(reverse("ramais_dashboard")).content.decode())
+
+        self.client.force_login(self.titular)
+        self.assertIn("sidebar-painel", self.client.get(reverse("ramais_dashboard")).content.decode())
+
+    # ---------------------------------------------------------- interface --
+    def test_esconder_renomear_e_mover_item_do_menu(self):
+        self.client.force_login(self.titular)
+
+        resposta = self._post(reverse("painel_interface_salvar"), {"acao": "visivel", "chave": "dicas"})
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(ItemMenuConfig.objects.get(chave="dicas").visivel)
+
+        html = self.client.get(reverse("ramais_dashboard")).content.decode()
+        self.assertNotIn("<span>Dicas</span>", html)
+
+        self._post(reverse("painel_interface_salvar"), {"acao": "rotulo", "chave": "ramais", "valor": "Telefones"})
+        html = self.client.get(reverse("ramais_dashboard")).content.decode()
+        self.assertIn("<span>Telefones</span>", html)
+        self.assertNotIn("<span>Ramais</span>", html)
+
+        # Subir move o item uma posicao e grava a ordem de toda a lista.
+        antes = [i["chave"] for i in itens_menu_para_painel()]
+        self._post(reverse("painel_interface_salvar"), {"acao": "subir", "chave": antes[3]})
+        depois = [i["chave"] for i in itens_menu_para_painel()]
+        self.assertEqual(depois[2], antes[3])
+        self.assertEqual(depois[3], antes[2])
+
+        # Restaurar tudo apaga os ajustes e devolve o padrao de fabrica.
+        self._post(reverse("painel_interface_salvar"), {"acao": "restaurar_tudo"})
+        self.assertEqual(ItemMenuConfig.objects.count(), 0)
+        self.assertEqual([i["chave"] for i in itens_menu_para_painel()], list(CHAVES_PADRAO))
+
+    def test_primeiro_item_nao_sobe_e_chave_invalida_e_recusada(self):
+        self.client.force_login(self.titular)
+        primeiro = itens_menu_para_painel()[0]["chave"]
+        self.assertEqual(
+            self._post(reverse("painel_interface_salvar"), {"acao": "subir", "chave": primeiro}).status_code, 400
+        )
+        self.assertEqual(
+            self._post(reverse("painel_interface_salvar"), {"acao": "visivel", "chave": "nao-existe"}).status_code, 400
+        )
+
+    # ----------------------------------------------------------- usuarios --
+    def test_perfil_e_situacao_das_contas(self):
+        self.client.force_login(self.titular)
+        url = reverse("painel_usuario_acao", args=[self.comum.pk])
+
+        self.assertEqual(self._post(url, {"acao": "atendente"}).status_code, 200)
+        self.assertTrue(self.comum.groups.filter(name=ATTENDANT_GROUP_NAME).exists())
+
+        self._post(url, {"acao": "admin"})
+        self.assertTrue(self.comum.groups.filter(name=ADMIN_GROUP_NAME).exists())
+
+        self._post(url, {"acao": "ativo"})
+        self.comum.refresh_from_db()
+        self.assertFalse(self.comum.is_active)
+
+    def test_a_conta_do_titular_nao_pode_ser_alterada(self):
+        self.client.force_login(self.titular)
+        resposta = self._post(reverse("painel_usuario_acao", args=[self.titular.pk]), {"acao": "ativo"})
+        self.assertEqual(resposta.status_code, 409)
+        self.titular.refresh_from_db()
+        self.assertTrue(self.titular.is_active)
+
+    # -------------------------------------------------------------- dados --
+    def test_listar_alterar_e_excluir_registro(self):
+        self.client.force_login(self.titular)
+
+        lista = self.client.get(reverse("painel_tabela", args=["ramais"]) + "?q=Zebedeu").json()
+        self.assertEqual(lista["total"], 1)
+        self.assertEqual(lista["linhas"][0]["pk"], self.ramal.pk)
+
+        alterar = reverse("painel_registro_alterar", args=["ramais", self.ramal.pk])
+        self.assertEqual(self._post(alterar, {"campo": "setor", "valor": "Compras"}).status_code, 200)
+        self.ramal.refresh_from_db()
+        self.assertEqual(self.ramal.setor, "Compras")
+
+        # Booleano aceita S/N; texto que nao serve para o campo e recusado.
+        self._post(alterar, {"campo": "kaspersky_instalado", "valor": "S"})
+        self.ramal.refresh_from_db()
+        self.assertTrue(self.ramal.kaspersky_instalado)
+        self.assertEqual(self._post(alterar, {"campo": "kaspersky_instalado", "valor": "talvez"}).status_code, 400)
+
+        # Campo automatico e campo inexistente ficam de fora.
+        self.assertEqual(self._post(alterar, {"campo": "criado_em", "valor": "01/01/2026"}).status_code, 400)
+        self.assertEqual(self._post(alterar, {"campo": "inventado", "valor": "x"}).status_code, 400)
+
+        excluir = reverse("painel_registro_excluir", args=["ramais", self.ramal.pk])
+        self.assertEqual(self._post(excluir).status_code, 200)
+        self.assertFalse(Ramal.objects.filter(pk=self.ramal.pk).exists())
+
+    def test_segredos_nao_saem_pelo_painel(self):
+        """Nenhuma tabela pode expor senha, hash ou texto cifrado."""
+        credencial = CofreCredencial.objects.create(rotulo="Roteador", usuario="admin", senha_cifrada="xxx")
+        self.client.force_login(self.titular)
+
+        detalhe = self.client.get(reverse("painel_registro", args=["cofre", credencial.pk])).json()
+        nomes = [campo["nome"] for campo in detalhe["campos"]]
+        self.assertNotIn("senha_cifrada", nomes)
+        self.assertNotIn("xxx", json.dumps(detalhe))
+        self.assertTrue(detalhe["somente_leitura"])
+
+        # Tabela so leitura nao aceita alteracao nem exclusao.
+        self.assertEqual(
+            self._post(
+                reverse("painel_registro_alterar", args=["cofre", credencial.pk]),
+                {"campo": "rotulo", "valor": "X"},
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self._post(reverse("painel_registro_excluir", args=["cofre", credencial.pk])).status_code, 400
+        )
+
+        for tabela in painel_dados.TABELAS:
+            campos = [c.name for c in painel_dados.campos_do_modelo(tabela)]
+            for suspeito in ("senha_cifrada", "senha_hash", "master_hash", "password"):
+                self.assertNotIn(suspeito, campos, f"{tabela.chave} expos {suspeito}")
+
+    # ----------------------------------------------------------- operacao --
+    def test_operacao_e_trilha_de_auditoria(self):
+        self.client.force_login(self.titular)
+
+        self._post(reverse("painel_interface_salvar"), {"acao": "visivel", "chave": "dicas"})
+        self._post(
+            reverse("painel_registro_alterar", args=["ramais", self.ramal.pk]), {"campo": "setor", "valor": "TI"}
+        )
+
+        trilha = PainelAuditoria.objects.all()
+        self.assertEqual(trilha.count(), 2)
+        self.assertEqual(trilha.filter(usuario=self.titular).count(), 2)
+        self.assertTrue(trilha.filter(area=PainelAuditoria.AREA_DADOS, detalhe__contains="TI").exists())
+
+        operacao = self.client.get(reverse("painel_operacao")).json()
+        self.assertEqual(len(operacao["auditoria"]), 2)
+        self.assertTrue(any(l["rotulo"] == "DJANGO" for l in operacao["sistema"]))
+
+        simulacao = self._post(reverse("painel_operacao_acao"), {"acao": "pausar_expediente_simulacao"})
+        self.assertEqual(simulacao.status_code, 200)
+        self.assertEqual(self._post(reverse("painel_operacao_acao"), {"acao": "inventada"}).status_code, 400)

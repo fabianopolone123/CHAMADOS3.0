@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% comment %}
+Painel do Titular: terminal de administracao do sistema (so `fabiano.polone`).
+A pagina so monta a moldura do terminal — topo, area de tela e barra de status.
+Todo o desenho e a navegacao por teclado ficam em `static/js/painel.js`, que
+conversa com as rotas JSON `/painel/api/...`.
+{% endcomment %}
+
+{% block title %}Painel do Titular{% endblock %}
+
+{% block body_class %}painel-body{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/painel.css' %}">
+{% endblock %}
+
+{% block content %}
+<main class="pnl"
+      data-operador="{{ operador }}"
+      data-url-estado="{% url 'painel_estado' %}"
+      data-url-interface="{% url 'painel_interface' %}"
+      data-url-interface-salvar="{% url 'painel_interface_salvar' %}"
+      data-url-usuarios="{% url 'painel_usuarios' %}"
+      data-url-usuario-acao="{% url 'painel_usuario_acao' usuario_id=0 %}"
+      data-url-tabelas="{% url 'painel_tabelas' %}"
+      data-url-tabela="{% url 'painel_tabela' chave='__CHAVE__' %}"
+      data-url-registro="{% url 'painel_registro' chave='__CHAVE__' pk='__PK__' %}"
+      data-url-registro-alterar="{% url 'painel_registro_alterar' chave='__CHAVE__' pk='__PK__' %}"
+      data-url-registro-excluir="{% url 'painel_registro_excluir' chave='__CHAVE__' pk='__PK__' %}"
+      data-url-operacao="{% url 'painel_operacao' %}"
+      data-url-operacao-acao="{% url 'painel_operacao_acao' %}"
+      data-url-saida="{% url 'tickets_dashboard' %}">
+
+    {% csrf_token %}
+
+    <div class="pnl-topo">
+        <b>P.T.&nbsp;&nbsp; PAINEL DO TITULAR &middot; SISTEMA DE CHAMADOS</b>
+        <small id="pnl-cabecalho">TERMINAL 01 &nbsp; OPERADOR: {{ operador|upper }}</small>
+    </div>
+
+    <div id="pnl-tela" class="pnl-corpo"></div>
+
+    <div class="pnl-status" id="pnl-status"></div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/painel.js' %}"></script>
+{% endblock %}

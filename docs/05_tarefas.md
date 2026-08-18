@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- **Painel do Titular** em `/painel/`: terminal de administracao por teclado (estilo sistema de banco), so para `fabiano.polone`, com as areas Interface (menu lateral configuravel), Usuarios, Dados (27 tabelas) e Operacao, tudo auditado em `PainelAuditoria`; menu lateral passou a ser dinamico (`core/menu.py` + `ItemMenuConfig`, migration `0052`); testes `PainelTitularTests` (9 casos)
+
 - Controle de antivirus refeito de forma simples: coluna **Kaspersky** tiquada a mao na lista de Ramais (campo `kaspersky_instalado`, migration `0051`), com contadores no topo, busca por "sem kaspersky" e o tique salvando na hora. Substitui os modulos Contatos/Kaspersky removidos; testes `RamalKasperskyTests`
 - Kaspersky: a aba Colaboradores passou a listar a mesma populacao do Contatos (Ramais + quem existe so no GLPI), entao quem tem dispositivo mas nao tem ramal deixou de sumir da tela
 - Contatos/Kaspersky: casamento de nome do GLPI passou a resolver grafia diferente de sobrenome ("Vich Everaldo" x "Everaldo Vichi") e nome de uma palavra so ("portaria"); e a etiqueta do Kaspersky virou "(sem registro no Kaspersky)", que antes repetia o "so no GLPI" do Contatos com outro significado. Conferido contra a base de producao: resolve 4 casos e nao altera nenhum vinculo existente

@@ -659,6 +659,31 @@ Configuracao unica (singleton, `load()`) das notificacoes por e-mail (modulo E-m
 
 O envio real fica em `core/emails.py` (funcoes `notificar_novo_chamado`, `notificar_nova_mensagem`, `notificar_mudanca_status`, `notificar_fechamento` e `enviar_email_teste`), sempre **fail-safe**: qualquer falha de SMTP e apenas logada e nunca interrompe o fluxo do chamado. A conexao e montada a partir da `EmailConfig`; em testes, `settings.EMAIL_BACKEND_OVERRIDE` forca o backend em memoria.
 
+### ItemMenuConfig
+
+Ajuste do titular em um item do menu lateral de TI. So existe linha para o item alterado; o padrao de fabrica (rotulo, ordem e icone) fica em `core/menu.py`, e restaurar o padrao e apagar a linha.
+
+| Campo | Tipo | Observacao |
+| --- | --- | --- |
+| `chave` | CharField(40), unico | Chave do item no catalogo (`chamados`, `ramais`, `cofre`, ...) |
+| `rotulo` | CharField(40), branco | Rotulo escolhido; em branco usa o padrao |
+| `ordem` | PositiveIntegerField, nulo | Posicao no menu; nulo usa a ordem padrao |
+| `visivel` | BooleanField | `False` esconde o item do menu de toda a equipe |
+| `atualizado_em` | DateTimeField(auto_now) | |
+
+### PainelAuditoria
+
+Trilha do que foi feito pelo Painel do Titular. Como o painel altera dados de qualquer modulo, toda acao que grava fica registrada. **Nunca guarda senha, chave ou conteudo cifrado.**
+
+| Campo | Tipo | Observacao |
+| --- | --- | --- |
+| `usuario` | FK User (SET_NULL) | Quem executou (o titular) |
+| `area` | CharField(20) | `interface`, `usuarios`, `dados`, `operacao` |
+| `acao` | CharField(60) | Ex.: "alterar setor", "grupo Administrador", "pausar expediente" |
+| `alvo` | CharField(200) | Ex.: "RAMAIS #87", "maria.admin" |
+| `detalhe` | TextField | Resumo em texto (ex.: valor anterior -> valor novo) |
+| `criado_em` | DateTimeField(auto_now_add) | Ordenacao `-criado_em` |
+
 ## Modelos removidos
 
 Os models `Computador`, `KasperskyDispositivo` e `KasperskyConfig` (modulos Contatos e Kaspersky) foram **apagados** pela migration `0050` em 30/07/2026, junto com os dados: os modulos serao refeitos do zero. As migrations `0046`/`0047`, que criaram essas tabelas, continuam no historico - nao se apaga migration ja aplicada.
