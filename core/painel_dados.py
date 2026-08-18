@@ -523,6 +523,90 @@ def alterar_campo(tabela: TabelaPainel, pk, nome_campo: str, texto: str) -> tupl
     return obj, anterior, valor_exibicao(obj, campo)
 
 
+def campos_para_criacao(tabela: TabelaPainel) -> list[dict]:
+    """Campos que o terminal pede ao criar um registro.
+
+    Os obrigatorios (sem branco, sem nulo e sem valor padrao) vem primeiro: sao
+    os unicos perguntados no fluxo de criacao. O resto se preenche depois, na
+    tela do registro, campo a campo.
+    """
+    saida = []
+    for campo in campos_do_modelo(tabela):
+        if not campo_editavel(tabela, campo) or campo.name in _campos_gerados(tabela.modelo):
+            continue
+        obrigatorio = not campo.blank and not campo.null and not campo.has_default()
+        saida.append(
+            {
+                "nome": campo.name,
+                "rotulo": campo.name.replace("_", " ").upper(),
+                "tipo": _tipo_legivel(campo),
+                "opcoes": [str(v) for v, _ in (campo.choices or [])] if getattr(campo, "choices", None) else [],
+                "obrigatorio": obrigatorio,
+            }
+        )
+    saida.sort(key=lambda c: (not c["obrigatorio"],))
+    return saida
+
+
+def _campos_gerados(modelo) -> set[str]:
+    """Campos que o proprio sistema preenche e o painel nao deve perguntar."""
+    gerados = set()
+    if hasattr(modelo, "gerar_numero"):
+        gerados.add("numero")
+    if hasattr(modelo, "gerar_codigo"):
+        gerados.add("codigo")
+    return gerados
+
+
+def criar(tabela: TabelaPainel, valores: dict, usuario=None) -> models.Model:
+    """Cria um registro a partir dos valores digitados no terminal.
+
+    Cuida sozinho do que o sistema gera: o numero do chamado (`gerar_numero`) e
+    o codigo da requisicao (gerado no `save`), e o autor (`criado_por`), que
+    passa a ser quem esta operando o painel.
+    """
+    if tabela.somente_leitura:
+        raise ValidationError("Esta tabela e somente leitura.")
+
+    obj = tabela.modelo()
+    nomes = {c.name for c in tabela.modelo._meta.get_fields() if getattr(c, "concrete", False)}
+
+    if "numero" in nomes and hasattr(tabela.modelo, "gerar_numero") and not getattr(obj, "numero", ""):
+        obj.numero = tabela.modelo.gerar_numero()
+
+    # O Django nao recusa sozinho um campo obrigatorio vazio no `save()` (o
+    # `blank` so vale em formulario), entao a checagem e feita aqui: sem isso o
+    # painel gravaria registro pela metade, como um IP sem endereco.
+    faltando = [
+        campo["rotulo"]
+        for campo in campos_para_criacao(tabela)
+        if campo["obrigatorio"] and not str((valores or {}).get(campo["nome"], "")).strip()
+    ]
+    if faltando:
+        raise ValidationError("Faltou preencher: " + ", ".join(faltando) + ".")
+
+    for nome, texto in (valores or {}).items():
+        try:
+            campo = obj._meta.get_field(nome)
+        except Exception:
+            raise ValidationError(f"Campo inexistente: {nome}.")
+        if not campo_editavel(tabela, campo):
+            raise ValidationError(f"O campo {nome} nao pode ser preenchido pelo painel.")
+        valor = _converter(campo, "" if texto is None else str(texto), obj)
+        if campo.is_relation:
+            setattr(obj, campo.attname, valor)
+        else:
+            campo.clean(valor, obj)
+            setattr(obj, campo.name, valor)
+
+    if usuario is not None and "criado_por" in nomes and not getattr(obj, "criado_por_id", None):
+        obj.criado_por = usuario
+
+    obj.save()
+    obj.refresh_from_db()
+    return obj
+
+
 def excluir(tabela: TabelaPainel, pk) -> str:
     if tabela.somente_leitura or not tabela.pode_excluir:
         raise ValidationError("Esta tabela nao permite exclusao pelo painel.")

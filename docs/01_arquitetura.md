@@ -9,7 +9,8 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - `chamados_ti`: configuracao principal do projeto
 - `core`: app unico que concentra autenticacao, rotas, Kanban, portal do solicitante, permissoes, historico e todos os modulos de TI. Modulos atuais: Requisicoes (nomes tecnicos internos com prefixo `Contrato`), Insumos, Documentos, Emprestimos (termo em PDF via `core/termo_pdf.py`), Emails, Ramais, Licencas, IPs, Servicos feitos, Contratos (`/contratos-ti/`, distinto de Requisicoes), Futura Digital, Dicas, Starlinks, Cofre (cifra em `core/crypto.py`) e E-mail (notificacoes SMTP em `core/emails.py`, senha cifrada)
 - `core/views_painel.py`: Painel do Titular — a tela `/painel/` e as rotas JSON `/painel/api/...` (interface, usuarios, dados, operacao), restritas ao titular
-- `core/painel_dados.py`: catalogo das tabelas do painel e camada generica de leitura/alteracao/exclusao montada sobre o `_meta` dos modelos, com bloqueio de campos de segredo e de arquivos
+- `core/painel_dados.py`: catalogo das tabelas do painel e camada generica de criacao/leitura/alteracao/exclusao montada sobre o `_meta` dos modelos, com bloqueio de campos de segredo e de arquivos
+- `core/painel_modulos.py`: ponte entre os botoes do menu e o painel — quais tabelas formam cada modulo e o que daquele modulo ainda so existe na tela classica
 - `core/menu.py`: catalogo do menu lateral de TI (chave, rota, rotulo padrao, icone) e resolucao com os ajustes de `ItemMenuConfig`
 - `core/crypto.py`: cifra simetrica (Fernet) do Cofre de senhas e da senha de app do e-mail; a chave vem de `VAULT_ENCRYPTION_KEY` (env)
 - `core/emails.py`: notificacoes de chamado por e-mail (SMTP a partir da `EmailConfig`); envio fail-safe (falha nunca quebra o chamado)

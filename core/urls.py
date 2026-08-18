@@ -2,6 +2,10 @@ from django.urls import path
 
 from .views_painel import (
     painel_estado_view,
+    painel_modulo_view,
+    painel_modulos_view,
+    painel_registro_campos_novos_view,
+    painel_registro_criar_view,
     painel_interface_salvar_view,
     painel_interface_view,
     painel_operacao_acao_view,
@@ -284,7 +288,11 @@ urlpatterns = [
     path("painel/api/interface/salvar/", painel_interface_salvar_view, name="painel_interface_salvar"),
     path("painel/api/usuarios/", painel_usuarios_view, name="painel_usuarios"),
     path("painel/api/usuarios/<int:usuario_id>/", painel_usuario_acao_view, name="painel_usuario_acao"),
+    path("painel/api/modulos/", painel_modulos_view, name="painel_modulos"),
+    path("painel/api/modulos/<str:chave>/", painel_modulo_view, name="painel_modulo"),
     path("painel/api/dados/", painel_tabelas_view, name="painel_tabelas"),
+    path("painel/api/dados/<str:chave>/novo/", painel_registro_campos_novos_view, name="painel_registro_campos_novos"),
+    path("painel/api/dados/<str:chave>/criar/", painel_registro_criar_view, name="painel_registro_criar"),
     path("painel/api/dados/<str:chave>/", painel_tabela_view, name="painel_tabela"),
     path("painel/api/dados/<str:chave>/<str:pk>/", painel_registro_view, name="painel_registro"),
     path("painel/api/dados/<str:chave>/<str:pk>/alterar/", painel_registro_alterar_view, name="painel_registro_alterar"),

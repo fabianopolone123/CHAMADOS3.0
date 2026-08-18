@@ -26,7 +26,11 @@
         interfaceSalvar: raiz.dataset.urlInterfaceSalvar,
         usuarios: raiz.dataset.urlUsuarios,
         usuarioAcao: raiz.dataset.urlUsuarioAcao,
+        modulos: raiz.dataset.urlModulos,
+        modulo: raiz.dataset.urlModulo,
         tabelas: raiz.dataset.urlTabelas,
+        registroCamposNovos: raiz.dataset.urlRegistroCamposNovos,
+        registroCriar: raiz.dataset.urlRegistroCriar,
         tabela: raiz.dataset.urlTabela,
         registro: raiz.dataset.urlRegistro,
         registroAlterar: raiz.dataset.urlRegistroAlterar,
@@ -103,7 +107,7 @@
         entrada: null, // {rotulo, valor, livre, aoConfirmar}
         confirma: null, // {texto, aoSim}
         dados: {},
-        contexto: { tabela: null, rotuloTabela: "", pk: null, saida: [] },
+        contexto: { modulo: null, rotuloModulo: "", tabela: null, rotuloTabela: "", pk: null, saida: [], voltaDaTabela: "tabelas" },
         // Busca e pagina sao por tela: entrar em DADOS nao herda a busca feita
         // em USUARIOS, e voltar do registro para a lista preserva o filtro.
         buscas: { usuarios: { termo: "", pagina: 0 }, tabela: { termo: "", pagina: 0 } },
@@ -174,6 +178,7 @@
             $status.innerHTML =
                 `<span class="pnl-tecla">${esc(estado.entrada.rotulo)}:</span>` +
                 `<input type="text" id="pnl-entrada" class="${estado.entrada.livre ? "pnl-livre" : ""}" autocomplete="off" spellcheck="false">` +
+                (estado.entrada.dica ? `<span class="pnl-info">${esc(estado.entrada.dica)}</span>` : "") +
                 '<span class="pnl-fraco">ENTER CONFIRMA &nbsp; ESC CANCELA</span>';
             const campo = document.getElementById("pnl-entrada");
             campo.value = estado.entrada.valor || "";
@@ -213,8 +218,8 @@
 
     /* --------------------------------------------------------- entradas --- */
 
-    function pedirTexto(rotulo, valorAtual, aoConfirmar, livre = false) {
-        estado.entrada = { rotulo: rotulo.toUpperCase(), valor: valorAtual || "", aoConfirmar, livre };
+    function pedirTexto(rotulo, valorAtual, aoConfirmar, livre = false, dica = "") {
+        estado.entrada = { rotulo: rotulo.toUpperCase(), valor: valorAtual || "", aoConfirmar, livre, dica };
         desenharStatus();
     }
 
@@ -400,6 +405,7 @@
                 `<table>${linhas}</table>`,
                 '<div class="pnl-regua"></div>',
                 '<div class="pnl-fraco">ESCOLHA UMA AREA PELA TECLA CORRESPONDENTE.</div>',
+                '<div class="pnl-fraco">[5] ABRE OS MODULOS DO MENU PARA TRABALHAR POR AQUI MESMO.</div>',
             ].join("");
             const menu = blocoMenu(
                 "AREAS",
@@ -408,6 +414,7 @@
                     linhaMenu("2", "USUARIOS E ACESSOS"),
                     linhaMenu("3", "DADOS DOS MODULOS"),
                     linhaMenu("4", "OPERACAO E MANUTENCAO"),
+                    linhaMenu("5", "MODULOS DO SISTEMA"),
                     linhaMenu("A", "ATUALIZAR"),
                     linhaMenu("0", "SAIR DO PAINEL"),
                 ],
@@ -420,6 +427,7 @@
             if (tecla === "2") return irPara("usuarios");
             if (tecla === "3") return irPara("tabelas");
             if (tecla === "4") return irPara("operacao");
+            if (tecla === "5") return irPara("modulos");
             if (tecla === "A") return recarregar();
             if (tecla === "0") {
                 window.location.href = URLS.saida;
@@ -458,6 +466,7 @@
                 tabelaHTML(["ITEM", "CHAVE", "SITUACAO", "ESTADO"], linhas, { vazio: "SEM ITENS." }),
                 '<div class="pnl-regua"></div>',
                 '<div class="pnl-fraco">O QUE VOCE MUDAR AQUI VALE PARA TODA A EQUIPE, NA HORA.</div>',
+                '<div class="pnl-fraco">ESTA TELA AJUSTA O MENU. PARA TRABALHAR NO MODULO, USE [I] OU A AREA [5].</div>',
             ].join("");
             const selecionado = estado.selecionado ? (estado.dados.itens || [])[estado.selecionado - 1] : null;
             const acoes = selecionado
@@ -469,6 +478,7 @@
                       linhaMenu("-", "DESCER NA LISTA"),
                       linhaMenu("E", "EDITAR O ROTULO"),
                       linhaMenu("R", "VOLTAR AO PADRAO"),
+                      linhaMenu("I", "ENTRAR NO MODULO"),
                   ]
                 : ['<div class="pnl-fraco">DIGITE O NUMERO DE UM ITEM PARA AGIR SOBRE ELE.</div>'];
             const menu = blocoMenu("ACOES", acoes.concat(['<div class="pnl-regua"></div>', linhaMenu("T", "RESTAURAR TUDO"), linhaMenu("A", "ATUALIZAR"), linhaMenu("0", "VOLTAR")]));
@@ -489,6 +499,10 @@
             if (tecla === "+") return acaoInterface({ acao: "subir", chave: item.chave });
             if (tecla === "-") return acaoInterface({ acao: "descer", chave: item.chave });
             if (tecla === "R") return acaoInterface({ acao: "restaurar", chave: item.chave });
+            if (tecla === "I") {
+                estado.contexto.modulo = item.chave;
+                return irPara("modulo");
+            }
             if (tecla === "E") {
                 pedirTexto(
                     "NOVO ROTULO",
@@ -632,6 +646,99 @@
         recarregar();
     }
 
+    /* ------------------------------------------------------- tela: modulos -- */
+
+    TELAS.modulos = {
+        voltarPara: "principal",
+        carregar: async () => {
+            estado.dados = await obter(URLS.modulos);
+        },
+        totalLinhas: () => (estado.dados.modulos || []).length,
+        escolher(linha) {
+            const modulo = estado.dados.modulos[linha - 1];
+            estado.contexto.modulo = modulo.chave;
+            estado.contexto.rotuloModulo = modulo.rotulo;
+            irPara("modulo");
+        },
+        desenhar() {
+            const linhas = (estado.dados.modulos || []).map((m) => [
+                `<span class="pnl-forte">${esc(m.rotulo)}</span>`,
+                esc(m.tabelas || "-"),
+                esc(m.registros),
+                m.no_menu ? "NO MENU" : '<span class="pnl-fraco">ESCONDIDO</span>',
+            ]);
+            const lista = [
+                '<div class="pnl-titulo">MODULOS DO SISTEMA</div>',
+                '<div class="pnl-regua"></div>',
+                tabelaHTML(["MODULO", "TABELAS", "REGISTROS", "MENU"], linhas),
+                '<div class="pnl-regua"></div>',
+                '<div class="pnl-fraco">DIGITE O NUMERO DO MODULO PARA ENTRAR E TRABALHAR NELE POR AQUI.</div>',
+            ].join("");
+            const menu = blocoMenu("NAVEGACAO", [linhaMenu("A", "ATUALIZAR"), linhaMenu("0", "VOLTAR")], "OS MESMOS BOTOES DO MENU LATERAL.");
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("principal");
+            if (tecla === "A") return recarregar();
+            return false;
+        },
+    };
+
+    TELAS.modulo = {
+        voltarPara: "modulos",
+        carregar: async () => {
+            estado.dados = await obter(url(URLS.modulo, estado.contexto.modulo, ""));
+            estado.contexto.rotuloModulo = estado.dados.rotulo;
+        },
+        totalLinhas: () => (estado.dados.tabelas || []).length,
+        escolher(linha) {
+            const tabela = estado.dados.tabelas[linha - 1];
+            estado.contexto.tabela = tabela.chave;
+            estado.contexto.rotuloTabela = tabela.rotulo;
+            estado.contexto.voltaDaTabela = "modulo";
+            estado.buscas.tabela = { termo: "", pagina: 0 };
+            irPara("tabela");
+        },
+        desenhar() {
+            const linhas = (estado.dados.tabelas || []).map((t) => [
+                `<span class="pnl-forte">${esc(t.rotulo)}</span>${t.principal ? ' <span class="pnl-fraco">(PRINCIPAL)</span>' : ""}`,
+                esc(t.total),
+                t.somente_leitura ? '<span class="pnl-fraco">SO LEITURA</span>' : "CRIA / ALTERA / EXCLUI",
+            ]);
+            const corpo = (estado.dados.tabelas || []).length
+                ? tabelaHTML(["TABELA", "REGISTROS", "ACESSO"], linhas)
+                : `<div class="pnl-vazio">ESTE MODULO NAO TEM TABELA PROPRIA. VEJA A AREA ${esc((estado.dados.area || "").toUpperCase())} DO PAINEL.</div>`;
+            const lista = [
+                `<div class="pnl-titulo">MODULO ${esc((estado.dados.rotulo || "").toUpperCase())}</div>`,
+                '<div class="pnl-regua"></div>',
+                corpo,
+                '<div class="pnl-regua"></div>',
+                estado.dados.nota ? `<div class="pnl-info">${esc(estado.dados.nota.toUpperCase())}</div>` : "",
+            ].join("");
+            const menu = blocoMenu(
+                "NAVEGACAO",
+                [
+                    linhaMenu("T", "ABRIR A TELA CLASSICA"),
+                    linhaMenu("A", "ATUALIZAR"),
+                    linhaMenu("0", "VOLTAR"),
+                ],
+                "DIGITE O NUMERO DA TABELA PARA LISTAR, CRIAR E ALTERAR."
+            );
+            return { lista, menu };
+        },
+        tecla(tecla) {
+            if (tecla === "0") return irPara("modulos");
+            if (tecla === "A") return recarregar();
+            if (tecla === "T") {
+                if (estado.dados.url) {
+                    window.location.href = estado.dados.url;
+                }
+                return;
+            }
+            return false;
+        },
+    };
+
     /* --------------------------------------------------------- tela: dados -- */
 
     TELAS.tabelas = {
@@ -644,6 +751,7 @@
             const tabela = estado.dados.tabelas[linha - 1];
             estado.contexto.tabela = tabela.chave;
             estado.contexto.rotuloTabela = tabela.rotulo;
+            estado.contexto.voltaDaTabela = "tabelas";
             estado.buscas.tabela = { termo: "", pagina: 0 };
             irPara("tabela");
         },
@@ -671,7 +779,9 @@
     };
 
     TELAS.tabela = {
-        voltarPara: "tabelas",
+        get voltarPara() {
+            return estado.contexto.voltaDaTabela || "tabelas";
+        },
         carregar: async () => {
             const filtro = busca("tabela");
             const endereco = `${url(URLS.tabela, estado.contexto.tabela, "")}?q=${encodeURIComponent(filtro.termo || "")}&pagina=${filtro.pagina || 0}`;
@@ -697,6 +807,9 @@
             const menu = blocoMenu(
                 "NAVEGACAO",
                 [
+                    estado.dados.somente_leitura
+                        ? '<div class="pnl-fraco">[N] TABELA SO DE LEITURA</div>'
+                        : linhaMenu("N", "NOVO REGISTRO"),
                     linhaMenu("B", "BUSCAR"),
                     linhaMenu(".", "PROXIMA PAGINA"),
                     linhaMenu(",", "PAGINA ANTERIOR"),
@@ -708,8 +821,9 @@
             return { lista, menu };
         },
         tecla(tecla) {
-            if (tecla === "0") return irPara("tabelas");
+            if (tecla === "0") return irPara(estado.contexto.voltaDaTabela || "tabelas");
             if (tecla === "A") return recarregar();
+            if (tecla === "N") return criarRegistro();
             if (tecla === "B") {
                 const filtro = busca("tabela");
                 pedirTexto("BUSCAR", filtro.termo, (valor) => {
@@ -726,6 +840,9 @@
 
     TELAS.registro = {
         voltarPara: "tabela",
+        // criado agora: a tela avisa que os campos opcionais podem ser
+        // preenchidos ali mesmo, um a um.
+        novo: false,
         carregar: async () => {
             estado.dados = await obter(url(URLS.registro, estado.contexto.tabela, estado.contexto.pk));
         },
@@ -738,8 +855,10 @@
                 desenhar();
                 return;
             }
-            const dica = campo.opcoes.length ? ` (${campo.opcoes.join(" / ")})` : "";
-            avisar(`${campo.rotulo} — ${campo.tipo}${dica.toUpperCase()}`, "info");
+            const dica = campo.opcoes.length
+                ? `OPCOES: ${campo.opcoes.join(" / ").toUpperCase()}`
+                : campo.tipo.toUpperCase();
+            avisar(`${campo.rotulo} — ${campo.tipo.toUpperCase()}`, "info");
             desenhar();
             pedirTexto(
                 campo.rotulo,
@@ -761,7 +880,8 @@
                             falhar(erro);
                         });
                 },
-                true
+                true,
+                dica
             );
         },
         desenhar() {
@@ -818,6 +938,79 @@
             return false;
         },
     };
+
+
+    /* ----------------------------------------------------- criar registro --- */
+
+    /* O terminal pergunta um campo por vez (so os obrigatorios), como uma ficha
+       de cadastro: preencheu todos, o registro e criado e abre na tela do
+       registro, onde o resto dos campos se completa a vontade. */
+    function criarRegistro() {
+        if (estado.dados.somente_leitura) {
+            avisar("ESTA TABELA E SOMENTE LEITURA.", "erro");
+            desenharStatus();
+            return;
+        }
+        estado.ocupado = true;
+        obter(url(URLS.registroCamposNovos, estado.contexto.tabela, ""))
+            .then((dados) => {
+                estado.ocupado = false;
+                const obrigatorios = (dados.campos || []).filter((c) => c.obrigatorio);
+                perguntarCampo(obrigatorios, 0, {});
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
+
+    function perguntarCampo(campos, indice, valores) {
+        if (indice >= campos.length) {
+            gravarNovo(valores);
+            return;
+        }
+        const campo = campos[indice];
+        const dica = campo.opcoes.length
+            ? `OPCOES: ${campo.opcoes.join(" / ").toUpperCase()}`
+            : campo.tipo.toUpperCase();
+        avisar(`NOVO REGISTRO ${indice + 1}/${campos.length} — ${campo.rotulo}`, "info");
+        desenhar();
+        pedirTexto(
+            `${campo.rotulo} (${indice + 1}/${campos.length})`,
+            "",
+            (valor) => {
+                if (!String(valor).trim()) {
+                    avisar(`${campo.rotulo} E OBRIGATORIO. CADASTRO CANCELADO.`, "erro");
+                    desenhar();
+                    return;
+                }
+                valores[campo.nome] = valor;
+                perguntarCampo(campos, indice + 1, valores);
+            },
+            true,
+            dica
+        );
+    }
+
+    function gravarNovo(valores) {
+        estado.ocupado = true;
+        avisar("GRAVANDO...", "info");
+        desenharStatus();
+        enviar(url(URLS.registroCriar, estado.contexto.tabela, ""), { valores })
+            .then((dados) => {
+                estado.ocupado = false;
+                estado.contexto.pk = dados.pk;
+                estado.dados = dados;
+                estado.tela = "registro";
+                estado.selecionado = null;
+                avisar((dados.message || "CRIADO.").toUpperCase() + " — COMPLETE OS DEMAIS CAMPOS PELO NUMERO.", "ok");
+                desenhar();
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
 
     /* ------------------------------------------------------ tela: operacao -- */
 

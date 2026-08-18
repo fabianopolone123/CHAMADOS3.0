@@ -128,7 +128,11 @@
 | `/painel/api/interface/salvar/` | POST | Esconde/mostra, renomeia, move ou restaura item do menu (`restaurar_tudo` volta ao padrao) | Implementada |
 | `/painel/api/usuarios/` | GET | Lista paginada de usuarios com perfil, situacao e ultimo acesso (busca por `q`) | Implementada |
 | `/painel/api/usuarios/<id>/` | POST | Alterna grupo Administrador/Atendente TI ou ativa/desativa a conta (titular recusado com `409`) | Implementada |
+| `/painel/api/modulos/` | GET | Modulos do menu como o painel os enxerga (rotulo em uso, tabelas e total de registros) | Implementada |
+| `/painel/api/modulos/<chave>/` | GET | Tabelas de um modulo, link da tela classica e o que so existe la | Implementada |
 | `/painel/api/dados/` | GET | Catalogo das tabelas do painel com a contagem de registros | Implementada |
+| `/painel/api/dados/<chave>/novo/` | GET | Campos que o terminal pede para criar um registro (obrigatorios primeiro) | Implementada |
+| `/painel/api/dados/<chave>/criar/` | POST | Cria o registro com os valores digitados (auditado) | Implementada |
 | `/painel/api/dados/<chave>/` | GET | Lista paginada de uma tabela (busca por `q`) | Implementada |
 | `/painel/api/dados/<chave>/<pk>/` | GET | Campos de um registro, com tipo e se e editavel | Implementada |
 | `/painel/api/dados/<chave>/<pk>/alterar/` | POST | Altera um campo do registro (auditado) | Implementada |

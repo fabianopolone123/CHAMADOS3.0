@@ -30,11 +30,12 @@ from django.core.management import call_command
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from . import painel_dados
+from . import painel_dados, painel_modulos
 from .menu import ITEM_POR_CHAVE, itens_menu_para_painel
 from .models import (
     AtendimentoHistorico,
@@ -317,6 +318,26 @@ def painel_usuario_acao_view(request, usuario_id: int):
     return JsonResponse({"ok": True, "message": f"{user.get_username()}: {texto}.", "usuario": _linha_usuario(user)})
 
 
+# --------------------------------------------------------------- modulos ----
+
+
+@titular_required
+@require_GET
+def painel_modulos_view(request):
+    """Os modulos do menu como o painel os enxerga (a outra interface)."""
+    return JsonResponse({"ok": True, "modulos": painel_modulos.modulos_para_painel()})
+
+
+@titular_required
+@require_GET
+def painel_modulo_view(request, chave: str):
+    detalhe = painel_modulos.detalhar_modulo(chave)
+    if not detalhe:
+        return _erro("Modulo inexistente.", status=404)
+    detalhe["url"] = reverse(detalhe.pop("url_name"))
+    return JsonResponse({"ok": True, **detalhe})
+
+
 # ----------------------------------------------------------------- dados ----
 
 
@@ -355,6 +376,50 @@ def painel_registro_view(request, chave: str, pk: str):
         return JsonResponse({"ok": True, **painel_dados.detalhar(tabela, pk)})
     except ObjectDoesNotExist:
         return _erro("Registro nao encontrado.", status=404)
+
+
+@titular_required
+@require_GET
+def painel_registro_campos_novos_view(request, chave: str):
+    """Campos que o terminal vai pedir para criar um registro nesta tabela."""
+    tabela = painel_dados.TABELA_POR_CHAVE.get(chave)
+    if not tabela:
+        return _erro("Tabela inexistente.", status=404)
+    if tabela.somente_leitura:
+        return _erro("Esta tabela e somente leitura.")
+    return JsonResponse(
+        {
+            "ok": True,
+            "rotulo": tabela.rotulo,
+            "campos": painel_dados.campos_para_criacao(tabela),
+        }
+    )
+
+
+@titular_required
+@require_POST
+def painel_registro_criar_view(request, chave: str):
+    tabela = painel_dados.TABELA_POR_CHAVE.get(chave)
+    if not tabela:
+        return _erro("Tabela inexistente.", status=404)
+
+    valores = _payload(request).get("valores") or {}
+    try:
+        obj = painel_dados.criar(tabela, valores, usuario=request.user)
+    except ValidationError as exc:
+        return _erro("; ".join(exc.messages))
+    except Exception as exc:
+        return _erro(f"Nao foi possivel criar: {exc}")
+
+    _registrar(request, PainelAuditoria.AREA_DADOS, "criar registro", f"{tabela.rotulo} #{obj.pk}", str(obj)[:200])
+    return JsonResponse(
+        {
+            "ok": True,
+            "message": f"Criado: {obj} #{obj.pk}",
+            "pk": obj.pk,
+            **painel_dados.detalhar(tabela, obj.pk),
+        }
+    )
 
 
 @titular_required

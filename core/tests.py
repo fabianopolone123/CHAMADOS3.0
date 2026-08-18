@@ -4041,6 +4041,86 @@ class PainelTitularTests(TestCase):
             for suspeito in ("senha_cifrada", "senha_hash", "master_hash", "password"):
                 self.assertNotIn(suspeito, campos, f"{tabela.chave} expos {suspeito}")
 
+
+    # -------------------------------------------------------------- modulos --
+    def test_modulos_espelham_o_menu_e_abrem_suas_tabelas(self):
+        self.client.force_login(self.titular)
+
+        modulos = self.client.get(reverse("painel_modulos")).json()["modulos"]
+        chaves = [m["chave"] for m in modulos]
+        self.assertEqual(chaves, list(CHAVES_PADRAO))
+
+        # O rotulo segue o que o titular escolheu no menu, e a ordem tambem.
+        self._post(reverse("painel_interface_salvar"), {"acao": "rotulo", "chave": "ramais", "valor": "Telefones"})
+        self._post(reverse("painel_interface_salvar"), {"acao": "visivel", "chave": "dicas"})
+        modulos = self.client.get(reverse("painel_modulos")).json()["modulos"]
+        ramais = next(m for m in modulos if m["chave"] == "ramais")
+        dicas = next(m for m in modulos if m["chave"] == "dicas")
+        self.assertEqual(ramais["rotulo"], "Telefones")
+        self.assertTrue(ramais["registros"] >= 1)
+        self.assertFalse(dicas["no_menu"])  # escondido do menu, mas ainda operavel aqui
+
+        detalhe = self.client.get(reverse("painel_modulo", args=["contratos"])).json()
+        self.assertEqual([t["chave"] for t in detalhe["tabelas"]], ["requisicoes", "orcamentos", "suborcamentos"])
+        self.assertTrue(detalhe["tabelas"][0]["principal"])
+        self.assertEqual(detalhe["url"], reverse("contratos_dashboard"))
+        self.assertIn("WhatsApp", detalhe["nota"])
+
+        self.assertEqual(self.client.get(reverse("painel_modulo", args=["nao-existe"])).status_code, 404)
+
+    # ---------------------------------------------------- criar pelo painel --
+    def test_criar_registro_pelo_terminal(self):
+        self.client.force_login(self.titular)
+
+        campos = self.client.get(reverse("painel_registro_campos_novos", args=["ips"])).json()["campos"]
+        obrigatorios = [c["nome"] for c in campos if c["obrigatorio"]]
+        self.assertEqual(obrigatorios, ["categoria", "endereco_ip"])
+        # os obrigatorios vem primeiro, que e a ordem em que o terminal pergunta
+        self.assertEqual([c["nome"] for c in campos][: len(obrigatorios)], obrigatorios)
+
+        criar = reverse("painel_registro_criar", args=["ips"])
+        resposta = self._post(criar, {"valores": {"categoria": "servers", "endereco_ip": "10.0.0.9"}})
+        self.assertEqual(resposta.status_code, 200)
+        dados = resposta.json()
+        ip = EnderecoIP.objects.get(pk=dados["pk"])
+        self.assertEqual(ip.endereco_ip, "10.0.0.9")
+        self.assertEqual(ip.criado_por, self.titular)  # autor e quem opera o painel
+
+        # obrigatorio vazio nao passa: o Django nao recusa `blank` sozinho no save
+        vazio = self._post(criar, {"valores": {"categoria": "servers"}})
+        self.assertEqual(vazio.status_code, 400)
+        self.assertIn("ENDERECO IP", vazio.json()["message"])
+        self.assertEqual(EnderecoIP.objects.filter(endereco_ip="").count(), 0)
+
+        # opcao invalida em campo de escolha
+        self.assertEqual(
+            self._post(criar, {"valores": {"categoria": "inventada", "endereco_ip": "10.0.0.10"}}).status_code, 400
+        )
+
+    def test_numero_e_codigo_sao_gerados_pelo_sistema(self):
+        self.client.force_login(self.titular)
+
+        # o terminal nao pergunta o que o sistema gera
+        campos = self.client.get(reverse("painel_registro_campos_novos", args=["chamados"])).json()["campos"]
+        self.assertNotIn("numero", [c["nome"] for c in campos])
+
+        chamado = self._post(reverse("painel_registro_criar", args=["chamados"]), {"valores": {"titulo": "Do painel"}})
+        self.assertEqual(chamado.status_code, 200)
+        self.assertTrue(Chamado.objects.get(pk=chamado.json()["pk"]).numero.startswith("CH-"))
+
+        requisicao = self._post(
+            reverse("painel_registro_criar", args=["requisicoes"]), {"valores": {"titulo": "Do painel"}}
+        )
+        self.assertEqual(requisicao.status_code, 200)
+        self.assertTrue(RequisicaoContrato.objects.get(pk=requisicao.json()["pk"]).codigo.startswith("REQ-"))
+
+    def test_tabela_so_leitura_nao_cria(self):
+        self.client.force_login(self.titular)
+        self.assertEqual(self.client.get(reverse("painel_registro_campos_novos", args=["eventos"])).status_code, 400)
+        self.assertEqual(
+            self._post(reverse("painel_registro_criar", args=["cofre"]), {"valores": {"rotulo": "X"}}).status_code, 400
+        )
+
     # ----------------------------------------------------------- operacao --
     def test_operacao_e_trilha_de_auditoria(self):
         self.client.force_login(self.titular)

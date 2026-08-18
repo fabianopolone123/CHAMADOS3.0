@@ -229,6 +229,15 @@ body.painel-body {
     outline: none;
 }
 
+/* A dica do campo (tipo aceito ou opcoes validas) fica ao lado do que se
+   digita: sem ela o operador nao sabe o que o campo aceita. */
+.pnl-status .pnl-info {
+    flex: 0 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .pnl-status input.pnl-livre {
     text-transform: none;
 }
