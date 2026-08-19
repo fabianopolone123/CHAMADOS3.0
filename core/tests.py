@@ -4318,6 +4318,10 @@ class PainelTitularTests(TestCase):
         lista = self.client.get(reverse("painel_tabela", args=["pausas"])).json()
         self.assertEqual(lista["total"], 1)
         self.assertEqual([l["pk"] for l in lista["linhas"]], [pendente.pk])
+        # De qual chamado e a pausa tem de estar na cara, em coluna propria:
+        # dentro do texto do atendimento ("fabiano - CH-000905") passava batido.
+        self.assertEqual(lista["colunas"][:2], ["CHAMADO", "ATENDENTE"])
+        self.assertIn(chamado.numero, lista["linhas"][0]["valores"][0])
 
         # A contagem do modulo tem de bater com a lista, senao o numero mente.
         modulo = self.client.get(reverse("painel_modulo", args=["chamados"])).json()

@@ -77,7 +77,7 @@ TABELAS: tuple[TabelaPainel, ...] = (
         chave="pausas",
         rotulo="PAUSAS A COMPLEMENTAR",
         modelo=m.PausaAutomatica,
-        colunas=("atendimento", "criado_em"),
+        colunas=("atendimento__chamado", "atendimento__atendente", "criado_em"),
         busca=("atendimento__chamado__numero", "atendimento__atendente__username"),
         ordem="-criado_em",
         # So aparece o que falta preencher: pausa complementada virou historico,
@@ -192,7 +192,7 @@ TABELAS: tuple[TabelaPainel, ...] = (
         chave="retiradas",
         rotulo="RETIRADAS DE INSUMO",
         modelo=m.RetiradaInsumoTI,
-        colunas=("insumo", "criado_em"),
+        colunas=("insumo", "tipo", "criado_em"),
         busca=("insumo__nome", "entregue_para", "motivo"),
         ordem="-criado_em",
     ),
@@ -332,7 +332,7 @@ TABELAS: tuple[TabelaPainel, ...] = (
         chave="equipamento_fotos",
         rotulo="FOTOS DE EQUIPAMENTO",
         modelo=m.FotoEquipamentoEmprestimoTI,
-        colunas=("equipamento", "nome_original"),
+        colunas=("equipamento__emprestimo", "equipamento", "nome_original"),
         busca=("nome_original", "equipamento__tipo_equipamento"),
         ordem="-enviado_em",
     ),
@@ -448,6 +448,21 @@ def valor_exibicao(instancia, campo) -> str:
 
 
 def _coluna_texto(instancia, nome: str) -> str:
+    """Texto de uma coluna da lista, aceitando caminho pelo vinculo.
+
+    `atendimento__chamado` existe porque ha tabela cuja identidade mora no avo:
+    a pausa automatica so faz sentido junto do **chamado**, que estava perdido
+    dentro do texto do atendimento ("fabiano - CH-000888"), lido de relance como
+    se fosse o nome de uma pessoa.
+    """
+    if "__" in nome:
+        alvo = instancia
+        for parte in nome.split("__")[:-1]:
+            alvo = getattr(alvo, parte, None)
+            if alvo is None:
+                return "-"
+        return _coluna_texto(alvo, nome.split("__")[-1])
+
     campo = None
     try:
         campo = instancia._meta.get_field(nome)
@@ -492,7 +507,7 @@ def listar(tabela: TabelaPainel, termo: str = "", pagina: int = 0, por_pagina: i
     return {
         "chave": tabela.chave,
         "rotulo": tabela.rotulo,
-        "colunas": [c.replace("_", " ").upper() for c in tabela.colunas],
+        "colunas": [c.split("__")[-1].replace("_", " ").upper() for c in tabela.colunas],
         "linhas": linhas,
         "total": total,
         "pagina": pagina,
