@@ -195,6 +195,29 @@ a execucao em andamento.
 - Guarde a `VAULT_ENCRYPTION_KEY` **fora** do backup (em local separado). Sem ela
   o backup do cofre nao pode ser restaurado.
 
+## 6b. Copia de producao para a maquina local
+
+Para desenvolver contra dados de verdade (o sistema novo que consome a API, um
+relatorio, um teste de importacao):
+
+```bash
+./scripts/copia_local.sh              # banco + arquivos, em ../copia-producao-AAAAMMDD
+SEM_MEDIA=1 ./scripts/copia_local.sh  # so o banco
+```
+
+O banco **nao** e copiado com `cp`: com o sistema rodando, o arquivo pode ser
+pego no meio de uma escrita e chegar corrompido. O script usa a API de backup do
+proprio SQLite, que devolve um snapshot consistente sem travar ninguem, e confere
+a integridade no fim.
+
+Duas coisas importantes sobre essa copia:
+
+- a `VAULT_ENCRYPTION_KEY` **nao** vai junto, e nem deve: as credenciais do cofre
+  e a senha do SMTP viajam cifradas e **nao abrem** fora do servidor;
+- ela carrega **dado pessoal** (CPF, e-mail e telefone de colaboradores). Trate a
+  pasta como o banco que ela e — nao sincronize com nuvem pessoal, e apague
+  quando nao precisar mais.
+
 ## 7. Boas praticas operacionais
 
 - Nunca commite `.env`, `seed/` ou `db.sqlite3` (ja estao no `.gitignore`).
