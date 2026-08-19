@@ -156,6 +156,15 @@ body.painel-body {
     width: 13ch;
 }
 
+/* Data tem tamanho conhecido; fixando-a, o texto (titulo, nome) fica com todo o
+   resto da linha em vez de dividir a largura em partes iguais. */
+.pnl th[data-col$=" EM"],
+.pnl td[data-col$=" EM"],
+.pnl th[data-col="QUANTIDADE ATUAL"],
+.pnl td[data-col="QUANTIDADE ATUAL"] {
+    width: 18ch;
+}
+
 .pnl td {
     padding: 2px 6px 2px 4px;
     vertical-align: top;
