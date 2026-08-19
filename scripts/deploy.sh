@@ -104,12 +104,43 @@ log "Checando configuracao (manage.py check --deploy)"
 "$PYTHON" manage.py check --deploy || true
 
 # --- 6. Reinicia o servico ---------------------------------------------------
+# Sem a regra de sudoers (docs/08), o `sudo` aqui pede senha e o deploy morre no
+# ultimo passo: codigo e estaticos novos no disco, gunicorn servindo o antigo -
+# exatamente o estado misto que este script existe para evitar. Quando o master
+# do gunicorn pertence a quem esta rodando o deploy, da para recarregar sem sudo,
+# com um HUP: o master sobe workers novos (que reimportam o codigo) e aposenta os
+# antigos, sem derrubar a porta.
+recarregar_sem_sudo() {
+    local pid
+    pid=$(systemctl show "$SERVICE" -p MainPID --value 2>/dev/null || echo "")
+    [ -n "$pid" ] && [ "$pid" != "0" ] || return 1
+    # so sinaliza processo do proprio usuario, e so se for gunicorn
+    [ "$(ps -o user= -p "$pid" 2>/dev/null | tr -d ' ')" = "$(id -un)" ] || return 1
+    ps -o cmd= -p "$pid" 2>/dev/null | grep -q gunicorn || return 1
+    kill -HUP "$pid" || return 1
+    sleep 3
+    kill -0 "$pid" 2>/dev/null || return 1
+    return 0
+}
+
 log "Reiniciando o servico ($SERVICE)"
-$SUDO systemctl restart "$SERVICE"
-sleep 1
-if $SUDO systemctl is-active --quiet "$SERVICE"; then
-    log "Servico ativo. Deploy concluido com sucesso."
-    $SUDO systemctl --no-pager --full status "$SERVICE" | head -n 8 || true
+if $SUDO -n true 2>/dev/null || [ "$(id -u)" -eq 0 ]; then
+    $SUDO systemctl restart "$SERVICE"
+    sleep 1
+    if $SUDO systemctl is-active --quiet "$SERVICE"; then
+        log "Servico ativo. Deploy concluido com sucesso."
+        $SUDO systemctl --no-pager --full status "$SERVICE" | head -n 8 || true
+    else
+        err "O servico $SERVICE nao subiu. Veja: journalctl -u $SERVICE -n 50 --no-pager"
+    fi
+elif recarregar_sem_sudo; then
+    log "Sem sudo sem senha: recarreguei o gunicorn (HUP). Codigo novo no ar."
+    printf '%b
+' "[1;33mAtencao: HUP recarrega o CODIGO, nao o EnvironmentFile.[0m"
+    printf '%b
+' "[1;33mSe voce mudou variaveis de ambiente, faca: sudo systemctl restart $SERVICE[0m"
+    printf '%b
+' "[1;33mPara o deploy fechar sozinho, instale a regra de sudoers (docs/08_deploy_seguro.md).[0m"
 else
-    err "O servico $SERVICE nao subiu. Veja: journalctl -u $SERVICE -n 50 --no-pager"
+    err "Nao consegui reiniciar nem recarregar o $SERVICE. Rode: sudo systemctl restart $SERVICE"
 fi

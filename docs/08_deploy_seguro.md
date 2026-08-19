@@ -172,10 +172,17 @@ Confira que pegou (tem de responder sem pedir senha):
 sudo -n systemctl is-active chamados
 ```
 
-**Sem essa regra o `chamados-deploy` para no ultimo passo**: o codigo novo fica
-no disco e os estaticos ja saem atualizados, mas o gunicorn continua servindo o
-codigo antigo — que e justamente o estado misto que o script existe para evitar.
-Nesse caso, termine a mao com `sudo systemctl restart chamados`.
+**Sem essa regra o `chamados-deploy` nao consegue o `systemctl restart`.** Para
+nao deixar o deploy pela metade (codigo e estaticos novos no disco, gunicorn
+servindo o antigo), o script cai num **reload sem sudo**: se o master do gunicorn
+pertence a quem esta rodando o deploy, ele manda um `HUP`, e o master sobe
+workers novos — que reimportam o codigo — aposentando os antigos sem derrubar a
+porta.
+
+Cuidado com o limite disso: **`HUP` recarrega o codigo, nao o `EnvironmentFile`**.
+Mudou `/etc/chamados/app.env` (chave do cofre, ALLOWED_HOSTS, cookies)? Ai e
+`sudo systemctl restart chamados` mesmo, com senha. O script avisa isso na tela
+quando usa o atalho.
 
 Observacao: o script re-executa a si mesmo a partir de uma copia temporaria
 antes do `git pull`, para que a atualizacao do proprio `deploy.sh` nunca corrompa
