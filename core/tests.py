@@ -3893,6 +3893,21 @@ class RamalKasperskyTests(TestCase):
         )
 
 
+class EstaticosTests(TestCase):
+    """Os arquivos estaticos tem de chegar atualizados depois de um deploy."""
+
+    def test_estatico_manda_o_navegador_revalidar(self):
+        # Sem `Cache-Control`, o navegador usa cache heuristico e segue com o JS
+        # antigo depois do deploy — foi o que escondeu a correcao da numeracao do
+        # painel ate limpar o cache na mao.
+        resposta = self.client.get("/static/js/painel.js")
+        self.assertEqual(resposta.status_code, 200)
+        self.assertEqual(resposta.headers.get("Cache-Control"), "no-cache")
+
+    def test_estatico_inexistente_continua_404(self):
+        self.assertEqual(self.client.get("/static/js/nao-existe.js").status_code, 404)
+
+
 class PainelTitularTests(TestCase):
     """Painel do Titular: acesso, interface do menu, usuarios, dados e trilha."""
 
@@ -4931,6 +4946,24 @@ class PainelTitularTests(TestCase):
         for template in ("contratos.html", "painel.html"):
             html = (base / "templates" / "chamados" / template).read_text(encoding="utf-8")
             self.assertIn("js/requisicao_texto.js", html)
+
+    def test_linha_abre_sem_enter_e_tabela_nao_escapa_do_quadro(self):
+        """Duas regras da lista, achadas usando o painel de verdade:
+
+        digitar a linha nao pode exigir ENTER (o terminal abre sozinho quando o
+        numero nao pode virar outro maior), e a tabela nao pode ficar mais larga
+        que o quadro — a ultima coluna sumia na borda da tela."""
+        from pathlib import Path
+
+        base = Path(settings.BASE_DIR)
+        painel_js = (base / "static" / "js" / "painel.js").read_text(encoding="utf-8")
+        self.assertIn("ESPERA_LINHA", painel_js)
+        self.assertIn("cancelarAberturaAutomatica", painel_js)
+        # o rodape nao pode mais prometer ENTER para abrir
+        self.assertNotIn("ENTER ABRE", painel_js)
+
+        painel_css = (base / "static" / "css" / "painel.css").read_text(encoding="utf-8")
+        self.assertIn("table-layout: fixed", painel_css)
 
     def test_lista_do_terminal_nao_numera_com_zero_a_esquerda(self):
         """A lista mostrava "01", "02"... mas `0` e a tecla de VOLTAR: quem

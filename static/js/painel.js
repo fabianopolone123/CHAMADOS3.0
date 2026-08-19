@@ -109,6 +109,7 @@
         // Busca e pagina sao por tela: entrar em DADOS nao herda a busca feita
         // em USUARIOS, e voltar do registro para a lista preserva o filtro.
         buscas: { usuarios: { termo: "", pagina: 0 }, tabela: { termo: "", pagina: 0 } },
+        temporizadorLinha: null,
         ocupado: false,
     };
 
@@ -151,11 +152,13 @@
         if (!linhas.length) {
             return `<div class="pnl-vazio">${esc(opcoes.vazio || "NADA A MOSTRAR.")}</div>`;
         }
-        const cabecalho = colunas.map((c) => `<th>${esc(c)}</th>`).join("");
+        const cabecalho = colunas.map((c) => `<th data-col="${esc(c)}">${esc(c)}</th>`).join("");
         const corpo = linhas
             .map((linha, indice) => {
                 const selecionada = estado.selecionado === indice + 1 ? " sel" : "";
-                const celulas = linha.map((valor) => `<td>${valor}</td>`).join("");
+                const celulas = linha
+                    .map((valor, coluna) => `<td data-col="${esc(colunas[coluna] || "")}">${valor}</td>`)
+                    .join("");
                 return `<tr class="pnl-item${selecionada}" data-linha="${indice + 1}"><td class="pnl-num">${indice + 1}</td>${celulas}</tr>`;
             })
             .join("");
@@ -193,7 +196,7 @@
 
         const partes = [];
         if (estado.buffer) {
-            partes.push(`<span class="pnl-buffer">LINHA: ${esc(estado.buffer)}_ &nbsp; ENTER ABRE &nbsp; ESC LIMPA</span>`);
+            partes.push(`<span class="pnl-buffer">LINHA: ${esc(estado.buffer)}_ &nbsp; ABRE SOZINHO &nbsp; ESC LIMPA</span>`);
         } else if (estado.aviso) {
             partes.push(`<span class="pnl-${esc(estado.avisoTipo)}">${esc(estado.aviso)}</span>`);
         } else {
@@ -208,6 +211,7 @@
         });
         $tela.querySelectorAll("[data-linha]").forEach((elemento) => {
             elemento.addEventListener("click", () => {
+                cancelarAberturaAutomatica();
                 estado.buffer = "";
                 TELAS[estado.tela].escolher(parseInt(elemento.dataset.linha, 10));
             });
@@ -222,6 +226,19 @@
     }
 
     const ESPERA_CONFIRMACAO = 400; // ms
+
+    /* Quando o numero digitado ainda pode ser o comeco de outro da lista (o "1"
+       de uma pagina que tem linha 10), o terminal espera um instante pelo
+       segundo digito e abre sozinho se ele nao vier. Assim nao existe ENTER
+       para abrir registro: numero sem continuacao possivel abre na hora. */
+    const ESPERA_LINHA = 350; // ms
+
+    function cancelarAberturaAutomatica() {
+        if (estado.temporizadorLinha) {
+            clearTimeout(estado.temporizadorLinha);
+            estado.temporizadorLinha = null;
+        }
+    }
 
     function pedirConfirmacao(texto, aoSim) {
         estado.confirma = { texto: texto.toUpperCase(), aoSim, desde: Date.now() };
@@ -251,6 +268,7 @@
     /* ----------------------------------------------------------- teclado -- */
 
     function tratarTecla(bruta) {
+        cancelarAberturaAutomatica();
         if (estado.ocupado) {
             // Requisicao em curso: a tecla e ignorada de proposito (enfileirar
             // acabaria executando comando fora de contexto), mas o operador ve
@@ -322,6 +340,14 @@
             TELAS[estado.tela].escolher(valor);
             return;
         }
+        // Ainda pode virar um numero maior (1 -> 10..14): da um instante para o
+        // proximo digito e, se ele nao vier, abre o que foi digitado.
+        estado.temporizadorLinha = setTimeout(() => {
+            estado.temporizadorLinha = null;
+            if (estado.buffer !== candidato) return;
+            estado.buffer = "";
+            TELAS[estado.tela].escolher(valor);
+        }, ESPERA_LINHA);
         desenharStatus();
     }
 

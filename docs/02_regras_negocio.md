@@ -141,6 +141,7 @@ Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem
 
 - O painel (`/painel/`) e **exclusivo do titular**: apenas o usuario `fabiano.polone` (`PRIMARY_ADMIN_USERNAME`). Ser superusuario ou pertencer ao grupo Administrador **nao** da acesso, porque o painel mexe na interface e nos dados de todos os modulos.
 - O botao de entrada fica ao lado da marca "TI" na barra lateral e so e renderizado para o titular.
+- **Abrir registro nao usa ENTER.** O numero digitado abre na hora quando nao pode ser o comeco de outro da lista; quando pode (o `1` numa pagina que tem linha `10`), o terminal espera um instante pelo segundo digito e abre sozinho se ele nao vier. O ENTER continua valendo para quem ja apertou por habito, e so e obrigatorio em campo de texto livre.
 - A **lista numera 1, 2, 3... sem zero a esquerda**, porque `0` e a tecla de voltar: mostrar "01" convidava a digitar um zero que sai da tela em vez de abrir o registro. O numero da linha aparece exatamente como se digita.
 - A navegacao e de terminal: a tecla executa na hora (sem ENTER e sem setas), ESC volta um nivel de cada vez (entrada de texto -> numero digitado -> selecao -> busca -> tela anterior) e o ENTER so vale em campo de texto livre. O clique do mouse repete a mesma acao da tecla.
 - **Toda acao que grava** (interface, usuarios, dados, operacao) e registrada em `PainelAuditoria`, com quem fez, quando, o alvo e o antes/depois.

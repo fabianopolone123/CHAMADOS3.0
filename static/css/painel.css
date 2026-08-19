@@ -31,7 +31,7 @@ body.painel-body {
 .pnl {
     border: 3px double var(--pnl-linha);
     background: var(--pnl-painel);
-    max-width: 1280px;
+    max-width: 1600px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -111,6 +111,10 @@ body.painel-body {
 .pnl table {
     width: 100%;
     border-collapse: collapse;
+    /* Fixo: a largura sai do container e nao da soma do conteudo. Sem isto, uma
+       coluna com texto longo empurra a tabela para fora do quadro e a ultima
+       (ATENDENTE, na lista de chamados) fica cortada na borda da tela. */
+    table-layout: fixed;
 }
 
 .pnl th {
@@ -119,13 +123,42 @@ body.painel-body {
     font-weight: normal;
     padding: 2px 6px 2px 4px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border-bottom: 1px solid var(--pnl-linha);
+}
+
+/* Colunas de conteudo curto ficam estreitas para sobrar largura ao que e longo
+   (titulo, nome, e-mail). O resto divide o que sobra em partes iguais. */
+.pnl th[data-col="ID"],
+.pnl td[data-col="ID"] {
+    width: 8ch;
+}
+
+.pnl th[data-col="NUMERO"],
+.pnl td[data-col="NUMERO"],
+.pnl th[data-col="STATUS"],
+.pnl td[data-col="STATUS"],
+.pnl th[data-col="PRIORIDADE"],
+.pnl td[data-col="PRIORIDADE"],
+.pnl th[data-col="SITUACAO"],
+.pnl td[data-col="SITUACAO"],
+.pnl th[data-col="ACESSO"],
+.pnl td[data-col="ACESSO"],
+.pnl th[data-col="REGISTROS"],
+.pnl td[data-col="REGISTROS"],
+.pnl th[data-col="MENU"],
+.pnl td[data-col="MENU"],
+.pnl th[data-col="ATIVO"],
+.pnl td[data-col="ATIVO"],
+.pnl th[data-col="TIPO"],
+.pnl td[data-col="TIPO"] {
+    width: 13ch;
 }
 
 .pnl td {
     padding: 2px 6px 2px 4px;
     vertical-align: top;
-    max-width: 34ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -292,7 +325,18 @@ body.painel-body {
         gap: 0 12px;
     }
 
+    /* Em tela estreita, espremer 8 colunas em partes iguais nao ajuda ninguem:
+       a largura volta a sair do conteudo e a lista rola de lado. */
+    .pnl table {
+        table-layout: auto;
+    }
+
     .pnl td {
         max-width: 20ch;
+    }
+
+    .pnl th[data-col],
+    .pnl td[data-col] {
+        width: auto;
     }
 }
