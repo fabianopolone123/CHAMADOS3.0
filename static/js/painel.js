@@ -55,8 +55,6 @@
             '"': "&quot;",
         }[c]));
 
-    const num = (valor, casas = 2) => String(valor).padStart(casas, "0");
-
     function csrfToken() {
         const campo = raiz.querySelector("input[name=csrfmiddlewaretoken]");
         if (campo && campo.value) {
@@ -158,7 +156,7 @@
             .map((linha, indice) => {
                 const selecionada = estado.selecionado === indice + 1 ? " sel" : "";
                 const celulas = linha.map((valor) => `<td>${valor}</td>`).join("");
-                return `<tr class="pnl-item${selecionada}" data-linha="${indice + 1}"><td class="pnl-num">${num(indice + 1)}</td>${celulas}</tr>`;
+                return `<tr class="pnl-item${selecionada}" data-linha="${indice + 1}"><td class="pnl-num">${indice + 1}</td>${celulas}</tr>`;
             })
             .join("");
         return `<table><thead><tr><th>N</th>${cabecalho}</tr></thead><tbody>${corpo}</tbody></table>`;

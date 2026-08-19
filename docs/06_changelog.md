@@ -2,6 +2,7 @@
 
 ## 2026-08-18
 
+- Painel do Titular: **a lista deixou de numerar com zero a esquerda**. As linhas apareciam como `01`, `02`... mas `0` e a tecla de **voltar**: quem digitava a linha do jeito que ela estava escrita saia da tela em vez de abrir o registro — e, pior, o digito seguinte ainda era aplicado na tela anterior. A tela pedia exatamente o que o terminal recusa. Agora o numero sai como se digita (`1`, `2`, `10`) e a coluna alinha a direita, mantendo o desenho tabular sem o zero enganoso. Achado testando a mao, na area INTERFACE. Ficou um teste que falha se a numeracao voltar a ser preenchida com zero.
 - Painel do Titular: **o que era gesto de tela virou tecla** — com isso nao sobra funcao fora do terminal.
   - **Assinar o termo de emprestimo** (`S`): ID da assinatura + senha de autorizacao (mascarada), pela rota que ja confere a senha e refaz o PDF com a rubrica. Estava classificado como "so na tela" por engano meu: eram dois campos.
   - **Rubrica da assinatura**: ganhou rota propria (`assinatura_imagem`) e abre pela acao `T`. Era o unico arquivo do sistema sem rota que o servisse — existia so dentro do PDF — e por isso o campo tinha sido escondido da tabela; agora aparece e abre.

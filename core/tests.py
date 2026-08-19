@@ -4932,6 +4932,16 @@ class PainelTitularTests(TestCase):
             html = (base / "templates" / "chamados" / template).read_text(encoding="utf-8")
             self.assertIn("js/requisicao_texto.js", html)
 
+    def test_lista_do_terminal_nao_numera_com_zero_a_esquerda(self):
+        """A lista mostrava "01", "02"... mas `0` e a tecla de VOLTAR: quem
+        digitasse a linha como ela aparecia saia da tela em vez de abrir o
+        registro. O numero tem de sair como se digita."""
+        from pathlib import Path
+
+        painel_js = (Path(settings.BASE_DIR) / "static" / "js" / "painel.js").read_text(encoding="utf-8")
+        self.assertIn('pnl-num">${indice + 1}', painel_js)
+        self.assertNotIn('padStart', painel_js)
+
     def test_cada_tabela_do_painel_usa_uma_tecla_por_acao(self):
         """Duas acoes na mesma tecla deixariam uma delas inalcancavel."""
         vistos = {}

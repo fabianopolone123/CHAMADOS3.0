@@ -147,6 +147,10 @@ body.painel-body {
 .pnl-num {
     color: var(--pnl-destaque);
     width: 42px;
+    /* Alinhado a direita porque o numero nao tem mais zero a esquerda: "01"
+       convidava a digitar o zero, que no terminal e a tecla de voltar. */
+    text-align: right;
+    padding-right: 10px;
 }
 
 .pnl-vazio {
