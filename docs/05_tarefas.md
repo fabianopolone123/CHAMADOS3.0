@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- **API para sistemas de fora**: token por cabecalho valendo em qualquer rota (escrita usa as rotas da tela, com as mesmas regras), leitura generica em `/api/v1/tabelas/...`, arquivos pela propria API; `core/api.py`, model `TokenApi` (migration `0053`), comando `criar_token_api`, `docs/09_api.md`
+
 - Painel do Titular: assinatura do termo (`S`), rubrica com rota propria, e a copia da requisicao para WhatsApp/e-mail por tecla — com o texto extraido para `static/js/requisicao_texto.js`, compartilhado com a tela de Requisicoes
 
 - Painel do Titular: senha-mestra do Cofre, documento com anexo (arquivo opcional), assinatura de responsavel e edicao de requisicao pela rota que registra o evento — com testes de catalogo cobrando "arquivo listado tem de abrir" e "uma tecla por acao"

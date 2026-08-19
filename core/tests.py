@@ -50,6 +50,7 @@ from .models import (
     ServicoFeitoAnexo,
     Starlink,
     SuborcamentoContrato,
+    TokenApi,
     SuborcamentoDocumento,
 )
 from . import painel_acoes, painel_dados
@@ -3907,6 +3908,117 @@ class EstaticosTests(TestCase):
 
     def test_estatico_inexistente_continua_404(self):
         self.assertEqual(self.client.get("/static/js/nao-existe.js").status_code, 404)
+
+
+class ApiTokenTests(TestCase):
+    """API para sistemas de fora: token, leitura generica e escrita pelas rotas."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin_group, _ = Group.objects.get_or_create(name=ADMIN_GROUP_NAME)
+        self.attendant_group, _ = Group.objects.get_or_create(name=ATTENDANT_GROUP_NAME)
+        self.ti = User.objects.create_user("ti.api", password="x")
+        self.ti.groups.add(self.attendant_group)
+        self.comum = User.objects.create_user("joao.comum", password="x")
+        self.ramal = Ramal.objects.create(colaborador="Zebedeu Teste", setor="Financeiro", ramal="1234")
+
+    def _token(self, usuario=None, escrita=False):
+        _, valor = TokenApi.gerar("Sistema de teste", usuario or self.ti, somente_leitura=not escrita)
+        return {"HTTP_AUTHORIZATION": f"Token {valor}"}
+
+    def test_sem_token_nao_le_nada(self):
+        self.assertEqual(self.client.get(reverse("api_tabelas")).status_code, 401)
+        self.assertEqual(
+            self.client.get(reverse("api_tabelas"), HTTP_AUTHORIZATION="Token inventado").status_code, 401
+        )
+
+    def test_token_le_tabelas_e_registros(self):
+        cabecalho = self._token()
+        tabelas = self.client.get(reverse("api_tabelas"), **cabecalho).json()
+        self.assertTrue(tabelas["ok"])
+        self.assertTrue(tabelas["somente_leitura"])
+        self.assertIn("ramais", [t["chave"] for t in tabelas["tabelas"]])
+
+        lista = self.client.get(reverse("api_tabela", args=["ramais"]), {"q": "Zebedeu"}, **cabecalho).json()
+        self.assertEqual(lista["total"], 1)
+        self.assertEqual(lista["linhas"][0]["pk"], self.ramal.pk)
+
+        registro = self.client.get(reverse("api_registro", args=["ramais", self.ramal.pk]), **cabecalho).json()
+        campos = {c["nome"]: c["valor"] for c in registro["campos"]}
+        # O detalhe traz o que a lista nao mostra mais.
+        self.assertEqual(campos["setor"], "Financeiro")
+
+    def test_token_de_leitura_nao_grava(self):
+        cabecalho = self._token()
+        resposta = self.client.post(
+            reverse("create_ticket_kanban"),
+            data={"titulo": "Da API", "descricao": "Aberto pelo sistema de fora."},
+            **cabecalho,
+        )
+        self.assertEqual(resposta.status_code, 403)
+        self.assertFalse(Chamado.objects.exists())
+
+    def test_token_de_escrita_usa_a_rota_da_tela_com_as_regras(self):
+        cabecalho = self._token(escrita=True)
+        resposta = self.client.post(
+            reverse("create_ticket_kanban"),
+            data={"titulo": "Impressora do RH", "descricao": "Nao imprime desde hoje."},
+            **cabecalho,
+        )
+        self.assertEqual(resposta.status_code, 200)
+        chamado = Chamado.objects.get(numero=resposta.json()["ticket_number"])
+        # Mesma rota da tela = mesmas consequencias.
+        self.assertTrue(chamado.eventos.filter(tipo=ChamadoEvento.TIPO_CRIACAO).exists())
+        self.assertEqual(chamado.solicitante, self.ti)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_arquivo_vai_e_volta_pela_api(self):
+        cabecalho = self._token(escrita=True)
+        envio = self.client.post(
+            reverse("documento_create"),
+            data={
+                "nome": "Contrato assinado",
+                "anexos": SimpleUploadedFile("contrato.pdf", b"%PDF-1.4 conteudo", content_type="application/pdf"),
+            },
+            **cabecalho,
+        )
+        self.assertEqual(envio.status_code, 200)
+        anexo = DocumentoTI.objects.get(nome="Contrato assinado").anexos.first()
+
+        baixado = self.client.get(reverse("documento_anexo_download", args=[anexo.pk]), **cabecalho)
+        self.assertEqual(baixado.status_code, 200)
+        self.assertEqual(b"".join(baixado.streaming_content), b"%PDF-1.4 conteudo")
+
+    def test_permissao_e_a_da_conta_do_token(self):
+        # Conta sem perfil de TI nao le os dados, mesmo com token valido.
+        cabecalho = self._token(usuario=self.comum)
+        self.assertEqual(self.client.get(reverse("api_tabelas"), **cabecalho).status_code, 403)
+
+    def test_token_desativado_para_de_valer(self):
+        _, valor = TokenApi.gerar("Vai ser desativado", self.ti, somente_leitura=True)
+        cabecalho = {"HTTP_AUTHORIZATION": f"Token {valor}"}
+        self.assertEqual(self.client.get(reverse("api_tabelas"), **cabecalho).status_code, 200)
+
+        TokenApi.objects.update(ativo=False)
+        self.assertEqual(self.client.get(reverse("api_tabelas"), **cabecalho).status_code, 401)
+
+    def test_segredo_nao_sai_pela_api(self):
+        cofre = CofreCredencial(rotulo="Roteador", usuario="admin")
+        cofre.definir_senha("nao-pode-vazar")
+        cofre.save()
+        cabecalho = self._token()
+
+        registro = self.client.get(reverse("api_registro", args=["cofre", cofre.pk]), **cabecalho).json()
+        corpo = json.dumps(registro)
+        self.assertNotIn("nao-pode-vazar", corpo)
+        self.assertNotIn("senha_cifrada", [c["nome"] for c in registro["campos"]])
+
+    def test_o_banco_guarda_so_o_hash_do_token(self):
+        token, valor = TokenApi.gerar("Sistema de teste", self.ti)
+        self.assertNotEqual(token.token_hash, valor)
+        self.assertNotIn(valor, token.token_hash)
+        self.assertEqual(TokenApi.autenticar(valor), token)
+        self.assertIsNone(TokenApi.autenticar("chute"))
 
 
 class PainelTitularTests(TestCase):

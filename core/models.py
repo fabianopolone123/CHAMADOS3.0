@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
 from datetime import timedelta
 from decimal import Decimal
 
@@ -1905,6 +1907,79 @@ class EmailConfig(models.Model):
             if email and email.lower() not in {v.lower() for v in vistos}:
                 vistos.append(email)
         return vistos
+
+
+class TokenApi(models.Model):
+    """Chave de acesso para um sistema de fora falar com o Chamados.
+
+    O token **nao e um usuario paralelo**: ele aponta para uma conta do sistema,
+    e o pedido roda com as permissoes dela. Assim a API nao tem regra propria —
+    o que aquele usuario pode fazer pela tela, pode pela API; o que nao pode,
+    tambem nao pode por aqui.
+
+    O valor so aparece uma vez, no momento em que e criado: o banco guarda
+    apenas o **hash** (o mesmo raciocinio da senha). Perdeu, gera outro.
+    """
+
+    rotulo = models.CharField(max_length=120, help_text="Para que serve / de quem e este token.")
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tokens_api",
+        help_text="Conta cujas permissoes valem para os pedidos com este token.",
+    )
+    ativo = models.BooleanField(default=True)
+    # Comeca so lendo de proposito: liberar escrita e uma decisao consciente.
+    somente_leitura = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tokens_api_criados",
+    )
+    ultimo_uso = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Token de API"
+        verbose_name_plural = "Tokens de API"
+        ordering = ["rotulo"]
+
+    def __str__(self) -> str:
+        return f"{self.rotulo} ({self.usuario})"
+
+    @staticmethod
+    def cifrar(valor: str) -> str:
+        return hashlib.sha256((valor or "").encode("utf-8")).hexdigest()
+
+    @classmethod
+    def gerar(cls, rotulo: str, usuario, criado_por=None, somente_leitura: bool = True):
+        """Cria o token e devolve (registro, valor em texto).
+
+        O valor em texto e a unica copia: nao da para recuperar depois.
+        """
+        valor = secrets.token_urlsafe(32)
+        token = cls.objects.create(
+            rotulo=rotulo,
+            token_hash=cls.cifrar(valor),
+            usuario=usuario,
+            criado_por=criado_por,
+            somente_leitura=somente_leitura,
+        )
+        return token, valor
+
+    @classmethod
+    def autenticar(cls, valor: str):
+        """Token ativo correspondente ao valor apresentado, ou None."""
+        if not valor:
+            return None
+        return (
+            cls.objects.select_related("usuario")
+            .filter(token_hash=cls.cifrar(valor), ativo=True, usuario__is_active=True)
+            .first()
+        )
 
 
 class ItemMenuConfig(models.Model):

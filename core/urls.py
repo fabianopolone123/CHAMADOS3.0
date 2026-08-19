@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .api import api_registro, api_tabela, api_tabelas
 from .views_painel import (
     painel_estado_view,
     painel_modulo_view,
@@ -284,6 +285,11 @@ urlpatterns = [
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
     # Painel do Titular (terminal de administracao, so `fabiano.polone`).
+    # --- API para sistemas de fora (leitura generica; escrita usa as rotas
+    # do proprio modulo, com o mesmo token) ---------------------------------
+    path("api/v1/tabelas/", api_tabelas, name="api_tabelas"),
+    path("api/v1/tabelas/<str:chave>/", api_tabela, name="api_tabela"),
+    path("api/v1/tabelas/<str:chave>/<str:pk>/", api_registro, name="api_registro"),
     path("painel/", painel_view, name="painel_titular"),
     path("painel/api/estado/", painel_estado_view, name="painel_estado"),
     path("painel/api/interface/", painel_interface_view, name="painel_interface"),

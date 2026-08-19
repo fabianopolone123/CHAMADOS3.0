@@ -32,6 +32,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Modulo Dicas (apenas TI/admin): base de conhecimento (resolucoes, configuracoes, procedimentos) em cards com filtro por categoria, busca, detalhe com conteudo formatado + anexo e CRUD
 - Modulo Starlinks (apenas TI/admin): antenas/contas Starlink em cards (local, conta, dados do kit), com resumo, busca, filtro por status e CRUD
 - Modulo Cofre (apenas TI/admin + senha-mestra): cofre de senhas da empresa com credenciais cifradas em repouso, destrave por senha-mestra com auto-lock e anti-brute-force, revelacao sob demanda e auditoria completa
+- **API para sistemas de fora** (`docs/09_api.md`): token no cabecalho, leitura generica em `/api/v1/tabelas/...` e escrita pelas mesmas rotas da tela — inclusive envio e download de arquivo
 - Painel do Titular em `/painel/` (apenas `fabiano.polone`): terminal de administracao por teclado, no estilo dos sistemas de banco — entra em cada modulo do menu e opera por ali (lista, cria, altera, exclui e executa as acoes do modulo — abrir chamado, Play/Pause/Stop, converter pendencia, aprovar orcamento), alem de interface do menu, usuarios e acessos, dados de todas as tabelas e operacao/manutencao, tudo auditado
 - Gestao inicial de permissoes (grupos Administrador e Atendente TI)
 - Logout funcional

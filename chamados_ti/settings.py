@@ -111,6 +111,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Depois da autenticacao do Django: quando vem token, ele substitui o
+    # `request.user` da sessao. Antes disso nao daria (nao haveria user).
+    "core.api.TokenApiMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
