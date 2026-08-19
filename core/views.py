@@ -86,6 +86,7 @@ from .permissions import (
     is_admin_user,
     is_attendant_user,
 )
+from .xhr import json_quando_xhr
 
 
 def _landing_route_for_user(user) -> str:
@@ -3879,6 +3880,7 @@ def emails_dashboard_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def email_import_view(request):
     """Importa/atualiza a lista de contas a partir do CSV exportado do Google
     Workspace (upsert por e-mail). Usa as notificacoes classicas (Django
@@ -4482,15 +4484,20 @@ def servicos_feitos_dashboard_view(request):
     return render(request, "chamados/servicos_feitos.html", context)
 
 
-def _parse_valor_brl(raw: str) -> Decimal:
-    """Converte um valor digitado (1.234,56 ou 1234.56) em Decimal."""
+def _parse_valor_brl(raw: str, casas: int = 2) -> Decimal:
+    """Converte um valor digitado (1.234,56 ou 1234.56) em Decimal.
+
+    `casas` acompanha o campo de destino: dinheiro tem 2, mas a Futura guarda o
+    preco da copia com 4 (`0.0750`) — arredondar para 2 na leitura do formulario
+    mudava a tarifa de quem so queria salvar a fatura.
+    """
     valor = (raw or "").strip()
     if not valor:
         return Decimal("0")
     if "," in valor:
         valor = valor.replace(".", "").replace(",", ".")
     try:
-        return Decimal(valor).quantize(Decimal("0.01"))
+        return Decimal(valor).quantize(Decimal(1).scaleb(-casas))
     except (InvalidOperation, ValueError):
         return Decimal("0")
 
@@ -4519,6 +4526,7 @@ def _ler_dados_servico(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def servico_feito_create_view(request):
     """Cadastra um novo servico feito, com anexos opcionais (TI/admin)."""
     if not _is_ti(request.user):
@@ -4544,6 +4552,7 @@ def servico_feito_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def servico_feito_update_view(request, servico_id: int):
     """Edita um servico feito; pode adicionar novos anexos (TI/admin)."""
     if not _is_ti(request.user):
@@ -4599,6 +4608,7 @@ def servico_feito_delete_view(request, servico_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def servico_feito_anexo_delete_view(request, anexo_id: int):
     """Exclui um anexo isolado de um servico feito (TI/admin)."""
     if not _is_ti(request.user):
@@ -4736,6 +4746,7 @@ def _ler_dados_contrato(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def contrato_ti_create_view(request):
     """Cadastra um novo contrato, com anexos opcionais (TI/admin)."""
     if not _is_ti(request.user):
@@ -4761,6 +4772,7 @@ def contrato_ti_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def contrato_ti_update_view(request, contrato_id: int):
     """Edita um contrato; pode adicionar novos anexos (TI/admin)."""
     if not _is_ti(request.user):
@@ -4816,6 +4828,7 @@ def contrato_ti_delete_view(request, contrato_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def contrato_ti_anexo_delete_view(request, anexo_id: int):
     """Exclui um anexo isolado de um contrato (TI/admin)."""
     if not _is_ti(request.user):
@@ -4969,8 +4982,9 @@ def _ler_dados_futura(request):
         return None, "Quantidades de copias invalidas."
 
     franquia_valor = _parse_valor_brl(request.POST.get("franquia_valor")) if (request.POST.get("franquia_valor") or "").strip() else FuturaDigital.FRANQUIA_VALOR_PADRAO
-    excedente = _parse_valor_brl(request.POST.get("valor_copia_excedente")) if (request.POST.get("valor_copia_excedente") or "").strip() else FuturaDigital.VALOR_EXCEDENTE_PADRAO
-    cor = _parse_valor_brl(request.POST.get("valor_copia_cor")) if (request.POST.get("valor_copia_cor") or "").strip() else FuturaDigital.VALOR_COR_PADRAO
+    # Preco da copia tem 4 casas no banco; ler com 2 rebaixava a tarifa.
+    excedente = _parse_valor_brl(request.POST.get("valor_copia_excedente"), casas=4) if (request.POST.get("valor_copia_excedente") or "").strip() else FuturaDigital.VALOR_EXCEDENTE_PADRAO
+    cor = _parse_valor_brl(request.POST.get("valor_copia_cor"), casas=4) if (request.POST.get("valor_copia_cor") or "").strip() else FuturaDigital.VALOR_COR_PADRAO
 
     dados = {
         "mes_referencia": mes,
@@ -4987,6 +5001,7 @@ def _ler_dados_futura(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def futura_digital_create_view(request):
     """Cadastra uma fatura mensal; calcula excedentes e valor no backend (TI/admin)."""
     if not _is_ti(request.user):
@@ -5009,6 +5024,7 @@ def futura_digital_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def futura_digital_update_view(request, fatura_id: int):
     """Edita uma fatura mensal e recalcula excedentes/valor (TI/admin)."""
     if not _is_ti(request.user):
@@ -5121,6 +5137,7 @@ def _ler_dados_dica(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def dica_create_view(request):
     """Cadastra uma nova dica, com anexo opcional (TI/admin)."""
     if not _is_ti(request.user):
@@ -5142,6 +5159,7 @@ def dica_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def dica_update_view(request, dica_id: int):
     """Edita uma dica (TI/admin)."""
     if not _is_ti(request.user):
@@ -5396,6 +5414,7 @@ def cofre_dashboard_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_set_master_view(request):
     """Define (1o acesso) ou altera a senha-mestra. Apenas admin."""
     if not is_admin_user(request.user):
@@ -5429,6 +5448,7 @@ def cofre_set_master_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_unlock_view(request):
     """Destrava o cofre conferindo a senha-mestra (TI/admin)."""
     if not _is_ti(request.user):
@@ -5462,6 +5482,7 @@ def cofre_unlock_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_lock_view(request):
     """Trava o cofre manualmente (limpa a sessao)."""
     _cofre_lock(request)
@@ -5494,6 +5515,7 @@ def _ler_dados_credencial(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_credencial_create_view(request):
     erro = _cofre_guard(request)
     if erro:
@@ -5517,6 +5539,7 @@ def cofre_credencial_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_credencial_update_view(request, credencial_id: int):
     erro = _cofre_guard(request)
     if erro:
@@ -5546,6 +5569,7 @@ def cofre_credencial_update_view(request, credencial_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def cofre_credencial_delete_view(request, credencial_id: int):
     erro = _cofre_guard(request)
     if erro:
@@ -5604,6 +5628,7 @@ def email_config_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def email_config_save_view(request):
     if not _is_ti(request.user):
         messages.error(request, "Voce nao tem permissao para configurar o e-mail.")
@@ -5655,6 +5680,7 @@ def email_config_save_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def email_config_test_view(request):
     if not _is_ti(request.user):
         messages.error(request, "Voce nao tem permissao para testar o e-mail.")

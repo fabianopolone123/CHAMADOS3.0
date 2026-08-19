@@ -177,7 +177,7 @@
         if (estado.entrada) {
             $status.innerHTML =
                 `<span class="pnl-tecla">${esc(estado.entrada.rotulo)}:</span>` +
-                `<input type="text" id="pnl-entrada" class="${estado.entrada.livre ? "pnl-livre" : ""}" autocomplete="off" spellcheck="false">` +
+                `<input type="${estado.entrada.mascara ? "password" : "text"}" id="pnl-entrada" class="${estado.entrada.livre ? "pnl-livre" : ""}" autocomplete="off" spellcheck="false">` +
                 (estado.entrada.dica ? `<span class="pnl-info">${esc(estado.entrada.dica)}</span>` : "") +
                 '<span class="pnl-fraco">ENTER CONFIRMA &nbsp; ESC CANCELA</span>';
             const campo = document.getElementById("pnl-entrada");
@@ -218,8 +218,8 @@
 
     /* --------------------------------------------------------- entradas --- */
 
-    function pedirTexto(rotulo, valorAtual, aoConfirmar, livre = false, dica = "") {
-        estado.entrada = { rotulo: rotulo.toUpperCase(), valor: valorAtual || "", aoConfirmar, livre, dica };
+    function pedirTexto(rotulo, valorAtual, aoConfirmar, livre = false, dica = "", mascara = false) {
+        estado.entrada = { rotulo: rotulo.toUpperCase(), valor: valorAtual || "", aoConfirmar, livre, dica, mascara };
         desenharStatus();
     }
 
@@ -914,7 +914,15 @@
                     '<div class="pnl-fraco">DIGITE O NUMERO DO CAMPO</div>',
                     '<div class="pnl-fraco">PARA ALTERAR O VALOR.</div>',
                     '<div class="pnl-regua"></div>',
-                    estado.dados.pode_excluir ? linhaMenu("X", "EXCLUIR O REGISTRO") : '<div class="pnl-fraco">[X] EXCLUSAO BLOQUEADA</div>',
+                    // Quando ha acao de fluxo no X (excluir credencial do Cofre,
+                    // que a camada generica nao pode fazer), ela manda na tecla.
+                    ...(acoes.some((a) => a.tecla === "X")
+                        ? []
+                        : [
+                              estado.dados.pode_excluir
+                                  ? linhaMenu("X", "EXCLUIR O REGISTRO")
+                                  : '<div class="pnl-fraco">[X] EXCLUSAO BLOQUEADA</div>',
+                          ]),
                     linhaMenu("A", "ATUALIZAR"),
                     linhaMenu("0", "VOLTAR"),
                 ],
@@ -969,14 +977,6 @@
     function executarAcao(acao) {
         const campos = acao.campos || [];
         const seguir = () => {
-            // Abrir arquivo nao envia nada: o navegador ja sabe o que fazer com
-            // PDF, planilha e imagem — abre em outra aba ou baixa, como sempre.
-            if (acao.formato === "abrir") {
-                window.open(acao.url, "_blank", "noopener");
-                avisar(`${acao.rotulo}: ABERTO EM OUTRA ABA.`, "ok");
-                desenharStatus();
-                return;
-            }
             if (acao.formato === "arquivo") {
                 escolherArquivo(acao, campos);
                 return;
@@ -1006,8 +1006,7 @@
                 document.body.removeChild(entrada);
             }
             if (!arquivo) {
-                avisar("NENHUM ARQUIVO ESCOLHIDO. ACAO CANCELADA.", "fraco");
-                desenharStatus();
+                semArquivo(acao, campos);
                 return;
             }
             avisar(`ARQUIVO: ${arquivo.name.toUpperCase()}`, "info");
@@ -1021,13 +1020,26 @@
             if (entrada.parentNode) {
                 document.body.removeChild(entrada);
             }
-            avisar("NENHUM ARQUIVO ESCOLHIDO. ACAO CANCELADA.", "fraco");
-            desenharStatus();
+            semArquivo(acao, campos);
         });
 
         avisar("ESCOLHA O ARQUIVO NA JANELA DO COMPUTADOR...", "info");
         desenharStatus();
         entrada.click();
+    }
+
+    /* Fechar a janela sem escolher: quando o arquivo e opcional (cadastrar um
+       documento que ainda nao tem anexo, por exemplo) a acao segue sem ele. */
+
+    function semArquivo(acao, campos) {
+        if (acao.arquivo_opcional) {
+            avisar("SEGUINDO SEM ARQUIVO.", "info");
+            desenhar();
+            coletarCampos(acao, campos, 0, {});
+            return;
+        }
+        avisar("NENHUM ARQUIVO ESCOLHIDO. ACAO CANCELADA.", "fraco");
+        desenharStatus();
     }
 
     function coletarCampos(acao, campos, indice, valores, arquivo) {
@@ -1036,7 +1048,13 @@
             return;
         }
         const campo = campos[indice];
-        const dica = campo.opcoes.length ? `OPCOES: ${campo.opcoes.join(" / ").toUpperCase()}` : campo.tipo;
+        const dica = campo.mascara
+            ? "NAO APARECE ENQUANTO DIGITA"
+            : campo.tipo === "DATA"
+              ? "DD/MM/AAAA"
+              : campo.opcoes.length
+                ? `OPCOES: ${campo.opcoes.join(" / ").toUpperCase()}`
+                : campo.tipo;
         avisar(`${acao.rotulo} — ${campo.rotulo}${campo.obrigatorio ? "" : " (OPCIONAL)"}`, "info");
         desenhar();
         pedirTexto(
@@ -1050,17 +1068,40 @@
                     return;
                 }
                 if (texto) {
-                    valores[campo.nome] = texto;
+                    valores[campo.nome] = campo.tipo === "DATA" ? dataParaISO(texto) : texto;
                 }
                 coletarCampos(acao, campos, indice + 1, valores, arquivo);
             },
             true,
-            dica
+            dica,
+            campo.mascara
         );
+    }
+
+    /* No painel a data se digita como em todo lugar do sistema (DD/MM/AAAA); as
+       rotas dos modulos leem ISO. A conversao fica aqui para o operador nao ter
+       de lembrar de dois formatos. Texto que nao for data passa como veio, e o
+       proprio backend recusa. */
+
+    function dataParaISO(texto) {
+        const partes = String(texto).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        return partes ? `${partes[3]}-${partes[2]}-${partes[1]}` : texto;
     }
 
     function enviarAcao(acao, valores, arquivo) {
         const corpo = Object.assign({}, acao.payload || {}, valores);
+
+        // Abrir nao envia nada: o navegador ja sabe o que fazer com PDF,
+        // planilha e imagem. O que foi perguntado (o mes da planilha, por
+        // exemplo) vai na propria URL, como a tela faz.
+        if (acao.formato === "abrir") {
+            const parametros = new URLSearchParams(corpo).toString();
+            window.open(parametros ? `${acao.url}?${parametros}` : acao.url, "_blank", "noopener");
+            avisar(`${acao.rotulo}: ABERTO EM OUTRA ABA.`, "ok");
+            desenharStatus();
+            return;
+        }
+
         estado.ocupado = true;
         avisar(arquivo ? "ENVIANDO O ARQUIVO..." : "EXECUTANDO...", "info");
         desenharStatus();
@@ -1072,7 +1113,9 @@
         if (acao.formato === "arquivo") {
             const dados = new FormData();
             Object.keys(corpo).forEach((chave) => dados.append(chave, corpo[chave]));
-            dados.append(acao.campo_arquivo, arquivo, arquivo.name);
+            if (arquivo) {
+                dados.append(acao.campo_arquivo, arquivo, arquivo.name);
+            }
             opcoes = {
                 method: "POST",
                 headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
@@ -1106,6 +1149,13 @@
             })
             .then((dados) => {
                 estado.ocupado = false;
+                if (acao.revela_resposta && dados[acao.revela_resposta]) {
+                    // Sem caixa alta e sem recarregar: senha so serve exatamente
+                    // como foi guardada, e some na proxima tecla.
+                    avisar(String(dados[acao.revela_resposta]), "ok");
+                    desenharStatus();
+                    return null;
+                }
                 avisar((dados.message || `${acao.rotulo}: CONCLUIDO.`).toUpperCase(), "ok");
                 // Criou algo? o terminal ja filtra a lista pelo registro novo,
                 // que fica na primeira linha, pronto para abrir.

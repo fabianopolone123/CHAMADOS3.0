@@ -42,6 +42,11 @@ class TabelaPainel:
     ordem: str = "-id"
     somente_leitura: bool = False
     pode_excluir: bool = True
+    # Campos que aparecem mas nao podem ser escritos pela camada generica porque
+    # ha uma rota dona deles: mexer no saldo do insumo na mao, por exemplo, muda
+    # o numero e deixa o extrato de movimentacoes mentindo. Quem altera e a acao
+    # de fluxo (entrada/retirada), que grava o movimento junto.
+    campos_travados: tuple[str, ...] = ()
     nota: str = ""
     campos_ocultos: tuple[str, ...] = dataclass_field(default_factory=tuple)
 
@@ -106,6 +111,9 @@ TABELAS: tuple[TabelaPainel, ...] = (
         colunas=("codigo", "titulo", "tipo", "status", "criado_por", "criado_em"),
         busca=("codigo", "titulo", "texto"),
         ordem="-criado_em",
+        # Titulo, tipo e texto passam pela rota do modulo (tecla E), que registra
+        # a edicao na linha do tempo da requisicao.
+        campos_travados=("titulo", "tipo", "texto"),
     ),
     TabelaPainel(
         chave="orcamentos",
@@ -168,6 +176,8 @@ TABELAS: tuple[TabelaPainel, ...] = (
         colunas=("nome", "quantidade_atual", "ativo", "atualizado_em"),
         busca=("nome", "descricao", "observacao"),
         ordem="nome",
+        campos_travados=("quantidade_atual",),
+        nota="O saldo so muda por entrada ou retirada, que gravam o extrato junto.",
     ),
     TabelaPainel(
         chave="retiradas",
@@ -240,16 +250,105 @@ TABELAS: tuple[TabelaPainel, ...] = (
         busca=("nome", "local", "email", "identificador", "numero_serie"),
         ordem="nome",
     ),
+    TabelaPainel(
+        chave="assinaturas",
+        rotulo="ASSINATURAS DE RESPONSAVEL",
+        modelo=m.AssinaturaResponsavelTI,
+        colunas=("nome_responsavel", "ativo", "criado_por", "criado_em"),
+        busca=("nome_responsavel",),
+        ordem="nome_responsavel",
+        # A rubrica so aparece dentro do termo em PDF: nao ha rota que sirva a
+        # imagem, e nome de arquivo que nao abre so atrapalha.
+        campos_ocultos=("imagem_assinatura",),
+        nota="A senha de autorizacao e o hash dela nunca aparecem; cadastre pela acao N.",
+    ),
+    # --- Anexos (o arquivo em si abre pela rota do modulo, tecla T) --------
+    # Estao aqui para o titular achar e abrir qualquer arquivo do sistema sem
+    # sair do terminal. O campo do arquivo nunca e editavel (regra geral do
+    # painel); excluir a linha apaga o arquivo do disco pelo signal post_delete.
+    TabelaPainel(
+        chave="chamado_anexos",
+        rotulo="ANEXOS DE CHAMADO",
+        modelo=m.ChamadoAnexo,
+        colunas=("chamado", "nome_original", "enviado_por", "enviado_em"),
+        busca=("nome_original", "chamado__numero"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="mensagem_anexos",
+        rotulo="ANEXOS DE MENSAGEM",
+        modelo=m.ChamadoMensagemAnexo,
+        colunas=("mensagem", "nome_original", "enviado_em"),
+        busca=("nome_original", "mensagem__chamado__numero"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="documento_anexos",
+        rotulo="ANEXOS DE DOCUMENTO",
+        modelo=m.DocumentoTIAnexo,
+        colunas=("documento", "nome_original", "enviado_por", "enviado_em"),
+        busca=("nome_original", "documento__nome"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="servico_anexos",
+        rotulo="ANEXOS DE SERVICO FEITO",
+        modelo=m.ServicoFeitoAnexo,
+        colunas=("servico", "nome_original", "enviado_em"),
+        busca=("nome_original", "servico__nome_servico"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="contrato_ti_anexos",
+        rotulo="ANEXOS DE CONTRATO TI",
+        modelo=m.ContratoAnexo,
+        colunas=("contrato", "nome_original", "enviado_em"),
+        busca=("nome_original", "contrato__nome"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="orcamento_documentos",
+        rotulo="DOCUMENTOS DE ORCAMENTO",
+        modelo=m.OrcamentoDocumento,
+        colunas=("orcamento", "nome_original", "enviado_em"),
+        busca=("nome_original", "orcamento__titulo"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="suborcamento_documentos",
+        rotulo="DOCUMENTOS DE SUBORCAMENTO",
+        modelo=m.SuborcamentoDocumento,
+        colunas=("suborcamento", "nome_original", "enviado_em"),
+        busca=("nome_original", "suborcamento__titulo"),
+        ordem="-enviado_em",
+    ),
+    TabelaPainel(
+        chave="equipamento_fotos",
+        rotulo="FOTOS DE EQUIPAMENTO",
+        modelo=m.FotoEquipamentoEmprestimoTI,
+        colunas=("equipamento", "nome_original", "enviado_por", "enviado_em"),
+        busca=("nome_original", "equipamento__tipo_equipamento"),
+        ordem="-enviado_em",
+    ),
     # --- Seguranca e sistema (so leitura) ---------------------------------
     TabelaPainel(
         chave="cofre",
-        rotulo="COFRE (SO METADADOS)",
+        rotulo="COFRE DE SENHAS",
         modelo=m.CofreCredencial,
         colunas=("rotulo", "usuario", "criado_em", "atualizado_em"),
         busca=("rotulo", "usuario"),
         somente_leitura=True,
         pode_excluir=False,
-        nota="As senhas ficam cifradas e so abrem no Cofre, com a senha-mestra.",
+        nota="A senha nao e campo da tabela: abre com a senha-mestra (Z) e cada revelacao vai para a auditoria.",
+    ),
+    TabelaPainel(
+        chave="email_config",
+        rotulo="CONFIGURACAO DE E-MAIL (SMTP)",
+        modelo=m.EmailConfig,
+        colunas=("ativo", "host", "porta", "usuario", "remetente", "emails_ti"),
+        busca=("host", "usuario", "remetente", "emails_ti"),
+        pode_excluir=False,
+        nota="A senha do SMTP nao e campo daqui: troque pela acao Y, que usa a rota da tela.",
     ),
     TabelaPainel(
         chave="cofre_auditoria",
@@ -301,6 +400,8 @@ def campos_do_modelo(tabela: TabelaPainel) -> list:
 
 def campo_editavel(tabela: TabelaPainel, campo) -> bool:
     if tabela.somente_leitura:
+        return False
+    if campo.name in tabela.campos_travados:
         return False
     if campo.name == "id" or isinstance(campo, models.AutoField):
         return False

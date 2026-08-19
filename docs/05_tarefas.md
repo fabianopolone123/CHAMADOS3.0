@@ -10,6 +10,14 @@
 
 ## Concluidas
 
+- Painel do Titular: senha-mestra do Cofre, documento com anexo (arquivo opcional), assinatura de responsavel e edicao de requisicao pela rota que registra o evento — com testes de catalogo cobrando "arquivo listado tem de abrir" e "uma tecla por acao"
+
+- Painel do Titular: **anexos de todo o sistema em 8 tabelas novas** (achar e abrir), **orcamentos/suborcamentos** (documento e foto), **requisicao criada pela rota do modulo** (com evento) e **configuracao de e-mail** como tabela, com senha do SMTP e e-mail de teste por acao
+
+- Painel do Titular: **Cofre** (senha-mestra mascarada, revelar/trocar/excluir credencial, tudo pelas rotas que auditam) e **fluxo de emprestimo** (criar com equipamento e termo, acrescentar equipamento, devolver)
+
+- Painel do Titular: **entrada/retirada de insumo** (com o saldo travado na camada generica), **anexos de Dicas, Futura, Servicos feitos e Contratos TI**, **importacao do CSV de e-mails** e **planilha mensal**, com o decorador `json_quando_xhr` (`core/xhr.py`) fazendo as rotas de tela responderem ao terminal
+
 - Painel do Titular: **responder chamado, complementar pausa automatica e o fluxo do emprestimo** (termo em PDF, anexar o assinado, documentacao OK) pelo terminal, com as duas formas novas de acao — `arquivo` (seletor do proprio computador) e `abrir` (aba nova do navegador); `ticket_message_create` passou a responder JSON para pedido por `fetch`
 
 - Painel do Titular: **acoes de fluxo dos modulos** dentro do terminal (abrir chamado, Play/Pause/Stop, atribuir/devolver, criar pendencia, trocar prioridade, converter em chamado, aprovar orcamento, entregar/desaprovar/nao aprovar requisicao), cada uma chamando a **mesma rota da tela classica** para nao duplicar regra; `core/painel_acoes.py`; testes novos em `PainelTitularTests` (17 casos no total)

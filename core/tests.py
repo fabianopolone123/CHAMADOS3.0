@@ -12,9 +12,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import (
+    AssinaturaResponsavelTI,
     AtendimentoHistorico,
     Chamado,
     ChamadoEvento,
+    ChamadoAnexo,
     ChamadoMensagem,
     ChamadoMensagemAnexo,
     CofreAuditoria,
@@ -24,10 +26,12 @@ from .models import (
     Contrato,
     ContratoAnexo,
     Dica,
+    DocumentoTI,
     EmprestimoTI,
     EquipamentoEmprestimoTI,
     EnderecoIP,
     FuturaDigital,
+    InsumoTI,
     ItemMenuConfig,
     Licenca,
     LicencaSoftware,
@@ -39,13 +43,14 @@ from .models import (
     Ramal,
     RequisicaoContrato,
     RequisicaoContratoEvento,
+    RetiradaInsumoTI,
     ServicoFeito,
     ServicoFeitoAnexo,
     Starlink,
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
-from . import painel_dados
+from . import painel_acoes, painel_dados
 from .menu import CHAVES_PADRAO, itens_menu_para_painel
 from .permissions import ADMIN_GROUP_NAME, ATTENDANT_GROUP_NAME
 
@@ -4061,7 +4066,10 @@ class PainelTitularTests(TestCase):
         self.assertFalse(dicas["no_menu"])  # escondido do menu, mas ainda operavel aqui
 
         detalhe = self.client.get(reverse("painel_modulo", args=["contratos"])).json()
-        self.assertEqual([t["chave"] for t in detalhe["tabelas"]], ["requisicoes", "orcamentos", "suborcamentos"])
+        self.assertEqual(
+            [t["chave"] for t in detalhe["tabelas"]],
+            ["requisicoes", "orcamentos", "suborcamentos", "orcamento_documentos", "suborcamento_documentos"],
+        )
         self.assertTrue(detalhe["tabelas"][0]["principal"])
         self.assertEqual(detalhe["url"], reverse("contratos_dashboard"))
         self.assertIn("WhatsApp", detalhe["nota"])
@@ -4108,11 +4116,17 @@ class PainelTitularTests(TestCase):
         self.assertEqual(chamado.status_code, 200)
         self.assertTrue(Chamado.objects.get(pk=chamado.json()["pk"]).numero.startswith("CH-"))
 
-        requisicao = self._post(
+        # A requisicao deixou de nascer pela camada generica: titulo/tipo/texto
+        # passam pela rota do modulo (tecla E/N), que registra o evento.
+        recusado = self._post(
             reverse("painel_registro_criar", args=["requisicoes"]), {"valores": {"titulo": "Do painel"}}
         )
-        self.assertEqual(requisicao.status_code, 200)
-        self.assertTrue(RequisicaoContrato.objects.get(pk=requisicao.json()["pk"]).codigo.startswith("REQ-"))
+        self.assertEqual(recusado.status_code, 400)
+        criada = self._post(
+            reverse("requisicao_create"), {"titulo": "Do painel", "tipo": "fisica", "texto": ""}
+        )
+        self.assertEqual(criada.status_code, 200)
+        self.assertTrue(RequisicaoContrato.objects.get(titulo="Do painel").codigo.startswith("REQ-"))
 
     def test_tabela_so_leitura_nao_cria(self):
         self.client.force_login(self.titular)
@@ -4301,9 +4315,10 @@ class PainelTitularTests(TestCase):
             colaborador_nome="Zebedeu Teste", data_emprestimo="2026-08-10", criado_por=self.titular
         )
 
-        # Sem termo gerado e sem assinado, so a acao de anexar faz sentido.
+        # Sem termo gerado e sem assinado, o que cabe e anexar o assinado e
+        # acrescentar equipamento — abrir termo/OK ainda nao.
         acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
-        self.assertEqual(set(acoes), {"Y"})
+        self.assertEqual(set(acoes), {"Y", "Q"})
         self.assertEqual(acoes["Y"]["formato"], "arquivo")
         self.assertEqual(acoes["Y"]["campo_arquivo"], "termo_assinado")
 
@@ -4319,7 +4334,7 @@ class PainelTitularTests(TestCase):
 
         # Com o assinado no lugar, aparecem abrir (aba nova) e o OK da documentacao.
         acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
-        self.assertEqual(set(acoes), {"Y", "V", "K"})
+        self.assertEqual(set(acoes), {"Y", "Q", "V", "K"})
         self.assertEqual(acoes["V"]["formato"], "abrir")
 
         self.assertEqual(self._post(acoes["K"]["url"]).status_code, 200)
@@ -4327,6 +4342,519 @@ class PainelTitularTests(TestCase):
         self.assertEqual(emprestimo.status, EmprestimoTI.STATUS_ASSINADA_OK)
         # Dado o OK, a tecla sai do menu.
         self.assertNotIn("K", self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk]))))
+
+    def test_estoque_do_insumo_so_muda_pelas_rotas_que_lancam_o_extrato(self):
+        self.client.force_login(self.titular)
+        insumo = InsumoTI.objects.create(nome="Toner preto", criado_por=self.titular)
+
+        # O saldo aparece, mas nao e editavel: quem mexe nele e a movimentacao.
+        detalhe = self.client.get(reverse("painel_registro", args=["insumos", insumo.pk])).json()
+        saldo = next(c for c in detalhe["campos"] if c["nome"] == "quantidade_atual")
+        self.assertFalse(saldo["editavel"])
+        recusado = self._post(
+            reverse("painel_registro_alterar", args=["insumos", insumo.pk]),
+            {"campo": "quantidade_atual", "valor": "99"},
+        )
+        self.assertEqual(recusado.status_code, 400)
+        insumo.refresh_from_db()
+        self.assertEqual(insumo.quantidade_atual, 0)
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["insumos", insumo.pk])))
+        self.assertEqual(set(acoes), {"E", "S"})
+
+        entrada = self._post(acoes["E"]["url"], {"quantidade": "10", "observacao": "Compra de agosto"})
+        self.assertEqual(entrada.status_code, 200)
+        insumo.refresh_from_db()
+        self.assertEqual(insumo.quantidade_atual, 10)
+        self.assertTrue(
+            insumo.retiradas.filter(tipo=RetiradaInsumoTI.TIPO_ENTRADA, quantidade=10).exists()
+        )
+
+        saida = self._post(
+            acoes["S"]["url"],
+            {"quantidade": "3", "entregue_para": "Zebedeu Teste", "motivo": "Troca da impressora"},
+        )
+        self.assertEqual(saida.status_code, 200)
+        insumo.refresh_from_db()
+        self.assertEqual(insumo.quantidade_atual, 7)
+        self.assertTrue(insumo.retiradas.filter(tipo=RetiradaInsumoTI.TIPO_SAIDA, quantidade=3).exists())
+
+        # A trava do estoque tambem vale na criacao pelo terminal.
+        criado = self._post(
+            reverse("painel_registro_criar", args=["insumos"]),
+            {"valores": {"nome": "Cabo de rede", "quantidade_atual": "50"}},
+        )
+        self.assertEqual(criado.status_code, 400)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_anexo_da_dica_abre_e_troca_pelo_seletor(self):
+        self.client.force_login(self.titular)
+        dica = Dica.objects.create(titulo="Impressora sem rede", conteudo="Reiniciar o spooler.")
+
+        # Sem anexo nao ha o que abrir; enviar sempre pode.
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["dicas", dica.pk])))
+        self.assertEqual(set(acoes), {"Y"})
+
+        envio = self.client.post(
+            acoes["Y"]["url"],
+            data=dict(
+                acoes["Y"]["payload"],
+                anexo=SimpleUploadedFile("manual.pdf", b"%PDF-1.4 manual", content_type="application/pdf"),
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        # A rota e de tela (redirect + messages); a ponte devolve JSON ao terminal.
+        self.assertEqual(envio.status_code, 200)
+        self.assertTrue(envio.json()["ok"])
+
+        dica.refresh_from_db()
+        self.assertTrue(dica.anexo)
+        # Anexar nao pode mexer no resto do registro.
+        self.assertEqual(dica.titulo, "Impressora sem rede")
+        self.assertEqual(dica.conteudo, "Reiniciar o spooler.")
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["dicas", dica.pk])))
+        self.assertEqual(acoes["T"]["formato"], "abrir")
+        self.assertEqual(self.client.get(acoes["T"]["url"]).status_code, 200)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_documento_da_futura_nao_mexe_na_tarifa_de_quatro_casas(self):
+        self.client.force_login(self.titular)
+        fatura = FuturaDigital.objects.create(
+            mes_referencia="2026-07-01",
+            copias_total=1000,
+            copias_cor=10,
+            valor_copia_excedente=Decimal("0.0750"),
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["futura", fatura.pk])))["Y"]
+        self.assertEqual(acao["payload"]["valor_copia_excedente"], "0.0750")
+
+        envio = self.client.post(
+            acao["url"],
+            data=dict(acao["payload"], documento=SimpleUploadedFile("fatura.pdf", b"%PDF-1.4", content_type="application/pdf")),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(envio.status_code, 200)
+        fatura.refresh_from_db()
+        self.assertTrue(fatura.documento)
+        # O preco da copia tem 4 casas: salvar a fatura nao pode rebaixar a tarifa.
+        self.assertEqual(fatura.valor_copia_excedente, Decimal("0.0750"))
+        self.assertEqual(fatura.copias_total, 1000)
+
+    def test_erro_da_rota_de_tela_chega_ao_terminal_como_erro(self):
+        """A ponte precisa distinguir falha de sucesso — os dois redirecionam."""
+        self.client.force_login(self.titular)
+        dica = Dica.objects.create(titulo="Titulo bom", conteudo="Conteudo")
+        resposta = self.client.post(
+            reverse("dica_update", args=[dica.pk]),
+            data={"titulo": "x", "categoria": "geral", "conteudo": "Conteudo"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 400)
+        self.assertFalse(resposta.json()["ok"])
+        self.assertIn("titulo", resposta.json()["message"].lower())
+        dica.refresh_from_db()
+        self.assertEqual(dica.titulo, "Titulo bom")
+
+    def test_importacao_do_csv_pelo_terminal(self):
+        self.client.force_login(self.titular)
+        acao = self._acoes(self.client.get(reverse("painel_tabela", args=["emails"])))["I"]
+        self.assertEqual(acao["formato"], "arquivo")
+        self.assertEqual(acao["campo_arquivo"], "arquivo")
+
+        csv = "\n".join(
+            [
+                "First Name [Required],Last Name [Required],Email Address [Required]",
+                "Zebedeu,Teste,zebedeu.teste@sidertec.com.br",
+                "",
+            ]
+        ).encode("utf-8")
+        envio = self.client.post(
+            acao["url"],
+            data={"arquivo": SimpleUploadedFile("contas.csv", csv, content_type="text/csv")},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(envio.status_code, 200)
+        self.assertTrue(envio.json()["ok"])
+        self.assertTrue(ContaEmail.objects.filter(email="zebedeu.teste@sidertec.com.br").exists())
+
+    def test_cofre_abre_pelo_terminal_com_a_senha_mestra_e_audita(self):
+        self.client.force_login(self.titular)
+        CofreConfig.objects.all().delete()
+        config = CofreConfig.load()
+        config.definir_senha_mestra("chave-mestra-123")
+        config.save()
+        credencial = CofreCredencial(rotulo="Roteador da sala", usuario="admin")
+        credencial.definir_senha("R0ot#Senha")
+        credencial.save()
+
+        # A senha nunca e campo da tabela, nem com o cofre aberto.
+        detalhe = self.client.get(reverse("painel_registro", args=["cofre", credencial.pk])).json()
+        self.assertNotIn("senha", [c["nome"] for c in detalhe["campos"]])
+
+        lista = self._acoes(self.client.get(reverse("painel_tabela", args=["cofre"])))
+        self.assertEqual(set(lista), {"Z", "L", "N", "M"})
+        senha_mestra = next(c for c in lista["Z"]["campos"] if c["nome"] == "senha_mestra")
+        self.assertTrue(senha_mestra["mascara"])
+
+        # Travado, revelar e recusado — a regra continua sendo do Cofre.
+        revelar = self._acoes(self.client.get(reverse("painel_registro", args=["cofre", credencial.pk])))["V"]
+        self.assertEqual(self._post(revelar["url"]).status_code, 403)
+
+        errada = self.client.post(
+            lista["Z"]["url"], data={"senha_mestra": "nao-e-essa"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(errada.status_code, 400)
+        self.assertFalse(errada.json()["ok"])
+
+        certa = self.client.post(
+            lista["Z"]["url"], data={"senha_mestra": "chave-mestra-123"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(certa.status_code, 200)
+        self.assertTrue(certa.json()["ok"])
+
+        aberta = self._post(revelar["url"])
+        self.assertEqual(aberta.status_code, 200)
+        # O terminal mostra o que vier aqui, sem caixa alta: senha diferencia.
+        self.assertEqual(aberta.json()["senha"], "R0ot#Senha")
+        self.assertEqual(revelar["revela_resposta"], "senha")
+        self.assertTrue(
+            CofreAuditoria.objects.filter(acao=CofreAuditoria.ACAO_CRED_REVELADA, ator=self.titular).exists()
+        )
+
+    def test_cofre_troca_a_senha_sem_apagar_o_resto_da_credencial(self):
+        self.client.force_login(self.titular)
+        CofreConfig.objects.all().delete()
+        config = CofreConfig.load()
+        config.definir_senha_mestra("chave-mestra-123")
+        config.save()
+        credencial = CofreCredencial(rotulo="Firewall", usuario="root", notas="Sala do CPD")
+        credencial.definir_senha("antiga")
+        credencial.save()
+        self.client.post(
+            reverse("cofre_unlock"), data={"senha_mestra": "chave-mestra-123"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["cofre", credencial.pk])))["Y"]
+        resposta = self.client.post(
+            acao["url"], data=dict(acao["payload"], senha="nova-senha"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(resposta.status_code, 200)
+        credencial.refresh_from_db()
+        self.assertEqual(credencial.obter_senha(), "nova-senha")
+        # A rota reescreve a credencial inteira: o espelho evita apagar o resto.
+        self.assertEqual(credencial.rotulo, "Firewall")
+        self.assertEqual(credencial.usuario, "root")
+        self.assertEqual(credencial.notas, "Sala do CPD")
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_emprestimo_nasce_com_equipamento_e_termo_pelo_terminal(self):
+        self.client.force_login(self.titular)
+
+        criar = self._acoes(self.client.get(reverse("painel_tabela", args=["emprestimos"])))["N"]
+        self.assertEqual(criar["url"], reverse("emprestimo_create"))
+        self.assertEqual(criar["payload"]["equipamentos_count"], "1")
+        # A data e perguntada como em todo o sistema; o terminal converte para ISO.
+        data = next(c for c in criar["campos"] if c["nome"] == "data_emprestimo")
+        self.assertEqual(data["tipo"], "DATA")
+
+        resposta = self.client.post(
+            criar["url"],
+            data=dict(
+                criar["payload"],
+                colaborador_nome="Zebedeu Teste",
+                data_emprestimo="2026-08-10",
+                equip_0_tipo="Notebook",
+                equip_0_marca="Dell",
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 200)
+        emprestimo = EmprestimoTI.objects.get(colaborador_nome="Zebedeu Teste")
+        self.assertEqual(emprestimo.equipamentos.count(), 1)
+        # O que a criacao generica nao faria: o termo em PDF sai junto.
+        self.assertTrue(emprestimo.termo_pdf)
+
+        # Segundo equipamento pela acao do proprio emprestimo.
+        adicionar = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))["Q"]
+        segundo = self.client.post(
+            adicionar["url"],
+            data=dict(adicionar["payload"], equip_0_tipo="Monitor", equip_0_marca="LG"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(segundo.status_code, 200)
+        emprestimo.refresh_from_db()
+        self.assertEqual(emprestimo.equipamentos.count(), 2)
+        # A rota reescreve o emprestimo inteiro: o espelho preserva o colaborador.
+        self.assertEqual(emprestimo.colaborador_nome, "Zebedeu Teste")
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_devolucao_do_equipamento_fecha_o_emprestimo(self):
+        self.client.force_login(self.titular)
+        emprestimo = EmprestimoTI.objects.create(
+            colaborador_nome="Zebedeu Teste",
+            empresa="Sidertec",
+            data_emprestimo="2026-08-10",
+            criado_por=self.titular,
+        )
+        notebook = EquipamentoEmprestimoTI.objects.create(
+            emprestimo=emprestimo, tipo_equipamento="Notebook", data_emprestimo="2026-08-10"
+        )
+        monitor = EquipamentoEmprestimoTI.objects.create(
+            emprestimo=emprestimo, tipo_equipamento="Monitor", data_emprestimo="2026-08-10"
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["equipamentos", notebook.pk])))["D"]
+        # A rota e do emprestimo: o equipamento so diz qual e a acao dele.
+        self.assertEqual(acao["url"], reverse("emprestimo_editar", args=[emprestimo.pk]))
+        self.assertEqual(acao["payload"][f"acao_equip_{notebook.pk}"], "devolver")
+        self.assertEqual(acao["payload"]["colaborador_nome"], "Zebedeu Teste")
+
+        self.assertEqual(
+            self.client.post(acao["url"], data=acao["payload"], HTTP_X_REQUESTED_WITH="XMLHttpRequest").status_code,
+            200,
+        )
+        notebook.refresh_from_db()
+        monitor.refresh_from_db()
+        self.assertIsNotNone(notebook.data_devolucao)
+        self.assertIsNone(monitor.data_devolucao)  # os outros ficam como estao
+        emprestimo.refresh_from_db()
+        self.assertEqual(emprestimo.empresa, "Sidertec")
+
+        # Devolvido, o equipamento nao oferece mais a tecla.
+        self.assertEqual(self._acoes(self.client.get(reverse("painel_registro", args=["equipamentos", notebook.pk]))), {})
+
+        # Com o ultimo devolvido, o emprestimo inteiro fecha.
+        ultimo = self._acoes(self.client.get(reverse("painel_registro", args=["equipamentos", monitor.pk])))["D"]
+        self.client.post(ultimo["url"], data=ultimo["payload"], HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        emprestimo.refresh_from_db()
+        self.assertEqual(emprestimo.status, EmprestimoTI.STATUS_DEVOLVIDO)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_documento_do_orcamento_sobe_sem_alterar_os_valores(self):
+        self.client.force_login(self.titular)
+        requisicao = RequisicaoContrato.objects.create(titulo="Cabos de rede", criado_por=self.titular)
+        orcamento = OrcamentoContrato.objects.create(
+            requisicao=requisicao,
+            titulo="Cabo Cat6 - loja A",
+            loja="Loja A",
+            valor=Decimal("199.90"),
+            frete=Decimal("35.00"),
+            quantidade=3,
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["orcamentos", orcamento.pk])))["Y"]
+        self.assertEqual(acao["campo_arquivo"], "documentos")
+        envio = self.client.post(
+            acao["url"],
+            data=dict(
+                acao["payload"],
+                documentos=SimpleUploadedFile("orcamento.pdf", b"%PDF-1.4", content_type="application/pdf"),
+            ),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(envio.status_code, 200)
+        orcamento.refresh_from_db()
+        self.assertEqual(orcamento.documentos.count(), 1)
+        # Anexar nao pode mexer no dinheiro.
+        self.assertEqual(orcamento.valor, Decimal("199.90"))
+        self.assertEqual(orcamento.frete, Decimal("35.00"))
+        self.assertEqual(orcamento.quantidade, 3)
+
+        # Requisicao entregue trava a edicao — a acao some, como na tela.
+        requisicao.status = RequisicaoContrato.STATUS_ENTREGUE
+        requisicao.save(update_fields=["status"])
+        depois = self._acoes(self.client.get(reverse("painel_registro", args=["orcamentos", orcamento.pk])))
+        self.assertNotIn("Y", depois)
+
+    def test_senha_do_smtp_troca_sem_desligar_as_notificacoes(self):
+        self.client.force_login(self.titular)
+        from .models import EmailConfig
+
+        config = EmailConfig.load()
+        config.ativo = True
+        config.host = "smtp.sidertec.com.br"
+        config.usuario = "chamados@sidertec.com.br"
+        config.emails_ti = "ti@sidertec.com.br"
+        config.notif_fechamento = True
+        config.save()
+
+        # A senha do SMTP nao aparece como campo da tabela.
+        detalhe = self.client.get(reverse("painel_registro", args=["email_config", config.pk])).json()
+        self.assertNotIn("senha_cifrada", [c["nome"] for c in detalhe["campos"]])
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["email_config", config.pk])))["Y"]
+        # Caixa marcada viaja como "on": a rota le ausencia como desligado.
+        self.assertEqual(acao["payload"]["ativo"], "on")
+        self.assertEqual(acao["payload"]["notif_fechamento"], "on")
+
+        resposta = self.client.post(
+            acao["url"], data=dict(acao["payload"], senha="abcd efgh ijkl mnop"), HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(resposta.status_code, 200)
+        config.refresh_from_db()
+        # Os espacos da senha de app do Google saem na rota.
+        self.assertEqual(config.obter_senha(), "abcdefghijklmnop")
+        # E o resto da configuracao continua de pe.
+        self.assertTrue(config.ativo)
+        self.assertTrue(config.notif_fechamento)
+        self.assertEqual(config.host, "smtp.sidertec.com.br")
+        self.assertEqual(config.emails_ti, "ti@sidertec.com.br")
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_anexos_do_sistema_aparecem_e_abrem_pelo_terminal(self):
+        self.client.force_login(self.titular)
+        chamado = Chamado.objects.create(
+            numero="CH-000904", titulo="Com anexo", solicitante=self.titular, status=Chamado.STATUS_ABERTO
+        )
+        anexo = ChamadoAnexo.objects.create(
+            chamado=chamado,
+            arquivo=SimpleUploadedFile("print.png", b"imagem", content_type="image/png"),
+            nome_original="print.png",
+            enviado_por=self.titular,
+        )
+
+        lista = self.client.get(reverse("painel_tabela", args=["chamado_anexos"])).json()
+        self.assertEqual(lista["total"], 1)
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["chamado_anexos", anexo.pk])))["T"]
+        self.assertEqual(acao["formato"], "abrir")
+        # A rota do anexo do chamado leva numero + id: o segundo vem do pai.
+        self.assertEqual(acao["url"], reverse("download_anexo", args=[chamado.numero, anexo.pk]))
+        self.assertEqual(self.client.get(acao["url"]).status_code, 200)
+
+        # O arquivo em si nunca e editavel pelo painel, aqui como em toda tabela.
+        detalhe = self.client.get(reverse("painel_registro", args=["chamado_anexos", anexo.pk])).json()
+        arquivo = next(c for c in detalhe["campos"] if c["nome"] == "arquivo")
+        self.assertFalse(arquivo["editavel"])
+
+    def test_toda_tabela_de_anexo_tem_como_abrir_o_arquivo(self):
+        """Anexo listado e nao abre e pior do que nao listar: fica so o nome."""
+        com_acao = {a.tabela for a in painel_acoes.ACOES if a.formato == "abrir"}
+        for tabela in painel_dados.TABELAS:
+            tem_arquivo = any(
+                painel_dados._e_arquivo(campo) for campo in painel_dados.campos_do_modelo(tabela)
+            )
+            if tem_arquivo:
+                self.assertIn(tabela.chave, com_acao, f"{tabela.chave} mostra arquivo sem como abrir")
+
+    def test_requisicao_criada_pelo_terminal_entra_com_evento(self):
+        self.client.force_login(self.titular)
+        acao = self._acoes(self.client.get(reverse("painel_tabela", args=["requisicoes"])))["N"]
+        resposta = self._post(acao["url"], {"titulo": "Cabos de rede", "tipo": "fisica", "texto": "20 metros"})
+        self.assertEqual(resposta.status_code, 200)
+
+        requisicao = RequisicaoContrato.objects.get(titulo="Cabos de rede")
+        self.assertTrue(requisicao.codigo.startswith("REQ-"))
+        # A criacao generica gravava a linha sem evento nenhum na timeline.
+        self.assertTrue(
+            requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_CRIACAO).exists()
+        )
+
+    def test_senha_mestra_do_cofre_pelo_terminal(self):
+        self.client.force_login(self.titular)
+        CofreConfig.objects.all().delete()
+        acao = self._acoes(self.client.get(reverse("painel_tabela", args=["cofre"])))["M"]
+        self.assertTrue(all(c["mascara"] for c in acao["campos"]))
+
+        resposta = self.client.post(
+            acao["url"],
+            data={"senha_atual": "", "nova_senha": "primeira-mestra", "confirma_senha": "primeira-mestra"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 200)
+        self.assertTrue(CofreConfig.load().tem_senha_mestra)
+
+        # Trocar sem a atual e recusado pela propria rota.
+        errada = self.client.post(
+            acao["url"],
+            data={"senha_atual": "chute", "nova_senha": "outra-mestra", "confirma_senha": "outra-mestra"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(errada.status_code, 400)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_documento_nasce_com_anexo_e_tambem_sem(self):
+        self.client.force_login(self.titular)
+        acao = self._acoes(self.client.get(reverse("painel_tabela", args=["documentos"])))["N"]
+        self.assertTrue(acao["arquivo_opcional"])
+
+        com = self.client.post(
+            acao["url"],
+            data={
+                "nome": "Contrato assinado",
+                "anexos": SimpleUploadedFile("contrato.pdf", b"%PDF-1.4", content_type="application/pdf"),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(com.status_code, 200)
+        documento = DocumentoTI.objects.get(nome="Contrato assinado")
+        self.assertEqual(documento.anexos.count(), 1)
+
+        # Fechar o seletor sem escolher: a rota aceita documento sem anexo.
+        sem = self.client.post(acao["url"], data={"nome": "So o registro"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(sem.status_code, 200)
+        self.assertEqual(DocumentoTI.objects.get(nome="So o registro").anexos.count(), 0)
+
+        # E o anexo aparece na tabela de anexos, com como abrir.
+        anexo = documento.anexos.first()
+        abrir = self._acoes(self.client.get(reverse("painel_registro", args=["documento_anexos", anexo.pk])))["T"]
+        self.assertEqual(self.client.get(abrir["url"]).status_code, 200)
+
+    def test_edicao_da_requisicao_passa_pela_rota_que_registra_o_evento(self):
+        self.client.force_login(self.titular)
+        requisicao = RequisicaoContrato.objects.create(
+            titulo="Compra de switches", tipo=RequisicaoContrato.TIPO_FISICA, criado_por=self.titular
+        )
+
+        # O titulo nao e mais editavel campo a campo: a rota e que registra.
+        detalhe = self.client.get(reverse("painel_registro", args=["requisicoes", requisicao.pk])).json()
+        titulo = next(c for c in detalhe["campos"] if c["nome"] == "titulo")
+        self.assertFalse(titulo["editavel"])
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["requisicoes", requisicao.pk])))["E"]
+        resposta = self._post(acao["url"], dict(acao["payload"], titulo="Compra de switches PoE", tipo="fisica"))
+        self.assertEqual(resposta.status_code, 200)
+        requisicao.refresh_from_db()
+        self.assertEqual(requisicao.titulo, "Compra de switches PoE")
+        self.assertTrue(requisicao.eventos.filter(tipo=RequisicaoContratoEvento.TIPO_EDICAO).exists())
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_assinatura_de_responsavel_cadastrada_pelo_terminal(self):
+        self.client.force_login(self.titular)
+        acao = self._acoes(self.client.get(reverse("painel_tabela", args=["assinaturas"])))["N"]
+        senha = next(c for c in acao["campos"] if c["nome"] == "senha")
+        self.assertTrue(senha["mascara"])
+
+        resposta = self.client.post(
+            acao["url"],
+            data={
+                "nome_responsavel": "Fabiano Polone",
+                "senha": "senha-forte",
+                "imagem_assinatura": SimpleUploadedFile("rubrica.png", b"imagem", content_type="image/png"),
+            },
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(resposta.status_code, 200)
+        assinatura = AssinaturaResponsavelTI.objects.get(nome_responsavel="Fabiano Polone")
+        self.assertTrue(assinatura.conferir_senha("senha-forte"))
+
+        # Nem a senha nem o hash dela aparecem na tabela.
+        detalhe = self.client.get(reverse("painel_registro", args=["assinaturas", assinatura.pk])).json()
+        nomes = [c["nome"] for c in detalhe["campos"]]
+        self.assertNotIn("senha_hash", nomes)
+
+    def test_cada_tabela_do_painel_usa_uma_tecla_por_acao(self):
+        """Duas acoes na mesma tecla deixariam uma delas inalcancavel."""
+        vistos = {}
+        for acao in painel_acoes.ACOES:
+            chave = (acao.tabela, acao.escopo, acao.tecla)
+            self.assertNotIn(chave, vistos, f"{acao.chave} repete a tecla de {vistos.get(chave)}")
+            vistos[chave] = acao.chave
+            self.assertIsInstance(acao.campos, tuple)
+            # Reservadas pelo terminal em qualquer tela.
+            self.assertNotIn(acao.tecla, {"A", "0"}, f"{acao.chave} usa tecla reservada")
 
     def test_tabela_sem_acao_de_fluxo_mantem_o_novo_registro_generico(self):
         self.client.force_login(self.titular)
