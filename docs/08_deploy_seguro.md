@@ -150,13 +150,32 @@ Variaveis suportadas: `CHAMADOS_DIR` (default `/opt/chamados`), `CHAMADOS_VENV`
 `/etc/chamados/app.env`), `CHAMADOS_SERVICE` (default `chamados`) e
 `CHAMADOS_BRANCH` (default `main`).
 
-Para o `systemctl restart` funcionar sem senha quando rodar como o usuario da
-aplicacao (`appuser`), libere apenas esse comando no sudoers:
+Para o `systemctl restart` funcionar sem senha, libere apenas esse comando no
+sudoers **para o usuario que roda o deploy** (no servidor atual e o `ti`, nao um
+`appuser`) e com o **caminho real** do `systemctl` — o sudo casa a regra pelo
+caminho resolvido, entao `/bin/systemctl` nao vale num sistema onde ele esta em
+`/usr/bin/systemctl`:
 
 ```bash
-echo 'appuser ALL=(root) NOPASSWD: /bin/systemctl restart chamados, /bin/systemctl status chamados, /bin/systemctl is-active chamados' | sudo tee /etc/sudoers.d/chamados-deploy
+# confira os dois antes de escrever a regra
+whoami                 # usuario do deploy (ex.: ti)
+command -v systemctl    # caminho real (ex.: /usr/bin/systemctl)
+
+SYSCTL=$(command -v systemctl)
+echo "$(whoami) ALL=(root) NOPASSWD: $SYSCTL restart chamados, $SYSCTL status chamados, $SYSCTL is-active chamados" | sudo tee /etc/sudoers.d/chamados-deploy
 sudo chmod 440 /etc/sudoers.d/chamados-deploy
 ```
+
+Confira que pegou (tem de responder sem pedir senha):
+
+```bash
+sudo -n systemctl is-active chamados
+```
+
+**Sem essa regra o `chamados-deploy` para no ultimo passo**: o codigo novo fica
+no disco e os estaticos ja saem atualizados, mas o gunicorn continua servindo o
+codigo antigo — que e justamente o estado misto que o script existe para evitar.
+Nesse caso, termine a mao com `sudo systemctl restart chamados`.
 
 Observacao: o script re-executa a si mesmo a partir de uma copia temporaria
 antes do `git pull`, para que a atualizacao do proprio `deploy.sh` nunca corrompa
