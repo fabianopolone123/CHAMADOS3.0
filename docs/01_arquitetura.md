@@ -21,6 +21,7 @@ Aplicacao web monolitica em Django, com renderizacao server-side por templates e
 - `templates/chamados`: templates das telas autenticadas (Kanban, portal e cada modulo)
 - `templates/partials`: componentes reutilizaveis (menus laterais, modais e notificacoes)
 - `static/css`: estilos visuais separados por contexto (inclui `sidebar.css` como fonte unica do menu lateral, e um CSS por modulo)
+- `static/js/requisicao_texto.js`: o texto da requisicao para WhatsApp e e-mail (e a copia para a area de transferencia), compartilhado pela tela de Requisicoes e pelo terminal do painel — a mensagem tem uma fonte so
 - `static/js`: um script por modulo (ex.: `chamados.js`, `ramais.js`, `ips.js`, `futura_digital.js`, `cofre.js`, `painel.js`, etc.) alem de `sidebar.js` (menu responsivo) e `notifications.js` (toasts)
 - `seed/`: arquivos locais de seed com dados/credenciais reais, IGNORADOS pelo Git (nao versionados)
 - `media/`: uploads e anexos, tambem fora de versionamento

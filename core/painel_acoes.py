@@ -21,7 +21,9 @@ Como declarar uma acao nova:
   - `arquivo`, que abre o **seletor de arquivo do proprio computador** e manda o
     escolhido no campo `campo_arquivo` (a rota recebe em `request.FILES`);
   - `abrir`, que nao envia nada: so abre a URL numa aba nova, para o navegador
-    fazer o que ja sabe fazer com PDF, planilha e imagem.
+    fazer o que ja sabe fazer com PDF, planilha e imagem;
+  - `copiar`, que le o JSON do modulo e monta o texto com o **mesmo codigo da
+    tela** (`montador`), jogando o resultado na area de transferencia.
 """
 from __future__ import annotations
 
@@ -54,6 +56,9 @@ class AcaoPainel:
     formato: str = "json"  # json | form | arquivo | abrir
     # Nome do campo de arquivo esperado pela rota (so para `formato="arquivo"`).
     campo_arquivo: str = ""
+    # Para `formato="copiar"`: qual montador de texto do modulo o terminal usa
+    # (o mesmo codigo da tela, em `static/js/requisicao_texto.js`).
+    montador: str = ""
     # Deixa seguir sem arquivo (cadastro que aceita anexo, mas nao exige).
     arquivo_opcional: bool = False
     campos: tuple[CampoAcao, ...] = ()
@@ -276,6 +281,31 @@ ACOES: tuple[AcaoPainel, ...] = (
             CampoAcao("texto", "DESCRICAO", obrigatorio=False),
         ),
         nota="Passa pela rota do modulo para a edicao entrar na linha do tempo da requisicao.",
+    ),
+    # Copiar a requisicao: na tela e um botao no modal; aqui e tecla. O texto e
+    # montado pelo mesmo arquivo nos dois lugares.
+    AcaoPainel(
+        chave="requisicao_copiar_whatsapp",
+        tecla="W",
+        rotulo="COPIAR PARA O WHATSAPP",
+        tabela="requisicoes",
+        escopo="registro",
+        url_name="requisicao_detail",
+        formato="copiar",
+        montador="requisicao_whatsapp",
+        args_do_registro=("pk",),
+    ),
+    AcaoPainel(
+        chave="requisicao_copiar_email",
+        tecla="C",
+        rotulo="COPIAR PARA O E-MAIL (TEXTO)",
+        tabela="requisicoes",
+        escopo="registro",
+        url_name="requisicao_detail",
+        formato="copiar",
+        montador="requisicao_email",
+        args_do_registro=("pk",),
+        nota="A versao com fotos e formatacao rica continua no botao da tela de Requisicoes.",
     ),
     AcaoPainel(
         chave="requisicao_entregue",
@@ -871,6 +901,42 @@ ACOES: tuple[AcaoPainel, ...] = (
         condicao="equipamento_em_posse",
     ),
     AcaoPainel(
+        chave="emprestimo_assinar",
+        tecla="S",
+        rotulo="APLICAR A ASSINATURA NO TERMO",
+        tabela="emprestimos",
+        escopo="registro",
+        url_name="emprestimo_editar",
+        formato="form",
+        args_do_registro=("pk",),
+        espelha_do_registro=(
+            "colaborador_nome",
+            "empresa",
+            "cpf",
+            "email",
+            "telefone",
+            "data_emprestimo",
+            "previsao_devolucao",
+            "observacoes_internas",
+        ),
+        campos=(
+            CampoAcao("assinatura_id", "ID DA ASSINATURA (VEJA EM ASSINATURAS)", tipo="NUMERO"),
+            CampoAcao("senha_assinatura", "SENHA DE AUTORIZACAO", mascara=True),
+        ),
+        nota="Refaz o termo com a rubrica do responsavel. A senha errada e recusada pela rota, como na tela.",
+    ),
+    AcaoPainel(
+        chave="assinatura_abrir_imagem",
+        tecla="T",
+        rotulo="ABRIR A RUBRICA",
+        tabela="assinaturas",
+        escopo="registro",
+        url_name="assinatura_imagem",
+        formato="abrir",
+        args_do_registro=("pk",),
+        condicao="assinatura_com_imagem",
+    ),
+    AcaoPainel(
         chave="emprestimo_termo",
         tecla="T",
         rotulo="BAIXAR O TERMO EM PDF",
@@ -941,6 +1007,7 @@ _CONDICOES = {
     # Requisicao entregue nao aceita mais edicao de orcamento (regra da rota).
     "orcamento_editavel": lambda obj, usuario: obj.requisicao.status != RequisicaoContrato.STATUS_ENTREGUE,
     "equipamento_em_posse": lambda obj, usuario: obj.data_devolucao is None,
+    "assinatura_com_imagem": lambda obj, usuario: bool(obj.imagem_assinatura),
     "emprestimo_com_termo": lambda obj, usuario: bool(obj.termo_pdf),
     "emprestimo_com_assinado": lambda obj, usuario: bool(obj.termo_assinado),
     # So faz sentido dar o OK depois que o assinado subiu (a rota recusa antes).
@@ -1025,6 +1092,7 @@ def serializar(acao: AcaoPainel, obj=None, usuario=None) -> dict | None:
         "url": reverse(acao.url_name, args=args) if args else reverse(acao.url_name),
         "formato": acao.formato,
         "campo_arquivo": acao.campo_arquivo,
+        "montador": acao.montador,
         "arquivo_opcional": acao.arquivo_opcional,
         "payload": payload,
         "campos": [

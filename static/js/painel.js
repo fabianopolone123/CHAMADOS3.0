@@ -1088,8 +1088,56 @@
         return partes ? `${partes[3]}-${partes[2]}-${partes[1]}` : texto;
     }
 
+    /* Copiar usa o MESMO codigo da tela (`requisicao_texto.js`) para montar a
+       mensagem: o terminal so busca o JSON do modulo, monta e joga na area de
+       transferencia. Nenhuma formatacao e reescrita aqui. */
+
+    const MONTADORES = {
+        requisicao_whatsapp: (dados) => window.RequisicaoTexto.whatsapp(dados),
+        requisicao_email: (dados) => window.RequisicaoTexto.emailTexto(dados),
+    };
+
+    function copiarDaRota(acao) {
+        const montar = MONTADORES[acao.montador];
+        if (!montar || !window.RequisicaoTexto) {
+            avisar("ESTA COPIA NAO ESTA DISPONIVEL NESTA TELA.", "erro");
+            desenharStatus();
+            return;
+        }
+        estado.ocupado = true;
+        avisar("MONTANDO O TEXTO...", "info");
+        desenharStatus();
+
+        fetch(acao.url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+            .then(async (resposta) => {
+                const dados = await resposta.json().catch(() => ({}));
+                if (!resposta.ok || dados.ok === false) {
+                    throw new Error(dados.message || "Nao foi possivel ler o registro.");
+                }
+                return dados;
+            })
+            .then((dados) => {
+                const texto = montar(dados);
+                return window.RequisicaoTexto.copiar(texto).then(() => texto);
+            })
+            .then((texto) => {
+                estado.ocupado = false;
+                avisar(`COPIADO: ${texto.split("\n").length} LINHAS. E SO COLAR.`, "ok");
+                desenharStatus();
+            })
+            .catch((erro) => {
+                estado.ocupado = false;
+                falhar(erro);
+            });
+    }
+
     function enviarAcao(acao, valores, arquivo) {
         const corpo = Object.assign({}, acao.payload || {}, valores);
+
+        if (acao.formato === "copiar") {
+            copiarDaRota(acao);
+            return;
+        }
 
         // Abrir nao envia nada: o navegador ja sabe o que fazer com PDF,
         // planilha e imagem. O que foi perguntado (o mes da planilha, por

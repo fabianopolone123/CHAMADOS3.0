@@ -257,9 +257,6 @@ TABELAS: tuple[TabelaPainel, ...] = (
         colunas=("nome_responsavel", "ativo", "criado_por", "criado_em"),
         busca=("nome_responsavel",),
         ordem="nome_responsavel",
-        # A rubrica so aparece dentro do termo em PDF: nao ha rota que sirva a
-        # imagem, e nome de arquivo que nao abre so atrapalha.
-        campos_ocultos=("imagem_assinatura",),
         nota="A senha de autorizacao e o hash dela nunca aparecem; cadastre pela acao N.",
     ),
     # --- Anexos (o arquivo em si abre pela rota do modulo, tecla T) --------

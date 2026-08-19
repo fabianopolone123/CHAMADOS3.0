@@ -41,7 +41,7 @@ MODULOS: tuple[ModuloPainel, ...] = (
             "chamado_anexos",
             "mensagem_anexos",
         ),
-        nota="O arrastar do Kanban e os anexos continuam na tela de Chamados.",
+        nota="Mover o chamado aqui e por tecla (M atribui, D devolve) no lugar de arrastar o card.",
     ),
     ModuloPainel(
         chave="contratos",

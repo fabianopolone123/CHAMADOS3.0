@@ -2874,6 +2874,26 @@ def emprestimos_dashboard_view(request):
 
 
 @login_required
+def assinatura_imagem_view(request, assinatura_id: int):
+    """Serve a rubrica da assinatura (TI/admin).
+
+    A imagem so era usada dentro do termo em PDF, entao nao havia rota para ela.
+    Passou a existir quando o painel comecou a listar as assinaturas: arquivo que
+    aparece pelo nome e nao abre e pior do que arquivo nenhum.
+    """
+    if not _is_ti(request.user):
+        raise Http404("Nao encontrado.")
+    assinatura = get_object_or_404(AssinaturaResponsavelTI, pk=assinatura_id)
+    if not assinatura.imagem_assinatura:
+        raise Http404("Assinatura sem imagem.")
+    return _serve_file(
+        assinatura.imagem_assinatura,
+        as_attachment=False,
+        filename=assinatura.imagem_assinatura.name.split("/")[-1],
+    )
+
+
+@login_required
 @require_POST
 def assinatura_create_view(request):
     if not _is_ti(request.user):

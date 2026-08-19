@@ -2,6 +2,13 @@
 
 ## 2026-08-18
 
+- Painel do Titular: **o que era gesto de tela virou tecla** — com isso nao sobra funcao fora do terminal.
+  - **Assinar o termo de emprestimo** (`S`): ID da assinatura + senha de autorizacao (mascarada), pela rota que ja confere a senha e refaz o PDF com a rubrica. Estava classificado como "so na tela" por engano meu: eram dois campos.
+  - **Rubrica da assinatura**: ganhou rota propria (`assinatura_imagem`) e abre pela acao `T`. Era o unico arquivo do sistema sem rota que o servisse — existia so dentro do PDF — e por isso o campo tinha sido escondido da tabela; agora aparece e abre.
+  - **Copiar a requisicao para WhatsApp** (`W`) **e para e-mail em texto** (`C`): na tela sao botoes do modal, aqui sao teclas. O texto **nao foi reescrito**: as funcoes que montavam a mensagem sairam de `contratos.js` para `static/js/requisicao_texto.js`, carregado pelas duas telas — a tela de Requisicoes passou a delegar para o mesmo arquivo. Mudou a mensagem, muda nos dois. (A versao de e-mail com fotos e formatacao rica continua no botao da tela: ali o valor esta no HTML colado, que nao e coisa de terminal.)
+  - **Arrastar o card do Kanban** ja existia como `M` (atribuir a um atendente) e `D` (devolver para abertos) — o que estava errado era a nota do modulo, que ainda mandava o titular para a tela.
+  - Formato novo de acao, `copiar`: le o JSON do modulo e monta o texto com o codigo da tela, jogando na area de transferencia (com o mesmo fallback para HTTP que a tela usa).
+  - Testes novos em `PainelTitularTests` (3 casos, entre eles um que **falha se o texto da requisicao voltar a existir em dois lugares**).
 - Painel do Titular: **fechados os ultimos buracos**, achados por uma varredura das 143 rotas do sistema contra o que o terminal alcanca.
   - **Senha-mestra do Cofre** (`M`): definir e trocar, com os tres campos mascarados, pela rota da tela — que exige a senha atual quando ja existe uma.
   - **Documento com anexo** (`N`): anexar so acontece na criacao (e assim na tela tambem), entao a criacao generica produzia documento que **nunca** poderia receber arquivo. A acao aceita **arquivo opcional**: fechar o seletor sem escolher cria o documento sem anexo.

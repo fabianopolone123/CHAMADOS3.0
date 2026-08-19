@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import tempfile
@@ -4136,6 +4137,12 @@ class PainelTitularTests(TestCase):
         )
 
     # --------------------------------------------------- acoes de fluxo ---
+    # PNG 1x1 valido: o termo em PDF embute a rubrica, entao bytes quaisquer
+    # quebram no gerador (reportlab/PIL), nao no codigo em teste.
+    _PNG_1X1 = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    )
+
     def _acoes(self, resposta):
         """Mapa TECLA -> acao, do jeito que o terminal recebe."""
         return {a["tecla"]: a for a in resposta.json()["acoes"]}
@@ -4318,7 +4325,7 @@ class PainelTitularTests(TestCase):
         # Sem termo gerado e sem assinado, o que cabe e anexar o assinado e
         # acrescentar equipamento — abrir termo/OK ainda nao.
         acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
-        self.assertEqual(set(acoes), {"Y", "Q"})
+        self.assertEqual(set(acoes), {"Y", "Q", "S"})
         self.assertEqual(acoes["Y"]["formato"], "arquivo")
         self.assertEqual(acoes["Y"]["campo_arquivo"], "termo_assinado")
 
@@ -4334,7 +4341,7 @@ class PainelTitularTests(TestCase):
 
         # Com o assinado no lugar, aparecem abrir (aba nova) e o OK da documentacao.
         acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
-        self.assertEqual(set(acoes), {"Y", "Q", "V", "K"})
+        self.assertEqual(set(acoes), {"Y", "Q", "S", "V", "K"})
         self.assertEqual(acoes["V"]["formato"], "abrir")
 
         self.assertEqual(self._post(acoes["K"]["url"]).status_code, 200)
@@ -4832,7 +4839,7 @@ class PainelTitularTests(TestCase):
             data={
                 "nome_responsavel": "Fabiano Polone",
                 "senha": "senha-forte",
-                "imagem_assinatura": SimpleUploadedFile("rubrica.png", b"imagem", content_type="image/png"),
+                "imagem_assinatura": SimpleUploadedFile("rubrica.png", self._PNG_1X1, content_type="image/png"),
             },
             HTTP_X_REQUESTED_WITH="XMLHttpRequest",
         )
@@ -4844,6 +4851,86 @@ class PainelTitularTests(TestCase):
         detalhe = self.client.get(reverse("painel_registro", args=["assinaturas", assinatura.pk])).json()
         nomes = [c["nome"] for c in detalhe["campos"]]
         self.assertNotIn("senha_hash", nomes)
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_termo_assinado_com_a_rubrica_pelo_terminal(self):
+        self.client.force_login(self.titular)
+        assinatura = AssinaturaResponsavelTI(nome_responsavel="Fabiano Polone", criado_por=self.titular)
+        assinatura.set_senha("autoriza-123")
+        assinatura.imagem_assinatura = SimpleUploadedFile("rubrica.png", self._PNG_1X1, content_type="image/png")
+        assinatura.save()
+
+        # A rubrica agora abre por rota propria (antes so existia dentro do PDF).
+        abrir = self._acoes(self.client.get(reverse("painel_registro", args=["assinaturas", assinatura.pk])))["T"]
+        self.assertEqual(self.client.get(abrir["url"]).status_code, 200)
+
+        emprestimo = EmprestimoTI.objects.create(
+            colaborador_nome="Zebedeu Teste", data_emprestimo="2026-08-10", criado_por=self.titular
+        )
+        EquipamentoEmprestimoTI.objects.create(
+            emprestimo=emprestimo, tipo_equipamento="Notebook", data_emprestimo="2026-08-10"
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))["S"]
+        senha = next(c for c in acao["campos"] if c["nome"] == "senha_assinatura")
+        self.assertTrue(senha["mascara"])
+
+        # Senha de autorizacao errada e recusada pela rota, como na tela.
+        errada = self.client.post(
+            acao["url"],
+            data=dict(acao["payload"], assinatura_id=assinatura.pk, senha_assinatura="chute"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(errada.status_code, 403)
+
+        certa = self.client.post(
+            acao["url"],
+            data=dict(acao["payload"], assinatura_id=assinatura.pk, senha_assinatura="autoriza-123"),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(certa.status_code, 200)
+        emprestimo.refresh_from_db()
+        self.assertEqual(emprestimo.assinatura_responsavel_id, assinatura.pk)
+        self.assertTrue(emprestimo.termo_pdf)
+        # O equipamento que ja estava no emprestimo continua nele.
+        self.assertEqual(emprestimo.equipamentos.count(), 1)
+
+    def test_copia_da_requisicao_usa_a_rota_de_detalhe_do_modulo(self):
+        """O texto e montado pelo mesmo arquivo que a tela usa; aqui garante-se
+        que o terminal aponta para o JSON certo e que ele traz o que o montador
+        espera (`requisicao` + `orcamentos`)."""
+        self.client.force_login(self.titular)
+        requisicao = RequisicaoContrato.objects.create(titulo="Cabos", criado_por=self.titular)
+        OrcamentoContrato.objects.create(requisicao=requisicao, titulo="Loja A", valor=Decimal("10.00"))
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["requisicoes", requisicao.pk])))
+        for tecla, montador in (("W", "requisicao_whatsapp"), ("C", "requisicao_email")):
+            self.assertEqual(acoes[tecla]["formato"], "copiar")
+            self.assertEqual(acoes[tecla]["montador"], montador)
+            self.assertEqual(acoes[tecla]["url"], reverse("requisicao_detail", args=[requisicao.pk]))
+
+        dados = self.client.get(acoes["W"]["url"]).json()
+        self.assertIn("requisicao", dados)
+        self.assertIn("orcamentos", dados)
+        self.assertEqual(dados["requisicao"]["titulo"], "Cabos")
+
+    def test_texto_da_requisicao_mora_em_um_arquivo_so(self):
+        """A tela e o terminal tem de ler o mesmo `requisicao_texto.js`."""
+        from pathlib import Path
+
+        base = Path(settings.BASE_DIR)
+        compartilhado = (base / "static" / "js" / "requisicao_texto.js").read_text(encoding="utf-8")
+        for nome in ("buildWhatsappMessage", "buildEmailPlainText", "copiar:"):
+            self.assertIn(nome, compartilhado)
+
+        contratos = (base / "static" / "js" / "contratos.js").read_text(encoding="utf-8")
+        # contratos.js delega em vez de ter a propria copia do texto
+        self.assertIn("RequisicaoTexto.whatsapp(data)", contratos)
+        self.assertNotIn("Sem orçamentos cadastrados.", contratos)
+
+        for template in ("contratos.html", "painel.html"):
+            html = (base / "templates" / "chamados" / template).read_text(encoding="utf-8")
+            self.assertIn("js/requisicao_texto.js", html)
 
     def test_cada_tabela_do_painel_usa_uma_tecla_por_acao(self):
         """Duas acoes na mesma tecla deixariam uma delas inalcancavel."""

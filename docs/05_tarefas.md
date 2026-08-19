@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- Painel do Titular: assinatura do termo (`S`), rubrica com rota propria, e a copia da requisicao para WhatsApp/e-mail por tecla — com o texto extraido para `static/js/requisicao_texto.js`, compartilhado com a tela de Requisicoes
+
 - Painel do Titular: senha-mestra do Cofre, documento com anexo (arquivo opcional), assinatura de responsavel e edicao de requisicao pela rota que registra o evento — com testes de catalogo cobrando "arquivo listado tem de abrir" e "uma tecla por acao"
 
 - Painel do Titular: **anexos de todo o sistema em 8 tabelas novas** (achar e abrir), **orcamentos/suborcamentos** (documento e foto), **requisicao criada pela rota do modulo** (com evento) e **configuracao de e-mail** como tabela, com senha do SMTP e e-mail de teste por acao
