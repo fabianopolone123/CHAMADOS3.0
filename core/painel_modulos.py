@@ -102,7 +102,7 @@ def modulos_para_painel() -> list[dict]:
             continue
         ajuste = ajustes.get(item.chave)
         total = sum(
-            painel_dados.TABELA_POR_CHAVE[c].modelo.objects.count()
+            painel_dados.consulta_base(painel_dados.TABELA_POR_CHAVE[c]).count()
             for c in modulo.tabelas
             if c in painel_dados.TABELA_POR_CHAVE
         )
@@ -145,7 +145,7 @@ def detalhar_modulo(chave: str) -> dict | None:
             {
                 "chave": tabela.chave,
                 "rotulo": tabela.rotulo,
-                "total": tabela.modelo.objects.count(),
+                "total": painel_dados.consulta_base(tabela).count(),
                 "principal": indice == 0,
                 "somente_leitura": tabela.somente_leitura,
             }

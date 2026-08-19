@@ -4297,6 +4297,40 @@ class PainelTitularTests(TestCase):
         )
         self.assertEqual(resposta.status_code, 302)
 
+    def test_pausas_lista_so_o_que_falta_complementar(self):
+        self.client.force_login(self.titular)
+        self.titular.groups.add(self.attendant_group)
+        chamado = Chamado.objects.create(
+            numero="CH-000905", titulo="Play esquecido", status=Chamado.STATUS_ATRIBUIDO
+        )
+        agora = timezone.now()
+
+        def _pausa():
+            return PausaAutomatica.objects.create(
+                atendimento=AtendimentoHistorico.objects.create(
+                    chamado=chamado, atendente=self.titular, iniciado_em=agora, finalizado_em=agora
+                )
+            )
+
+        pendente, feita = _pausa(), _pausa()
+        feita.complementar(descricao="Terminei no dia seguinte.", usuario=self.titular)
+
+        lista = self.client.get(reverse("painel_tabela", args=["pausas"])).json()
+        self.assertEqual(lista["total"], 1)
+        self.assertEqual([l["pk"] for l in lista["linhas"]], [pendente.pk])
+
+        # A contagem do modulo tem de bater com a lista, senao o numero mente.
+        modulo = self.client.get(reverse("painel_modulo", args=["chamados"])).json()
+        pausas = next(t for t in modulo["tabelas"] if t["chave"] == "pausas")
+        self.assertEqual(pausas["total"], 1)
+
+        # Complementada some da fila, mas continua abrindo pelo id.
+        pendente.complementar(descricao="Feito.", usuario=self.titular)
+        self.assertEqual(self.client.get(reverse("painel_tabela", args=["pausas"])).json()["total"], 0)
+        self.assertEqual(
+            self.client.get(reverse("painel_registro", args=["pausas", pendente.pk])).status_code, 200
+        )
+
     def test_complemento_da_pausa_so_aparece_para_quem_atendeu(self):
         self.client.force_login(self.titular)
         self.titular.groups.add(self.attendant_group)

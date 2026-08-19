@@ -47,6 +47,10 @@ class TabelaPainel:
     # o numero e deixa o extrato de movimentacoes mentindo. Quem altera e a acao
     # de fluxo (entrada/retirada), que grava o movimento junto.
     campos_travados: tuple[str, ...] = ()
+    # Recorte fixo da tabela: pares (lookup, valor) aplicados sempre, para a
+    # tabela existir por um proposito e nao como despejo do modelo. Usado nas
+    # pausas automaticas, que so interessam enquanto falta complementar.
+    filtro: tuple[tuple[str, object], ...] = ()
     nota: str = ""
     campos_ocultos: tuple[str, ...] = dataclass_field(default_factory=tuple)
 
@@ -71,11 +75,16 @@ TABELAS: tuple[TabelaPainel, ...] = (
     ),
     TabelaPainel(
         chave="pausas",
-        rotulo="PAUSAS AUTOMATICAS",
+        rotulo="PAUSAS A COMPLEMENTAR",
         modelo=m.PausaAutomatica,
         colunas=("atendimento", "criado_em"),
         busca=("atendimento__chamado__numero", "atendimento__atendente__username"),
         ordem="-criado_em",
+        # So aparece o que falta preencher: pausa complementada virou historico,
+        # e o texto dela ja esta na linha do tempo do chamado (evento) e na
+        # planilha do mes. Aqui a lista e uma fila de trabalho.
+        filtro=(("complementado_em__isnull", True),),
+        nota="Lista so as pausas que ainda faltam complementar; a tecla C so aparece nas suas.",
     ),
     TabelaPainel(
         chave="pendencias",
@@ -447,8 +456,21 @@ def _coluna_texto(instancia, nome: str) -> str:
     return valor_exibicao(instancia, campo)
 
 
-def listar(tabela: TabelaPainel, termo: str = "", pagina: int = 0, por_pagina: int = 14) -> dict:
+def consulta_base(tabela: TabelaPainel):
+    """Queryset da tabela ja com o recorte fixo dela.
+
+    Fica num lugar so porque a contagem que aparece na area MODULOS tem de bater
+    com o que a lista mostra — numero que nao fecha com a tela e pior do que
+    numero nenhum.
+    """
     qs = tabela.modelo.objects.all()
+    if tabela.filtro:
+        qs = qs.filter(**dict(tabela.filtro))
+    return qs
+
+
+def listar(tabela: TabelaPainel, termo: str = "", pagina: int = 0, por_pagina: int = 14) -> dict:
+    qs = consulta_base(tabela)
     termo = (termo or "").strip()
     if termo and tabela.busca:
         filtro = models.Q()
