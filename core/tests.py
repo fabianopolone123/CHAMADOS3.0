@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import tempfile
 from decimal import Decimal
 
@@ -4995,10 +4996,11 @@ class PainelTitularTests(TestCase):
 
         base = Path(settings.BASE_DIR)
         painel_js = (base / "static" / "js" / "painel.js").read_text(encoding="utf-8")
-        self.assertIn("ESPERA_LINHA", painel_js)
         self.assertIn("cancelarAberturaAutomatica", painel_js)
-        # o rodape nao pode mais prometer ENTER para abrir
-        self.assertNotIn("ENTER ABRE", painel_js)
+        # A espera pelo segundo digito precisa caber em quem digita olhando para
+        # a tela: com 350ms, "1" e "4" abria o registro 1 antes de chegar o 4.
+        espera = int(re.search(r"const ESPERA_LINHA = (\d+)", painel_js).group(1))
+        self.assertGreaterEqual(espera, 800)
 
         painel_css = (base / "static" / "css" / "painel.css").read_text(encoding="utf-8")
         self.assertIn("table-layout: fixed", painel_css)

@@ -196,7 +196,10 @@
 
         const partes = [];
         if (estado.buffer) {
-            partes.push(`<span class="pnl-buffer">LINHA: ${esc(estado.buffer)}_ &nbsp; ABRE SOZINHO &nbsp; ESC LIMPA</span>`);
+            partes.push(
+                `<span class="pnl-buffer">LINHA: ${esc(estado.buffer)}_</span>` +
+                    '<span class="pnl-fraco">DIGITE O PROXIMO NUMERO, OU ESPERE PARA ABRIR &nbsp; ENTER ABRE JA &nbsp; ESC LIMPA</span>'
+            );
         } else if (estado.aviso) {
             partes.push(`<span class="pnl-${esc(estado.avisoTipo)}">${esc(estado.aviso)}</span>`);
         } else {
@@ -228,10 +231,16 @@
     const ESPERA_CONFIRMACAO = 400; // ms
 
     /* Quando o numero digitado ainda pode ser o comeco de outro da lista (o "1"
-       de uma pagina que tem linha 10), o terminal espera um instante pelo
-       segundo digito e abre sozinho se ele nao vier. Assim nao existe ENTER
-       para abrir registro: numero sem continuacao possivel abre na hora. */
-    const ESPERA_LINHA = 350; // ms
+       de uma pagina que tem linha 10), o terminal espera pelo segundo digito e
+       abre sozinho se ele nao vier. Assim nao existe ENTER para abrir registro:
+       numero sem continuacao possivel abre na hora.
+
+       Um segundo, e nao um instante: com 350ms quem digitava "1" e "4" olhando
+       para a tela caia no registro 1 antes de alcancar o 4. Esperar demais so
+       atrasa a linha 1 (as outras abrem na hora); esperar de menos abre o
+       registro errado, que e bem pior. ENTER continua abrindo na hora para quem
+       nao quiser esperar. */
+    const ESPERA_LINHA = 1000; // ms
 
     function cancelarAberturaAutomatica() {
         if (estado.temporizadorLinha) {
