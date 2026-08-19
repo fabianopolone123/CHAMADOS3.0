@@ -369,16 +369,17 @@ def painel_tabela_view(request, chave: str):
     )
 
 
-def _detalhe_com_acoes(tabela, pk) -> dict:
+def _detalhe_com_acoes(tabela, pk, usuario) -> dict:
     """Detalhe do registro + as acoes de fluxo que cabem nele agora.
 
     Fica num helper porque as tres telas que devolvem o registro (abrir, criar e
     alterar) precisam das mesmas acoes — depois de um Play, por exemplo, o menu
-    do registro tem de mudar junto.
+    do registro tem de mudar junto. O operador vai junto porque ha regra que
+    depende de quem e (a pausa automatica so o proprio atendente complementa).
     """
     detalhe = painel_dados.detalhar(tabela, pk)
     detalhe["acoes"] = painel_acoes.acoes_serializadas(
-        tabela.chave, "registro", tabela.modelo.objects.get(pk=pk)
+        tabela.chave, "registro", tabela.modelo.objects.get(pk=pk), usuario
     )
     return detalhe
 
@@ -390,7 +391,7 @@ def painel_registro_view(request, chave: str, pk: str):
     if not tabela:
         return _erro("Tabela inexistente.", status=404)
     try:
-        return JsonResponse({"ok": True, **_detalhe_com_acoes(tabela, pk)})
+        return JsonResponse({"ok": True, **_detalhe_com_acoes(tabela, pk, request.user)})
     except ObjectDoesNotExist:
         return _erro("Registro nao encontrado.", status=404)
 
@@ -434,7 +435,7 @@ def painel_registro_criar_view(request, chave: str):
             "ok": True,
             "message": f"Criado: {obj} #{obj.pk}",
             "pk": obj.pk,
-            **_detalhe_com_acoes(tabela, obj.pk),
+            **_detalhe_com_acoes(tabela, obj.pk, request.user),
         }
     )
 
@@ -470,7 +471,7 @@ def painel_registro_alterar_view(request, chave: str, pk: str):
         {
             "ok": True,
             "message": f"{campo.replace('_', ' ').upper()}: {anterior} -> {novo}",
-            **_detalhe_com_acoes(tabela, obj.pk),
+            **_detalhe_com_acoes(tabela, obj.pk, request.user),
         }
     )
 

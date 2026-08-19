@@ -10,6 +10,8 @@
 
 ## Concluidas
 
+- Painel do Titular: **responder chamado, complementar pausa automatica e o fluxo do emprestimo** (termo em PDF, anexar o assinado, documentacao OK) pelo terminal, com as duas formas novas de acao — `arquivo` (seletor do proprio computador) e `abrir` (aba nova do navegador); `ticket_message_create` passou a responder JSON para pedido por `fetch`
+
 - Painel do Titular: **acoes de fluxo dos modulos** dentro do terminal (abrir chamado, Play/Pause/Stop, atribuir/devolver, criar pendencia, trocar prioridade, converter em chamado, aprovar orcamento, entregar/desaprovar/nao aprovar requisicao), cada uma chamando a **mesma rota da tela classica** para nao duplicar regra; `core/painel_acoes.py`; testes novos em `PainelTitularTests` (17 casos no total)
 
 - Painel do Titular: area **[5] MODULOS** (entra em cada botao do menu e opera as tabelas daquele modulo por ali) e **criacao de registro** pelo terminal, perguntando campo a campo os obrigatorios; `core/painel_modulos.py`; testes novos em `PainelTitularTests` (13 casos no total)

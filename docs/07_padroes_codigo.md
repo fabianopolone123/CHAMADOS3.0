@@ -23,6 +23,7 @@ Definir convencoes para manter o projeto consistente, legivel e facil de evoluir
 
 - O menu lateral de TI e dinamico: o catalogo (chave, rota, rotulo padrao e icone SVG) fica em `core/menu.py` e os ajustes do titular em `ItemMenuConfig`. **Modulo novo entra no menu cadastrando o item em `core/menu.py`**, nunca escrevendo `<a>` a mao em `templates/partials/ti_sidebar.html`, que so itera `menu_itens`.
 - O Painel do Titular **nao reimplementa regra de modulo**: acao com fluxo (abrir chamado, Play/Pause/Stop, converter pendencia, aprovar orcamento) e declarada em `core/painel_acoes.py` apontando para a **rota que a tela classica ja usa**; o painel so monta o pedido e mostra a resposta. Escrever direto na tabela pela camada generica nesses casos pula evento de timeline, notificacao e validacao.
+- Rota que a tela classica usa com `redirect` + `messages` e que o painel tambem precisa chamar deve responder **JSON quando o pedido vem por `fetch`** (`X-Requested-With: XMLHttpRequest`), mantendo o redirect para o formulario da tela — e o caso de `ticket_message_create`. Nao criar rota paralela so para o painel.
 - Telas de administracao que alteram dados de varios modulos (Painel do Titular) devem: restringir por `titular_required`, responder JSON, registrar toda escrita em `PainelAuditoria` e manter a lista de campos de segredo (`_CAMPO_SECRETO` em `core/painel_dados.py`) como barreira — nenhuma tela generica pode expor senha, hash ou texto cifrado.
 
 ## Configuracao e seguranca

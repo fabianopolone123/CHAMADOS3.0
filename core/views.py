@@ -1595,16 +1595,25 @@ def ticket_message_create_view(request, numero: str):
 
     Mantem o usuario no detalhe do chamado apos o envio e grava apenas um resumo
     no historico tecnico, sem duplicar o conteudo da conversa.
+
+    A tela do chamado envia um formulario comum e continua sendo redirecionada;
+    quem chama por `fetch` (o terminal do Painel do Titular) recebe **JSON**,
+    porque la nao ha pagina para onde voltar nem `messages` para exibir.
     """
     chamado = get_object_or_404(Chamado, numero=numero)
+    espera_json = request.headers.get("x-requested-with") == "XMLHttpRequest"
 
     if not _user_can_access_ticket(request.user, chamado):
+        if espera_json:
+            return _json_error("Voce nao tem acesso a este chamado.", status=403)
         messages.error(request, "Voce nao tem acesso a este chamado.")
         return redirect("my_tickets")
 
     form = MensagemChamadoForm(request.POST, request.FILES)
     if not form.is_valid():
         erro = next(iter(form.errors.values()))[0] if form.errors else "Nao foi possivel enviar a mensagem."
+        if espera_json:
+            return _json_error(erro)
         messages.error(request, erro)
         return redirect("ticket_detail", numero=chamado.numero)
 
@@ -1639,6 +1648,14 @@ def ticket_message_create_view(request, numero: str):
         )
 
     notificacoes.notificar_nova_mensagem(chamado, mensagem, request)
+    if espera_json:
+        return JsonResponse(
+            {
+                "ok": True,
+                "message": f"Mensagem enviada no chamado {chamado.numero}.",
+                "mensagem_id": mensagem.id,
+            }
+        )
     messages.success(request, "Mensagem enviada com sucesso.")
     return redirect("ticket_detail", numero=chamado.numero)
 

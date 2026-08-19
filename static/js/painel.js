@@ -968,16 +968,71 @@
 
     function executarAcao(acao) {
         const campos = acao.campos || [];
+        const seguir = () => {
+            // Abrir arquivo nao envia nada: o navegador ja sabe o que fazer com
+            // PDF, planilha e imagem — abre em outra aba ou baixa, como sempre.
+            if (acao.formato === "abrir") {
+                window.open(acao.url, "_blank", "noopener");
+                avisar(`${acao.rotulo}: ABERTO EM OUTRA ABA.`, "ok");
+                desenharStatus();
+                return;
+            }
+            if (acao.formato === "arquivo") {
+                escolherArquivo(acao, campos);
+                return;
+            }
+            coletarCampos(acao, campos, 0, {});
+        };
         if (acao.confirma) {
-            pedirConfirmacao(acao.confirma, () => coletarCampos(acao, campos, 0, {}));
+            pedirConfirmacao(acao.confirma, seguir);
             return;
         }
-        coletarCampos(acao, campos, 0, {});
+        seguir();
     }
 
-    function coletarCampos(acao, campos, indice, valores) {
+    /* O terminal e uma pagina de navegador: para mandar arquivo, quem escolhe e
+       o seletor do proprio computador. A tecla dispara o `input file` escondido
+       e o arquivo sobe pela mesma rota da tela classica. */
+
+    function escolherArquivo(acao, campos) {
+        const entrada = document.createElement("input");
+        entrada.type = "file";
+        entrada.style.display = "none";
+        document.body.appendChild(entrada);
+
+        entrada.addEventListener("change", () => {
+            const arquivo = entrada.files && entrada.files[0];
+            if (entrada.parentNode) {
+                document.body.removeChild(entrada);
+            }
+            if (!arquivo) {
+                avisar("NENHUM ARQUIVO ESCOLHIDO. ACAO CANCELADA.", "fraco");
+                desenharStatus();
+                return;
+            }
+            avisar(`ARQUIVO: ${arquivo.name.toUpperCase()}`, "info");
+            desenhar();
+            coletarCampos(acao, campos, 0, {}, arquivo);
+        });
+
+        // Fechar a janela sem escolher nada nao dispara `change`: sem isso o
+        // terminal ficaria parado no "escolha o arquivo" e o input pendurado.
+        entrada.addEventListener("cancel", () => {
+            if (entrada.parentNode) {
+                document.body.removeChild(entrada);
+            }
+            avisar("NENHUM ARQUIVO ESCOLHIDO. ACAO CANCELADA.", "fraco");
+            desenharStatus();
+        });
+
+        avisar("ESCOLHA O ARQUIVO NA JANELA DO COMPUTADOR...", "info");
+        desenharStatus();
+        entrada.click();
+    }
+
+    function coletarCampos(acao, campos, indice, valores, arquivo) {
         if (indice >= campos.length) {
-            enviarAcao(acao, valores);
+            enviarAcao(acao, valores, arquivo);
             return;
         }
         const campo = campos[indice];
@@ -997,35 +1052,49 @@
                 if (texto) {
                     valores[campo.nome] = texto;
                 }
-                coletarCampos(acao, campos, indice + 1, valores);
+                coletarCampos(acao, campos, indice + 1, valores, arquivo);
             },
             true,
             dica
         );
     }
 
-    function enviarAcao(acao, valores) {
+    function enviarAcao(acao, valores, arquivo) {
         const corpo = Object.assign({}, acao.payload || {}, valores);
         estado.ocupado = true;
-        avisar("EXECUTANDO...", "info");
+        avisar(arquivo ? "ENVIANDO O ARQUIVO..." : "EXECUTANDO...", "info");
         desenharStatus();
 
-        const opcoes =
-            acao.formato === "form"
-                ? {
-                      method: "POST",
-                      headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
-                      body: new URLSearchParams(corpo),
-                  }
-                : {
-                      method: "POST",
-                      headers: {
-                          "Content-Type": "application/json",
-                          "X-CSRFToken": csrfToken(),
-                          "X-Requested-With": "XMLHttpRequest",
-                      },
-                      body: JSON.stringify(corpo),
-                  };
+        // O `Content-Type` do FormData e do formulario tem de ser montado pelo
+        // navegador (o multipart leva um separador que ele mesmo gera), entao so
+        // o envio em JSON declara o cabecalho.
+        let opcoes;
+        if (acao.formato === "arquivo") {
+            const dados = new FormData();
+            Object.keys(corpo).forEach((chave) => dados.append(chave, corpo[chave]));
+            dados.append(acao.campo_arquivo, arquivo, arquivo.name);
+            opcoes = {
+                method: "POST",
+                headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+                body: dados,
+            };
+        } else if (acao.formato === "form") {
+            opcoes = {
+                method: "POST",
+                headers: { "X-CSRFToken": csrfToken(), "X-Requested-With": "XMLHttpRequest" },
+                body: new URLSearchParams(corpo),
+            };
+        } else {
+            opcoes = {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken(),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: JSON.stringify(corpo),
+            };
+        }
 
         fetch(acao.url, opcoes)
             .then(async (resposta) => {

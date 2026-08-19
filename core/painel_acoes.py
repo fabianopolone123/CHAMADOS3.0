@@ -16,11 +16,16 @@ Como declarar uma acao nova:
 - `url_name` e a rota existente, com `args_do_registro` quando ela leva o id;
 - `campos` sao os valores perguntados no terminal, um por vez;
 - `payload_do_registro` copia dados do proprio registro para o pedido;
-- `formato` e `json` (padrao) ou `form` para as rotas que esperam formulario.
+- `formato` diz como o pedido sai do terminal:
+  - `json` (padrao) e `form`, para as rotas que esperam formulario;
+  - `arquivo`, que abre o **seletor de arquivo do proprio computador** e manda o
+    escolhido no campo `campo_arquivo` (a rota recebe em `request.FILES`);
+  - `abrir`, que nao envia nada: so abre a URL numa aba nova, para o navegador
+    fazer o que ja sabe fazer com PDF, planilha e imagem.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .models import AtendimentoHistorico, Chamado, PendenciaTI
 
@@ -42,7 +47,9 @@ class AcaoPainel:
     tabela: str
     escopo: str  # "registro" | "tabela"
     url_name: str
-    formato: str = "json"
+    formato: str = "json"  # json | form | arquivo | abrir
+    # Nome do campo de arquivo esperado pela rota (so para `formato="arquivo"`).
+    campo_arquivo: str = ""
     campos: tuple[CampoAcao, ...] = ()
     payload_do_registro: tuple[tuple[str, str], ...] = ()
     payload_fixo: tuple[tuple[str, str], ...] = ()
@@ -148,6 +155,31 @@ ACOES: tuple[AcaoPainel, ...] = (
         payload_fixo=(("target", "aberto"),),
         condicao="chamado_aberto",
     ),
+    AcaoPainel(
+        chave="chamado_responder",
+        tecla="R",
+        rotulo="RESPONDER (MENSAGEM AO SOLICITANTE)",
+        tabela="chamados",
+        escopo="registro",
+        url_name="ticket_message_create",
+        formato="form",
+        args_do_registro=("numero",),
+        campos=(CampoAcao("texto", "SUA MENSAGEM"),),
+        nota="Entra na conversa do chamado, registra o comentario na linha do tempo e notifica por e-mail.",
+    ),
+    # ------------------------------------------------------------- pausas --
+    AcaoPainel(
+        chave="pausa_complementar",
+        tecla="C",
+        rotulo="COMPLEMENTAR O QUE FOI FEITO",
+        tabela="pausas",
+        escopo="registro",
+        url_name="pausa_complementar",
+        args_do_registro=("pk",),
+        campos=(CampoAcao("description", "O QUE FOI FEITO NO PERIODO"),),
+        nota="A pendencia e do proprio atendente: pelo painel so da para complementar as suas.",
+        condicao="pausa_minha_e_pendente",
+    ),
     # ---------------------------------------------------------- pendencias --
     AcaoPainel(
         chave="pendencia_criar",
@@ -232,14 +264,72 @@ ACOES: tuple[AcaoPainel, ...] = (
         confirma="APROVAR ESTE ORCAMENTO?",
         nota="Aprova este e remove a aprovacao dos outros da mesma requisicao.",
     ),
+    # -------------------------------------------------------- emprestimos --
+    AcaoPainel(
+        chave="emprestimo_termo",
+        tecla="T",
+        rotulo="BAIXAR O TERMO EM PDF",
+        tabela="emprestimos",
+        escopo="registro",
+        url_name="emprestimo_baixar_termo",
+        formato="abrir",
+        args_do_registro=("pk",),
+        condicao="emprestimo_com_termo",
+    ),
+    AcaoPainel(
+        chave="emprestimo_anexar_assinado",
+        tecla="Y",
+        rotulo="ANEXAR O TERMO ASSINADO",
+        tabela="emprestimos",
+        escopo="registro",
+        url_name="emprestimo_anexar_termo_assinado",
+        formato="arquivo",
+        campo_arquivo="termo_assinado",
+        args_do_registro=("pk",),
+        nota="Abre o seletor de arquivo do computador; o termo digitalizado sobe pela mesma rota da tela.",
+    ),
+    AcaoPainel(
+        chave="emprestimo_ver_assinado",
+        tecla="V",
+        rotulo="ABRIR O TERMO ASSINADO",
+        tabela="emprestimos",
+        escopo="registro",
+        url_name="emprestimo_termo_assinado",
+        formato="abrir",
+        args_do_registro=("pk",),
+        condicao="emprestimo_com_assinado",
+    ),
+    AcaoPainel(
+        chave="emprestimo_documentacao_ok",
+        tecla="K",
+        rotulo="MARCAR DOCUMENTACAO COMO OK",
+        tabela="emprestimos",
+        escopo="registro",
+        url_name="emprestimo_marcar_ok",
+        args_do_registro=("pk",),
+        confirma="CONFIRMAR QUE A DOCUMENTACAO ASSINADA ESTA OK?",
+        condicao="emprestimo_assinado_pendente_de_ok",
+    ),
 )
 
 
+# Cada teste recebe o registro e quem esta operando o painel — algumas regras
+# sao do registro (chamado encerrado) e outras da pessoa (a pausa e de quem
+# atendeu, ninguem complementa a do outro).
 _CONDICOES = {
     # Chamado encerrado nao recebe mais Play/Pause/Stop nem movimentacao.
-    "chamado_aberto": lambda obj: getattr(obj, "status", None) not in Chamado.STATUS_ENCERRADOS,
+    "chamado_aberto": lambda obj, usuario: getattr(obj, "status", None) not in Chamado.STATUS_ENCERRADOS,
     # Pendencia ja convertida vira historico.
-    "pendencia_aberta": lambda obj: not getattr(obj, "convertido_em_chamado", False),
+    "pendencia_aberta": lambda obj, usuario: not getattr(obj, "convertido_em_chamado", False),
+    # A rota so aceita a pausa do proprio atendente, e uma vez so.
+    "pausa_minha_e_pendente": lambda obj, usuario: bool(
+        obj.pendente and usuario is not None and obj.atendimento.atendente_id == usuario.pk
+    ),
+    "emprestimo_com_termo": lambda obj, usuario: bool(obj.termo_pdf),
+    "emprestimo_com_assinado": lambda obj, usuario: bool(obj.termo_assinado),
+    # So faz sentido dar o OK depois que o assinado subiu (a rota recusa antes).
+    "emprestimo_assinado_pendente_de_ok": lambda obj, usuario: bool(obj.termo_assinado)
+    and not obj.termo_assinado_ok,
 }
 
 
@@ -251,17 +341,18 @@ def acao_por_chave(chave: str) -> AcaoPainel | None:
     return next((a for a in ACOES if a.chave == chave), None)
 
 
-def serializar(acao: AcaoPainel, obj=None) -> dict | None:
+def serializar(acao: AcaoPainel, obj=None, usuario=None) -> dict | None:
     """Descreve a acao para o terminal, ja resolvida para este registro.
 
     Devolve `None` quando a acao nao cabe no registro (chamado encerrado,
-    pendencia ja convertida), para o terminal nem oferecer a tecla.
+    pendencia ja convertida, termo que ainda nao foi gerado), para o terminal
+    nem oferecer a tecla.
     """
     from django.urls import reverse
 
     if acao.condicao and obj is not None:
         teste = _CONDICOES.get(acao.condicao)
-        if teste and not teste(obj):
+        if teste and not teste(obj, usuario):
             return None
 
     args = [getattr(obj, nome) for nome in acao.args_do_registro] if obj is not None else []
@@ -276,6 +367,7 @@ def serializar(acao: AcaoPainel, obj=None) -> dict | None:
         "rotulo": acao.rotulo,
         "url": reverse(acao.url_name, args=args) if args else reverse(acao.url_name),
         "formato": acao.formato,
+        "campo_arquivo": acao.campo_arquivo,
         "payload": payload,
         "campos": [
             {
@@ -293,10 +385,10 @@ def serializar(acao: AcaoPainel, obj=None) -> dict | None:
     }
 
 
-def acoes_serializadas(chave_tabela: str, escopo: str, obj=None) -> list[dict]:
+def acoes_serializadas(chave_tabela: str, escopo: str, obj=None, usuario=None) -> list[dict]:
     saida = []
     for acao in acoes_da_tabela(chave_tabela, escopo):
-        dados = serializar(acao, obj)
+        dados = serializar(acao, obj, usuario)
         if dados:
             saida.append(dados)
     return saida

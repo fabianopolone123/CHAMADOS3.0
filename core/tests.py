@@ -4158,7 +4158,7 @@ class PainelTitularTests(TestCase):
         )
 
         acoes = self._acoes(self.client.get(reverse("painel_registro", args=["chamados", chamado.pk])))
-        self.assertEqual(set(acoes), {"P", "U", "F", "M", "D"})
+        self.assertEqual(set(acoes), {"P", "U", "F", "M", "D", "R"})
         self.assertEqual(acoes["P"]["payload"], {"ticket_number": chamado.numero})
         self.assertEqual(acoes["F"]["payload"]["action"], AtendimentoHistorico.TIPO_ENCERRAMENTO_STOP)
 
@@ -4172,9 +4172,11 @@ class PainelTitularTests(TestCase):
         chamado.refresh_from_db()
         self.assertIn(chamado.status, Chamado.STATUS_ENCERRADOS)
 
-        # Chamado encerrado nao oferece mais Play/Pause/Stop nem movimentacao.
+        # Chamado encerrado nao oferece mais Play/Pause/Stop nem movimentacao —
+        # mas continua aceitando mensagem, como a tela do chamado, que mostra o
+        # campo de resposta mesmo depois de fechado.
         depois = self._acoes(self.client.get(reverse("painel_registro", args=["chamados", chamado.pk])))
-        self.assertEqual(depois, {})
+        self.assertEqual(set(depois), {"R"})
 
     def test_acoes_da_pendencia_perguntam_a_prioridade_que_a_rota_espera(self):
         self.client.force_login(self.titular)
@@ -4202,6 +4204,129 @@ class PainelTitularTests(TestCase):
         self.assertEqual(
             self._acoes(self.client.get(reverse("painel_registro", args=["pendencias", pendencia.pk]))), {}
         )
+
+    @override_settings(EMAIL_BACKEND_OVERRIDE=_LOCMEM)
+    def test_responder_chamado_pelo_terminal_notifica_e_entra_na_timeline(self):
+        self.client.force_login(self.titular)
+        chamado = Chamado.objects.create(
+            numero="CH-000901",
+            titulo="Sem acesso a pasta",
+            descricao="Nao consigo abrir a pasta do setor.",
+            solicitante=self.comum,
+            solicitante_email="joao.comum@sidertec.com.br",
+            status=Chamado.STATUS_ATRIBUIDO,
+            atendente_atual=self.titular,
+        )
+
+        acao = self._acoes(self.client.get(reverse("painel_registro", args=["chamados", chamado.pk])))["R"]
+        self.assertEqual(acao["url"], reverse("ticket_message_create", args=[chamado.numero]))
+
+        from django.core import mail
+
+        from .models import EmailConfig
+
+        config = EmailConfig.load()
+        config.ativo = True
+        config.remetente = "chamados@sidertec.com.br"
+        config.emails_ti = "ti@sidertec.com.br"
+        config.save()
+
+        mail.outbox = []
+        resposta = self.client.post(
+            acao["url"],
+            data={"texto": "Liberado o acesso, pode testar."},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        # A tela do chamado redireciona; o terminal precisa de JSON.
+        self.assertEqual(resposta.status_code, 200)
+        self.assertTrue(resposta.json()["ok"])
+
+        mensagem = ChamadoMensagem.objects.get(pk=resposta.json()["mensagem_id"])
+        self.assertEqual(mensagem.chamado, chamado)
+        self.assertTrue(chamado.eventos.filter(tipo=ChamadoEvento.TIPO_COMENTARIO).exists())
+        # A notificacao sai porque a rota e a mesma da tela; a escrita generica
+        # na tabela `mensagens` nao mandaria e-mail nenhum.
+        destinos = {d for m in mail.outbox for d in m.to}
+        self.assertIn("joao.comum@sidertec.com.br", destinos)
+        self.assertIn("ti@sidertec.com.br", destinos)
+
+    def test_tela_do_chamado_continua_redirecionando(self):
+        """O JSON e so para quem chama por fetch: o formulario do portal nao muda."""
+        chamado = Chamado.objects.create(
+            numero="CH-000902", titulo="Do portal", solicitante=self.comum, status=Chamado.STATUS_ABERTO
+        )
+        self.client.force_login(self.comum)
+        resposta = self.client.post(
+            reverse("ticket_message_create", args=[chamado.numero]), data={"texto": "Obrigado!"}
+        )
+        self.assertEqual(resposta.status_code, 302)
+
+    def test_complemento_da_pausa_so_aparece_para_quem_atendeu(self):
+        self.client.force_login(self.titular)
+        self.titular.groups.add(self.attendant_group)
+        outro = get_user_model().objects.create_user("carlos.tec", password="x")
+        outro.groups.add(self.attendant_group)
+
+        chamado = Chamado.objects.create(
+            numero="CH-000903", titulo="Play esquecido", status=Chamado.STATUS_ATRIBUIDO, atendente_atual=self.titular
+        )
+        agora = timezone.now()
+        minha = PausaAutomatica.objects.create(
+            atendimento=AtendimentoHistorico.objects.create(
+                chamado=chamado, atendente=self.titular, iniciado_em=agora, finalizado_em=agora
+            )
+        )
+        alheia = PausaAutomatica.objects.create(
+            atendimento=AtendimentoHistorico.objects.create(
+                chamado=chamado, atendente=outro, iniciado_em=agora, finalizado_em=agora
+            )
+        )
+
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["pausas", minha.pk])))
+        self.assertEqual(set(acoes), {"C"})
+        # A rota so aceita a pausa do proprio atendente: o painel nem oferece a tecla.
+        self.assertEqual(self._acoes(self.client.get(reverse("painel_registro", args=["pausas", alheia.pk]))), {})
+
+        resposta = self._post(acoes["C"]["url"], {"description": "Terminei a instalacao no dia seguinte."})
+        self.assertEqual(resposta.status_code, 200)
+        minha.refresh_from_db()
+        self.assertFalse(minha.pendente)
+        # Complementada, a acao sai do menu.
+        self.assertEqual(self._acoes(self.client.get(reverse("painel_registro", args=["pausas", minha.pk]))), {})
+
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+    def test_termo_do_emprestimo_sobe_pelo_seletor_de_arquivo(self):
+        self.client.force_login(self.titular)
+        emprestimo = EmprestimoTI.objects.create(
+            colaborador_nome="Zebedeu Teste", data_emprestimo="2026-08-10", criado_por=self.titular
+        )
+
+        # Sem termo gerado e sem assinado, so a acao de anexar faz sentido.
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
+        self.assertEqual(set(acoes), {"Y"})
+        self.assertEqual(acoes["Y"]["formato"], "arquivo")
+        self.assertEqual(acoes["Y"]["campo_arquivo"], "termo_assinado")
+
+        # O terminal manda o arquivo escolhido no computador pela mesma rota da tela.
+        envio = self.client.post(
+            acoes["Y"]["url"],
+            data={"termo_assinado": SimpleUploadedFile("termo.pdf", b"%PDF-1.4 assinado", content_type="application/pdf")},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(envio.status_code, 200)
+        emprestimo.refresh_from_db()
+        self.assertTrue(emprestimo.termo_assinado)
+
+        # Com o assinado no lugar, aparecem abrir (aba nova) e o OK da documentacao.
+        acoes = self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk])))
+        self.assertEqual(set(acoes), {"Y", "V", "K"})
+        self.assertEqual(acoes["V"]["formato"], "abrir")
+
+        self.assertEqual(self._post(acoes["K"]["url"]).status_code, 200)
+        emprestimo.refresh_from_db()
+        self.assertEqual(emprestimo.status, EmprestimoTI.STATUS_ASSINADA_OK)
+        # Dado o OK, a tecla sai do menu.
+        self.assertNotIn("K", self._acoes(self.client.get(reverse("painel_registro", args=["emprestimos", emprestimo.pk]))))
 
     def test_tabela_sem_acao_de_fluxo_mantem_o_novo_registro_generico(self):
         self.client.force_login(self.titular)
