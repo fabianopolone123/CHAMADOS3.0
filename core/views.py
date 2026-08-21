@@ -5293,6 +5293,7 @@ def _ler_dados_starlink(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def starlink_create_view(request):
     """Cadastra uma nova Starlink (TI/admin)."""
     if not _is_ti(request.user):
@@ -5311,6 +5312,7 @@ def starlink_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def starlink_update_view(request, starlink_id: int):
     """Edita uma Starlink existente (TI/admin)."""
     if not _is_ti(request.user):
@@ -5336,6 +5338,7 @@ def starlink_update_view(request, starlink_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def starlink_delete_view(request, starlink_id: int):
     """Exclui uma Starlink (TI/admin)."""
     if not _is_ti(request.user):
