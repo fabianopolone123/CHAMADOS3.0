@@ -4080,6 +4080,7 @@ def ramal_kaspersky_toggle_view(request, ramal_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def ramal_create_view(request):
     """Cadastra um novo ramal. O e-mail pode ser digitado ou escolhido entre as
     contas ja cadastradas. Notifica pelo toast classico e redireciona."""
@@ -4099,6 +4100,7 @@ def ramal_create_view(request):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def ramal_update_view(request, ramal_id: int):
     """Edita um ramal existente (TI/admin)."""
     if not _is_ti(request.user):
@@ -4124,6 +4126,7 @@ def ramal_update_view(request, ramal_id: int):
 
 @login_required
 @require_POST
+@json_quando_xhr
 def ramal_delete_view(request, ramal_id: int):
     """Exclui um ramal (TI/admin)."""
     if not _is_ti(request.user):
