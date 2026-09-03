@@ -8,6 +8,19 @@
     white-space: nowrap;
 }
 
+.ticket-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: center;
+}
+
+.ticket-delete-trigger {
+    font-weight: 700;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
 /* Badges de status reutilizaveis fora do modal. */
 .status-badge {
     display: inline-flex;

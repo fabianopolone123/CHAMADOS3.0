@@ -23,12 +23,14 @@
                 <h2 class="topbar-title">{{ chamado.titulo }}</h2>
                 <p class="topbar-subtitle">Abertura em {{ chamado.criado_em|date:"d/m/Y H:i" }} - Ultima atualizacao em {{ chamado.atualizado_em|date:"d/m/Y H:i" }}</p>
             </div>
-            <a href="{% if is_admin or is_attendant %}{% url 'tickets_dashboard' %}{% else %}{% url 'my_tickets' %}{% endif %}" class="btn btn-light portal-cta">Voltar</a>
-            {% if can_delete_ticket %}
-                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#ticketDeleteModal">
-                    Excluir chamado
-                </button>
-            {% endif %}
+            <div class="ticket-topbar-actions">
+                <a href="{% if is_admin or is_attendant %}{% url 'tickets_dashboard' %}{% else %}{% url 'my_tickets' %}{% endif %}" class="btn btn-light portal-cta">Voltar</a>
+                {% if can_delete_ticket %}
+                    <button type="button" class="btn btn-sm btn-danger ticket-delete-trigger" data-bs-toggle="modal" data-bs-target="#ticketDeleteModal">
+                        Excluir
+                    </button>
+                {% endif %}
+            </div>
         </header>
 
         <section class="portal-detail">
