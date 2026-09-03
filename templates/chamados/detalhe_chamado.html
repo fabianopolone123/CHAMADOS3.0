@@ -24,6 +24,14 @@
                 <p class="topbar-subtitle">Abertura em {{ chamado.criado_em|date:"d/m/Y H:i" }} - Ultima atualizacao em {{ chamado.atualizado_em|date:"d/m/Y H:i" }}</p>
             </div>
             <a href="{% if is_admin or is_attendant %}{% url 'tickets_dashboard' %}{% else %}{% url 'my_tickets' %}{% endif %}" class="btn btn-light portal-cta">Voltar</a>
+            {% if can_delete_ticket %}
+                <form method="post" action="{% url 'ticket_delete' numero=chamado.numero %}" class="ticket-delete-form" onsubmit="return confirm('Confirma excluir este chamado? Esta acao nao pode ser desfeita.');">
+                    {% csrf_token %}
+                    <label for="ticket-delete-reason">Motivo da exclusao (obrigatorio)</label>
+                    <textarea id="ticket-delete-reason" name="motivo" rows="3" minlength="3" maxlength="2000" required placeholder="Informe por que este chamado sera excluido."></textarea>
+                    <button type="submit" class="btn btn-danger">Excluir chamado</button>
+                </form>
+            {% endif %}
         </header>
 
         <section class="portal-detail">
