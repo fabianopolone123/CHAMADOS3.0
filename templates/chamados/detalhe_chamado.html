@@ -25,12 +25,9 @@
             </div>
             <a href="{% if is_admin or is_attendant %}{% url 'tickets_dashboard' %}{% else %}{% url 'my_tickets' %}{% endif %}" class="btn btn-light portal-cta">Voltar</a>
             {% if can_delete_ticket %}
-                <form method="post" action="{% url 'ticket_delete' numero=chamado.numero %}" class="ticket-delete-form" onsubmit="return confirm('Confirma excluir este chamado? Esta acao nao pode ser desfeita.');">
-                    {% csrf_token %}
-                    <label for="ticket-delete-reason">Motivo da exclusao (obrigatorio)</label>
-                    <textarea id="ticket-delete-reason" name="motivo" rows="3" minlength="3" maxlength="2000" required placeholder="Informe por que este chamado sera excluido."></textarea>
-                    <button type="submit" class="btn btn-danger">Excluir chamado</button>
-                </form>
+                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#ticketDeleteModal">
+                    Excluir chamado
+                </button>
             {% endif %}
         </header>
 
@@ -192,4 +189,28 @@
         </section>
     </section>
 </main>
+{% if can_delete_ticket %}
+    <div class="modal fade" id="ticketDeleteModal" tabindex="-1" aria-labelledby="ticketDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ticketDeleteModalLabel">Excluir chamado {{ chamado.numero }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form method="post" action="{% url 'ticket_delete' numero=chamado.numero %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <p>Esta acao nao pode ser desfeita. Informe o motivo da exclusao:</p>
+                        <label for="ticket-delete-reason" class="form-label">Motivo da exclusao</label>
+                        <textarea id="ticket-delete-reason" name="motivo" class="form-control" rows="4" minlength="3" maxlength="2000" required placeholder="Informe por que este chamado sera excluido."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Confirmar exclusao</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endif %}
 {% endblock %}
