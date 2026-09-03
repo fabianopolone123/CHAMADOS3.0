@@ -113,6 +113,28 @@ class Chamado(models.Model):
         return dict(self.PRIORIDADE_CHOICES).get(self.prioridade, self.prioridade or "-")
 
 
+class ChamadoExclusaoLog(models.Model):
+    chamado_numero = models.CharField(max_length=30)
+    chamado_titulo = models.CharField(max_length=255)
+    motivo = models.TextField()
+    excluido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="exclusoes_de_chamados",
+    )
+    excluido_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-excluido_em", "-id"]
+        verbose_name = "Exclusao de chamado"
+        verbose_name_plural = "Exclusoes de chamados"
+
+    def __str__(self) -> str:
+        return f"{self.chamado_numero} - exclusao em {self.excluido_em:%d/%m/%Y %H:%M}"
+
+
 def anexo_upload_path(instance, filename):
     """Organiza os anexos por chamado dentro de MEDIA_ROOT."""
     numero = instance.chamado.numero or "sem-numero"

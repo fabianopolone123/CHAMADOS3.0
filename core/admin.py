@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     AssinaturaResponsavelTI,
+    ChamadoExclusaoLog,
     ContaEmail,
     CofreAuditoria,
     CofreConfig,
@@ -33,6 +34,14 @@ from .models import (
     SuborcamentoContrato,
     SuborcamentoDocumento,
 )
+
+
+@admin.register(ChamadoExclusaoLog)
+class ChamadoExclusaoLogAdmin(admin.ModelAdmin):
+    list_display = ("chamado_numero", "chamado_titulo", "excluido_por", "excluido_em")
+    search_fields = ("chamado_numero", "chamado_titulo", "motivo", "excluido_por__username")
+    list_filter = ("excluido_em",)
+    readonly_fields = ("chamado_numero", "chamado_titulo", "motivo", "excluido_por", "excluido_em")
 
 
 class OrcamentoDocumentoInline(admin.TabularInline):

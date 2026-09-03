@@ -974,9 +974,11 @@
                     desenharStatus();
                     return;
                 }
-                pedirConfirmacao(`EXCLUIR ${String(estado.dados.titulo || "").toUpperCase()}? NAO TEM VOLTA.`, () => {
+                const excluir = (motivo = "") => {
                     estado.ocupado = true;
-                    enviar(url(URLS.registroExcluir, estado.contexto.tabela, estado.contexto.pk), {})
+                    enviar(url(URLS.registroExcluir, estado.contexto.tabela, estado.contexto.pk), {
+                        motivo,
+                    })
                         .then((dados) => {
                             estado.ocupado = false;
                             avisar((dados.message || "EXCLUIDO.").toUpperCase(), "ok");
@@ -986,7 +988,27 @@
                             estado.ocupado = false;
                             falhar(erro);
                         });
-                });
+                };
+                const confirmarExclusao = () => {
+                    if (estado.contexto.tabela === "chamados") {
+                        pedirTexto("MOTIVO DA EXCLUSAO (OBRIGATORIO)", "", (motivo) => {
+                            if (motivo.trim().length < 3) {
+                                avisar("INFORME UM MOTIVO COM PELO MENOS 3 CARACTERES.", "erro");
+                                return;
+                            }
+                            pedirConfirmacao(
+                                `EXCLUIR ${String(estado.dados.titulo || "").toUpperCase()}? NAO TEM VOLTA.`,
+                                () => excluir(motivo.trim())
+                            );
+                        }, true, "DESCREVA POR QUE O CHAMADO SERA EXCLUIDO.");
+                        return;
+                    }
+                    excluir();
+                };
+                pedirConfirmacao(
+                    `EXCLUIR ${String(estado.dados.titulo || "").toUpperCase()}? NAO TEM VOLTA.`,
+                    confirmarExclusao
+                );
                 return;
             }
             return false;

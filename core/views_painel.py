@@ -27,7 +27,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.management import call_command
-from django.db import connection
+from django.db import connection, transaction
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -40,6 +40,7 @@ from .menu import ITEM_POR_CHAVE, itens_menu_para_painel
 from .models import (
     AtendimentoHistorico,
     Chamado,
+    ChamadoExclusaoLog,
     ItemMenuConfig,
     PainelAuditoria,
     PausaAutomatica,
@@ -482,8 +483,22 @@ def painel_registro_excluir_view(request, chave: str, pk: str):
     tabela = painel_dados.TABELA_POR_CHAVE.get(chave)
     if not tabela:
         return _erro("Tabela inexistente.", status=404)
+    motivo = ""
+    if chave == "chamados":
+        motivo = str(_payload(request).get("motivo") or "").strip()
+        if len(motivo) < 3:
+            return _erro("Informe o motivo da exclusao do chamado (minimo de 3 caracteres).")
     try:
-        rotulo = painel_dados.excluir(tabela, pk)
+        with transaction.atomic():
+            objeto = tabela.modelo.objects.get(pk=pk)
+            if chave == "chamados":
+                ChamadoExclusaoLog.objects.create(
+                    chamado_numero=objeto.numero,
+                    chamado_titulo=objeto.titulo,
+                    motivo=motivo,
+                    excluido_por=request.user,
+                )
+            rotulo = painel_dados.excluir(tabela, pk)
     except ObjectDoesNotExist:
         return _erro("Registro nao encontrado.", status=404)
     except ValidationError as exc:
