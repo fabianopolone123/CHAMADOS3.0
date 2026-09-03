@@ -86,7 +86,6 @@ from .permissions import (
     ensure_user_permission_defaults,
     is_admin_user,
     is_attendant_user,
-    is_titular_user,
 )
 from .xhr import json_quando_xhr
 
@@ -1449,7 +1448,7 @@ def ticket_detail_view(request, numero: str):
         "is_owner": chamado.solicitante_id == request.user.id,
         "is_admin": is_admin_user(request.user),
         "is_attendant": is_attendant_user(request.user),
-        "can_delete_ticket": is_titular_user(request.user),
+        "can_delete_ticket": is_admin_user(request.user) or is_attendant_user(request.user),
         "can_view_history": pode_ver_todos,
     }
     return render(request, "chamados/detalhe_chamado.html", context)
@@ -1459,8 +1458,8 @@ def ticket_detail_view(request, numero: str):
 @require_POST
 def ticket_delete_view(request, numero: str):
     chamado = get_object_or_404(Chamado, numero=numero)
-    if not is_titular_user(request.user):
-        messages.error(request, "Apenas o administrador principal pode excluir chamados.")
+    if not (is_admin_user(request.user) or is_attendant_user(request.user)):
+        messages.error(request, "Apenas usuarios da TI podem excluir chamados.")
         return redirect("ticket_detail", numero=chamado.numero)
 
     motivo = (request.POST.get("motivo") or "").strip()
