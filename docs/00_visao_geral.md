@@ -18,6 +18,7 @@ Centralizar a abertura e o acompanhamento de chamados tecnicos, com foco em padr
 - Controle de tempo por atendimento (iniciar, pausar, finalizar) e tela de historico
 - Planilha mensal de atendimentos por atendente (.xlsx no modelo que a TI ja usava), baixada pelo botao na coluna do Kanban: uma linha por periodo Play -> Pause/Stop
 - Portal do solicitante: abertura, listagem e detalhe dos proprios chamados, com anexos
+- Exclusao de chamado pela TI no detalhe do chamado, com motivo obrigatorio registrado em `ChamadoExclusaoLog`
 - Modulo Requisicoes (apenas TI/admin): requisicoes com orcamentos e suborcamentos (complementos), com foto do produto, documentos anexos, captura de print, calculo de totais e pesquisa inteligente que filtra a lista a cada tecla por qualquer dado da requisicao
 - Modulo Insumos (apenas TI/admin): controle simples de estoque de materiais de TI com cadastro, retirada com baixa de estoque e historico de retiradas
 - Modulo Documentos (apenas TI/admin): cadastro e armazenamento de documentos internos com nome, observacao e anexos multiplos

@@ -156,6 +156,18 @@ Eventos registrados atualmente:
 - Complemento da pausa (`complemento_pausa`, migration `0049`): "Complemento da pausa automatica por X: <o que foi feito>"
 - Encerramento sem atendimento ativo (`encerramento_direto`, migration `0044`): "Chamado finalizado por X sem atendimento ativo (estava em Aguardando peca). O que foi feito: ..." — usado quando um chamado parado em "aguardando" e fechado direto pelo Stop, sem Play. Como esse fechamento nao cria periodo em `AtendimentoHistorico`, o tipo proprio permite mostra-lo tambem no "Andamento do atendimento" do detalhe do chamado.
 
+### ChamadoExclusaoLog
+
+Registro de cada chamado excluido (migration `0054`). Guarda numero e titulo **como texto**, sem FK para `Chamado`, para sobreviver a exclusao. Registrado no admin como somente leitura ("Exclusoes de chamados").
+
+| Campo | Tipo | Observacao |
+| --- | --- | --- |
+| `chamado_numero` | CharField(30) | Numero do chamado excluido (ex.: `CH-000812`) |
+| `chamado_titulo` | CharField(255) | Titulo no momento da exclusao |
+| `motivo` | TextField | Motivo informado (obrigatorio, 3 a 2000 caracteres) |
+| `excluido_por` | FK User (SET_NULL) | Quem excluiu |
+| `excluido_em` | DateTimeField(auto_now_add) | Ordenacao `-excluido_em` |
+
 ### ChamadoAnexo
 
 Armazena os arquivos anexados a um chamado no momento da abertura pelo portal do solicitante.

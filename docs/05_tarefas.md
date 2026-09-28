@@ -8,7 +8,12 @@
 
 - Os 757 chamados migrados estao com `criado_em`/`fechado_em` **3 horas adiantados**: a migracao original leu as datas do banco antigo (naive em UTC) como hora local. Afeta o "Aberto em" do Kanban e o modal de fechados; a planilha de atendimentos nao e afetada. Corrigir exige um `update` de -3h nesses 757 registros.
 
+- **Exclusao de chamado apaga o tempo trabalhado**: por causa do `CASCADE` de `AtendimentoHistorico`, excluir um chamado tira os periodos dele das planilhas mensais ja fechadas. Avaliar exclusao logica (marcar como excluido) se isso virar problema.
+- A exclusao de chamado ainda nao tem testes automatizados.
+
 ## Concluidas
+
+- **Exclusao de chamado com motivo obrigatorio**: botao no detalhe (TI/admin) com modal de motivo, rota `POST /meus-chamados/<numero>/excluir/`, motivo tambem exigido no Painel do Titular e log `ChamadoExclusaoLog` (migration `0054`)
 
 - **API para sistemas de fora**: token por cabecalho valendo em qualquer rota (escrita usa as rotas da tela, com as mesmas regras), leitura generica em `/api/v1/tabelas/...`, arquivos pela propria API; `core/api.py`, model `TokenApi` (migration `0053`), comando `criar_token_api`, `docs/09_api.md`
 

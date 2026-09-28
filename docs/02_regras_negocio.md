@@ -84,7 +84,7 @@ O sistema possui autenticacao corporativa via Active Directory/LDAP e uma interf
 7. **Chamado encerrado direto pelo Stop (sem Play) nao gera linha**, porque nao existe periodo de atendimento (ver regra 10b do controle de tempo). O mesmo vale para chamado aberto no mes que nunca recebeu Play: a planilha e um registro de **tempo trabalhado**, nao de chamados abertos.
 8. Qualquer Atendente TI/Admin pode baixar a planilha de **qualquer** atendente (o botao aparece em todas as colunas). E uma diferenca intencional em relacao a tela de Historico, que mostra ao atendente apenas os proprios registros.
 9. A planilha e gerada **ao vivo** a partir do banco: se um chamado for editado depois, uma nova baixa do mesmo mes sai diferente. O arquivo baixado (que a TI salva na pasta do mes) e o registro definitivo daquele fechamento.
-10. Nao existe hoje exclusao de chamado pela aplicacao (nao ha rota nem registro no admin do Django). Se ela for criada algum dia, `AtendimentoHistorico` tem `on_delete=CASCADE` para `chamado` **e** para `atendente`: apagar um chamado ou um usuario apagaria tambem os periodos de atendimento e mudaria retroativamente as planilhas dos meses ja fechados.
+10. **Excluir um chamado muda as planilhas ja geradas.** A exclusao existe desde 03/09/2026 (ver "Regras atuais da exclusao de chamado") e `AtendimentoHistorico` tem `on_delete=CASCADE` para `chamado` **e** para `atendente`: apagar um chamado (ou um usuario) apaga tambem os periodos de atendimento, e uma nova baixa de um mes ja fechado sai sem aquelas linhas. O arquivo salvo na pasta do mes continua sendo o registro definitivo.
 
 ## Atendimentos importados do sistema antigo
 
@@ -173,6 +173,7 @@ Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem
   - tabelas marcadas como somente leitura (eventos de chamado, auditorias, Cofre) nao aceitam alteracao nem exclusao;
   - o valor digitado segue o padrao brasileiro: data `DD/MM/AAAA`, data e hora `DD/MM/AAAA HH:MM`, booleano `S`/`N`, vinculo pelo ID do registro.
 - **Operacao**: mostra o estado do servidor (Python/Django, banco, migracoes, tamanho do `media`, DEBUG, hora), os atendimentos com Play em aberto, as pausas sem complemento e a trilha do painel; executa `pausar_expediente` (com confirmacao) e sua simulacao, `clearsessions` e o `check` do Django.
+- **Excluir chamado** pelo painel pede primeiro o **motivo** (obrigatorio, minimo de 3 caracteres, conferido tambem no backend) e grava `ChamadoExclusaoLog` junto com a exclusao.
 - Acoes destrutivas pedem confirmacao S/N e a confirmacao ignora teclas nos primeiros instantes, para que uma digitacao rapida nao confirme sozinha.
 
 ## Regras atuais de permissao
@@ -195,6 +196,16 @@ Os modulos **Contatos** e **Kaspersky** foram removidos em 30/07/2026 para serem
 8. O usuario comum visualiza e acessa apenas os chamados que ele mesmo abriu.
 9. Administrador e Atendente TI podem acessar o detalhe de qualquer chamado.
 10. A tela de detalhe exibe a timeline real dos periodos de atendimento registrados no chamado.
+
+## Regras atuais da exclusao de chamado
+
+1. O detalhe do chamado (`/meus-chamados/<numero>/`) mostra o botao **Excluir** (pequeno, no cabecalho) **apenas para Atendente TI/Admin**. Usuario comum nao ve o botao e a rota recusa o pedido dele no backend.
+2. O botao abre um **modal** que pede o **motivo da exclusao**, obrigatorio (minimo de 3 e maximo de 2000 caracteres, validado no navegador e no backend). Sem motivo valido o chamado nao e excluido e o usuario volta ao detalhe com a mensagem de erro.
+3. A exclusao e `POST` com CSRF (`/meus-chamados/<numero>/excluir/`) e, na mesma transacao, grava um registro em `ChamadoExclusaoLog` (numero, titulo, motivo, quem excluiu e quando) e apaga o chamado. O registro fica mesmo depois de o chamado sumir, porque guarda numero e titulo como texto, sem vinculo.
+4. Apagar o chamado apaga **em cascata** anexos, mensagens (e os anexos delas), eventos da linha do tempo e os **periodos de atendimento** (`AtendimentoHistorico`) — o que muda retroativamente a planilha mensal (regra 10 da planilha).
+5. Depois de excluir, o usuario vai para o Kanban com a mensagem de sucesso.
+6. Pelo **Painel do Titular**, excluir um registro da tabela **Chamados** tambem exige o motivo (o terminal pede o texto antes da confirmacao S/N) e grava o mesmo `ChamadoExclusaoLog`, alem da `PainelAuditoria`.
+7. O log e consultado no admin do Django (**Exclusoes de chamados**), somente leitura.
 
 ## Regras atuais das pendencias (Kanban)
 

@@ -24,6 +24,7 @@
 | `/meus-chamados/novo/` | GET, POST | Abertura de chamado pelo usuario comum | Implementada |
 | `/meus-chamados/<numero>/` | GET | Detalhe do chamado com conversa, anexos, historico tecnico (recolhido) e timeline de atendimentos | Implementada |
 | `/meus-chamados/<numero>/mensagens/` | POST | Envia uma mensagem na conversa do chamado, com anexos opcionais | Implementada |
+| `/meus-chamados/<numero>/excluir/` | POST | Exclui o chamado com motivo obrigatorio e grava `ChamadoExclusaoLog` (apenas TI/admin) | Implementada |
 | `/meus-chamados/<numero>/anexo/<anexo_id>/` | GET | Download protegido de anexo do chamado (solicitante ou TI/admin) | Implementada |
 | `/meus-chamados/<numero>/mensagens/anexo/<anexo_id>/` | GET | Download protegido de anexo de mensagem (solicitante ou TI/admin) | Implementada |
 | `/contratos/` | GET | Modulo Requisicoes (exibido como "Requisicoes"; rota mantem o prefixo tecnico): lista de requisicoes (codigo + titulo + status) com pesquisa inteligente e botao "+ Adicionar" (apenas TI/admin) | Implementada |
@@ -187,6 +188,14 @@
 - Uma mensagem precisa ter texto ou pelo menos um anexo; caso contrario retorna ao detalhe com mensagem de erro.
 - Cada envio cria a mensagem (e seus anexos) e registra um evento resumido em `ChamadoEvento` (tipo `comentario`), sem duplicar o texto da conversa.
 - Apos o envio, o usuario e redirecionado de volta ao detalhe do chamado com notificacao de sucesso.
+
+## Regras da exclusao de chamado
+
+- `/meus-chamados/<numero>/excluir/` exige `login_required`, aceita apenas `POST` (`require_POST`) e usa CSRF.
+- So Atendente TI/Admin excluem; usuario comum volta ao detalhe com mensagem de erro e nada e apagado.
+- O campo `motivo` e obrigatorio (3 a 2000 caracteres); o log e o `delete` rodam na mesma transacao.
+- Sucesso redireciona para o Kanban (`tickets_dashboard`) com mensagem de sucesso.
+- No painel, `POST` de exclusao na tabela `chamados` exige `motivo` no corpo JSON (`400` sem ele).
 
 ## Regras do modal de chamados fechados
 
